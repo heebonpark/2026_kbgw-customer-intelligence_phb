@@ -9,6 +9,7 @@ import webbrowser
 sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
 from core.handlers import process_and_merge, load_data
 from core.report import generate_html_report
+from core.matching_config import load_matching_config
 
 class DataIntelGUI:
     def __init__(self, root):
@@ -120,7 +121,8 @@ class DataIntelGUI:
                     files_dict[key] = None
                     
             self.log("데이터 병합 처리를 진행합니다...")
-            merged_df, branch_stats, msg = process_and_merge(files_dict)
+            matching_config = load_matching_config()
+            merged_df, msg, match_report = process_and_merge(files_dict, matching_config)
             
             if merged_df is None:
                 self.log(f"병합 실패: {msg}")
