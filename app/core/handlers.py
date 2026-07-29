@@ -110,6 +110,19 @@ def _has_title_row(columns):
     return unnamed >= len(cols) - 2
 
 
+def _strip_invisible_whitespace(series):
+    """Strips \\xa0 (non-breaking space) and surrounding whitespace from any
+    string cells. Excel exports routinely embed \\xa0 in date/time columns
+    (e.g. '14:30\\xa0'); pandas' pd.to_datetime() format-guessing tries to
+    encode strings with the OS locale codec while inspecting them, and on a
+    Windows machine whose locale codec is cp949 that raises UnicodeEncodeError
+    -- not just on print(), on the parse itself. Cleaning the string first
+    avoids hitting that path at all."""
+    if series.dtype != object:
+        return series
+    return series.apply(lambda v: v.replace('\xa0', ' ').strip() if isinstance(v, str) else v)
+
+
 def load_data(file_path, is_csv=False):
     if file_path is None: return None
     try:
@@ -176,7 +189,7 @@ def _merge_aggregate(merged_df, file_df, conditions, display_cols, prefix, date_
     counts = sub.groupby(file_cols, dropna=False).size().rename(count_col).reset_index()
 
     if date_col:
-        sub['_dt'] = pd.to_datetime(sub[date_col], errors='coerce')
+        sub['_dt'] = pd.to_datetime(_strip_invisible_whitespace(sub[date_col]), errors='coerce')
         # Stable sort with NaT first: within each group the max-dated row ends
         # up last; a group with no dated rows at all keeps its original file
         # order (stable sort), so its last row wins -- matching report.py's
