@@ -908,6 +908,14 @@ def find_unregistered_high_value_cancellations(cancelled_facility_df, cancel_df,
             if pd.isna(v):
                 row[k] = None
 
+    status_values = sorted(view['계약상태(중)'].dropna().unique().tolist()) if '계약상태(중)' in view.columns else []
+
+    by_branch = []
+    if '지사' in view.columns:
+        for name, g in view.groupby('지사'):
+            by_branch.append({"지사": str(name), "건수": int(len(g)), "월정료합계": int(g['월정료'].sum())})
+        by_branch.sort(key=lambda r: -r['월정료합계'])
+
     return {
         "active": True,
         "threshold": threshold,
@@ -916,4 +924,6 @@ def find_unregistered_high_value_cancellations(cancelled_facility_df, cancel_df,
         "amount_sum": float(unregistered['_amount'].sum()) if len(unregistered) else 0.0,
         "rows": rows,
         "columns": list(display_cols.values()),
+        "status_values": status_values,
+        "by_branch": by_branch,
     }

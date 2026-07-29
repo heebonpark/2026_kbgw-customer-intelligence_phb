@@ -795,7 +795,10 @@ def render_nudge_section(cancelled_facility_df, cancel_df, threshold=100_000):
         </div>
         </details>"""
 
-    table_html = render_simple_table(nudge.get('columns') or ['계약번호', '고객상호', '본부', '지사', '월정료'], nudge['rows'])
+    columns = nudge.get('columns') or ['계약번호', '고객상호', '본부', '지사', '월정료']
+    table_html = _nudge_table_html(columns, nudge['rows'])
+    filter_html = _nudge_status_filter_html(nudge.get('status_values') or [])
+    branch_summary_html = _nudge_branch_summary_html(nudge.get('by_branch') or [])
 
     return f"""
     <details class="section-collapse" open><summary class="section-title">고액 해지 미등록 알림</summary>
@@ -804,12 +807,67 @@ def render_nudge_section(cancelled_facility_df, cancel_df, threshold=100_000):
         <strong>{nudge['count']:,}건({_fmt_won(nudge['amount_sum'])})이 해지 파이프라인에 미등록</strong> 상태입니다.
         아래 목록을 해지 파이프라인에 등록하도록 담당자에게 독려하세요.
     </div>
+    {filter_html}
+    <div class="stat-grid" id="nudgeBranchSummary">{branch_summary_html}</div>
     <div class="table-section">{table_html}</div>
     </details>"""
 
 
 def _fmt_won(v):
     return f"{v:,.0f}원"
+
+
+def _nudge_table_html(columns, rows):
+    """Like render_simple_table, but each <tr> also carries data-status/
+    data-branch/data-amount so applyNudgeFilter() (vanilla JS, no server
+    round-trip) can filter by 계약상태(중) and recompute the 지사별 요약
+    tiles above it without needing this section wired into the big
+    filter/recompute engine the rest of the report uses."""
+    thead = "".join(f"<th>{_e(c)}</th>" for c in columns)
+    body_rows = []
+    for r in rows:
+        status = r.get('계약상태(중)') or ''
+        branch = r.get('지사') or ''
+        amount = r.get('월정료')
+        attrs = f' data-status="{_e(status)}" data-branch="{_e(branch)}" data-amount="{amount if amount is not None else 0}"'
+        cells = []
+        for c in columns:
+            v = r.get(c)
+            if v is None:
+                cells.append('<td class="cell-empty">-</td>')
+            elif c == '월정료':
+                cells.append(f'<td class="cell-num">{v:,.0f}</td>')
+            else:
+                cells.append(f"<td>{_e(v)}</td>")
+        body_rows.append(f"<tr{attrs}>{''.join(cells)}</tr>")
+    return f"""
+    <div class="table-scroll">
+        <table id="nudgeTable">
+            <thead><tr>{thead}</tr></thead>
+            <tbody>{"".join(body_rows)}</tbody>
+        </table>
+    </div>"""
+
+
+def _nudge_status_filter_html(status_values):
+    if not status_values:
+        return ""
+    buttons = ['<button class="filter-pill active" type="button" data-value="">전체</button>']
+    for v in status_values:
+        buttons.append(f'<button class="filter-pill" type="button" data-value="{_e(v)}">{_e(v)}</button>')
+    return f'<div class="filter-pill-row" id="nudgeStatusFilterRow">{"".join(buttons)}</div>'
+
+
+def _nudge_branch_summary_html(by_branch):
+    tiles = []
+    for r in by_branch:
+        tiles.append(f"""
+        <div class="stat-tile">
+            <div class="stat-label">{_e(r['지사'])}</div>
+            <div class="stat-value">{r['건수']:,}건</div>
+            <div class="stat-sub">{r['월정료합계']:,}원</div>
+        </div>""")
+    return "".join(tiles)
 
 
 def render_eda_section_body(eda, section_id="edaSection"):
@@ -1396,6 +1454,57 @@ function attachFilterListeners() {
     applyFilters();
 }
 document.addEventListener('DOMContentLoaded', attachFilterListeners);
+
+// ===== 고액 해지 미등록 알림 -- 계약상태(중) 필터 + 지사별 요약 =====
+function applyNudgeFilter(value) {
+    const rows = document.querySelectorAll('#nudgeTable tbody tr');
+    const branchTotals = new Map();
+    rows.forEach(row => {
+        const show = !value || row.dataset.status === value;
+        row.style.display = show ? '' : 'none';
+        if (show) {
+            const branch = row.dataset.branch || '미상';
+            const amount = Number(row.dataset.amount) || 0;
+            if (!branchTotals.has(branch)) branchTotals.set(branch, { count: 0, amount: 0 });
+            const t = branchTotals.get(branch);
+            t.count += 1;
+            t.amount += amount;
+        }
+    });
+    const summaryEl = document.getElementById('nudgeBranchSummary');
+    if (!summaryEl) return;
+    summaryEl.innerHTML = '';
+    const sorted = Array.from(branchTotals, ([label, t]) => ({ label, count: t.count, amount: t.amount }))
+        .sort((a, b) => b.amount - a.amount);
+    sorted.forEach(r => {
+        const tile = document.createElement('div');
+        tile.className = 'stat-tile';
+        const labelEl = document.createElement('div');
+        labelEl.className = 'stat-label';
+        labelEl.textContent = r.label;
+        const valueEl = document.createElement('div');
+        valueEl.className = 'stat-value';
+        valueEl.textContent = r.count.toLocaleString('ko-KR') + '건';
+        const subEl = document.createElement('div');
+        subEl.className = 'stat-sub';
+        subEl.textContent = r.amount.toLocaleString('ko-KR') + '원';
+        tile.appendChild(labelEl); tile.appendChild(valueEl); tile.appendChild(subEl);
+        summaryEl.appendChild(tile);
+    });
+}
+function wireNudgeFilter() {
+    const row = document.getElementById('nudgeStatusFilterRow');
+    if (!row) return;
+    row.addEventListener('click', (e) => {
+        const btn = e.target.closest('.filter-pill');
+        if (!btn) return;
+        row.querySelectorAll('.filter-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        applyNudgeFilter(btn.dataset.value || '');
+    });
+    applyNudgeFilter('');
+}
+document.addEventListener('DOMContentLoaded', wireNudgeFilter);
 
 // ===== Client-side matching + dashboard engine =====
 // Mirrors app/core/handlers.py (apply_matching/process_and_merge) and
