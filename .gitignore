@@ -1,0 +1,15 @@
+# Data files
+*.xlsx
+*.xls
+*.csv
+*.json
+
+# Generated reports
+*.html
+
+# Python cache
+__pycache__/
+*.pyc
+
+# OS generated files
+.DS_Store
