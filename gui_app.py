@@ -1,14 +1,47 @@
-import tkinter as tk
-from tkinter import filedialog, messagebox
-from tkinter import ttk
 import os
 import sys
-import webbrowser
 import warnings
+
+
+class _SafeStream:
+    """Absorbs writes when there's no real console to write to."""
+    def write(self, *a, **k): pass
+    def flush(self, *a, **k): pass
+    def isatty(self): return False
+
+
+def _make_streams_safe():
+    """Windows .exe builds made with `pyinstaller --windowed` have no console,
+    so sys.stdout/sys.stderr are either None (any print() raises
+    AttributeError) or a stub stream whose encoding falls back to the
+    Windows locale codec (cp949 etc), which can't encode characters like
+    \xa0 that show up in pandas/openpyxl warning text -- any print() of
+    those then raises UnicodeEncodeError. This runs before any other import
+    so every print() and warning in the app (and in pandas/openpyxl) is safe
+    regardless of which of those two situations we're in."""
+    for name in ('stdout', 'stderr'):
+        stream = getattr(sys, name)
+        if stream is None:
+            setattr(sys, name, _SafeStream())
+            continue
+        if hasattr(stream, 'reconfigure'):
+            try:
+                stream.reconfigure(encoding='utf-8', errors='replace')
+            except Exception:
+                setattr(sys, name, _SafeStream())
+
+
+_make_streams_safe()
 
 # Suppress all warnings to prevent UnicodeEncodeError in PyInstaller
 # when Pandas tries to print warnings containing \xa0 to sys.stderr on Windows
 warnings.filterwarnings("ignore")
+
+import tkinter as tk
+from tkinter import filedialog, messagebox
+from tkinter import ttk
+import webbrowser
+import traceback
 
 # Ensure we can import from app.core
 sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
@@ -20,7 +53,7 @@ class DataIntelGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Data Intel PRO - Admin Uploader")
-        self.root.geometry("750x600")
+        self.root.geometry("750x680")
         self.root.configure(padx=20, pady=20)
         
         # Style configuration for ttk
@@ -35,7 +68,8 @@ class DataIntelGUI:
             'patrol': tk.StringVar(),
             'cancel': tk.StringVar(),
             'original': tk.StringVar(),
-            'facility': tk.StringVar()
+            'facility': tk.StringVar(),
+            'cancelled_facility': tk.StringVar(),
         }
         
         self.report_password = tk.StringVar()
@@ -57,7 +91,8 @@ class DataIntelGUI:
             ("3. 월/일일 SE,SG 정기점검:", 'patrol'),
             ("4. 월 해지파이프라인:", 'cancel'),
             ("5. 2026년 관리고객원본:", 'original'),
-            ("6. 시설현황 (csv):", 'facility')
+            ("6. 시설현황 (csv):", 'facility'),
+            ("7. 해지시설 내역 (고액 미등록 알림용):", 'cancelled_facility'),
         ]
         
         for i, (label_text, key) in enumerate(fields):
@@ -70,16 +105,17 @@ class DataIntelGUI:
             btn = ttk.Button(frame, text="찾아보기", command=lambda k=key: self.browse_file(k))
             btn.grid(row=i, column=2, pady=10)
             
-        # Add password and expiry inputs
+        # Add password and expiry inputs (rows come after the file fields above)
+        next_row = len(fields)
         pwd_lbl = tk.Label(frame, text="★사용자 비밀번호 (빈칸=랜덤):", width=32, anchor="w", font=("Helvetica", 12))
-        pwd_lbl.grid(row=6, column=0, pady=10, sticky="w")
+        pwd_lbl.grid(row=next_row, column=0, pady=10, sticky="w")
         pwd_ent = tk.Entry(frame, textvariable=self.report_password, width=40, font=("Helvetica", 11))
-        pwd_ent.grid(row=6, column=1, pady=10, padx=10)
-        
+        pwd_ent.grid(row=next_row, column=1, pady=10, padx=10)
+
         exp_lbl = tk.Label(frame, text="★리포트 만료일 (YYYY-MM-DD):", width=32, anchor="w", font=("Helvetica", 12))
-        exp_lbl.grid(row=7, column=0, pady=10, sticky="w")
+        exp_lbl.grid(row=next_row + 1, column=0, pady=10, sticky="w")
         exp_ent = tk.Entry(frame, textvariable=self.report_expiry, width=40, font=("Helvetica", 11))
-        exp_ent.grid(row=7, column=1, pady=10, padx=10)
+        exp_ent.grid(row=next_row + 1, column=1, pady=10, padx=10)
             
         self.run_btn = ttk.Button(self.root, text="데이터 병합 및 리포트 생성 실행", 
                                  style="Action.TButton", command=self.run_process)
@@ -145,9 +181,9 @@ class DataIntelGUI:
                 voc_df=files_dict.get('voc'),
                 patrol_df=files_dict.get('patrol'),
                 cancel_df=files_dict.get('cancel'),
-                cancelled_facility_df=files_dict.get('facility') if files_dict.get('facility') is not None else None, # For now
+                cancelled_facility_df=files_dict.get('cancelled_facility'),
                 raw_files=files_dict,
-                matching_config=None,
+                matching_config=matching_config,
                 password=pwd_val,
                 expiry_date=exp_val
             )
@@ -171,7 +207,8 @@ class DataIntelGUI:
             webbrowser.open(f"file://{output_path}")
             
         except Exception as e:
-            self.log(f"예기치 않은 오류 발생: {str(e)}")
+            tb = traceback.format_exc()
+            self.log(f"예기치 않은 오류 발생: {str(e)}\n\n[상세 오류 내역]\n{tb}")
             messagebox.showerror("오류", f"실행 중 오류가 발생했습니다: {str(e)}")
         finally:
             self.run_btn.config(state=tk.NORMAL)

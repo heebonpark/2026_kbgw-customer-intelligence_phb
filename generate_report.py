@@ -1,6 +1,17 @@
 import os
 import sys
 
+# Windows terminals often default to the cp949 code page, which can't encode
+# characters like \xa0 that show up in pandas/openpyxl warning text -- without
+# this, print()ing such a message crashes with UnicodeEncodeError instead of
+# showing the actual message.
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, 'reconfigure'):
+        try:
+            _stream.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass
+
 # Add the app directory to the path so we can import core modules
 sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
 
