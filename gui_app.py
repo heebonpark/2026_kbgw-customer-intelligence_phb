@@ -137,7 +137,12 @@ class DataIntelGUI:
         scrollbar = ttk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
         self.scroll_frame = tk.Frame(canvas, bg=BG)
         self.scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
-        canvas.create_window((0, 0), window=self.scroll_frame, anchor="nw")
+        canvas_window = canvas.create_window((0, 0), window=self.scroll_frame, anchor="nw")
+        # A canvas-embedded window keeps its own natural (minimum) width by
+        # default -- without this, the cards below stay pinned to a narrow
+        # width and the rest of the canvas just sits empty. Re-stretch the
+        # frame to the canvas's actual width on every resize instead.
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig(canvas_window, width=e.width))
         canvas.configure(yscrollcommand=scrollbar.set)
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -201,6 +206,7 @@ class DataIntelGUI:
         return tk.Frame(parent, bg=CARD_BG, highlightbackground=BORDER, highlightthickness=1)
 
     def _build_file_card(self, parent, label_text, tag_text, key):
+        is_required = tag_text.startswith("필수")
         card = self._card(parent)
         card.pack(fill=tk.X, pady=5, padx=2)
 
@@ -208,8 +214,8 @@ class DataIntelGUI:
         row1.pack(fill=tk.X, padx=12, pady=(10, 4))
         tk.Label(row1, text=label_text, bg=CARD_BG, fg=TEXT_DARK,
                  font=("Helvetica", 11, "bold")).pack(side=tk.LEFT)
-        tk.Label(row1, text=f"  ({tag_text})", bg=CARD_BG, fg=TEXT_MUTED,
-                 font=("Helvetica", 9)).pack(side=tk.LEFT)
+        tk.Label(row1, text=f"  ({tag_text})", bg=CARD_BG, fg=("#dc2626" if is_required else TEXT_MUTED),
+                 font=("Helvetica", 9, "bold" if is_required else "normal")).pack(side=tk.LEFT)
 
         row2 = tk.Frame(card, bg=CARD_BG)
         row2.pack(fill=tk.X, padx=12, pady=(0, 4))
