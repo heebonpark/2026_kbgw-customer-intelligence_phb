@@ -795,7 +795,7 @@ def render_nudge_section(cancelled_facility_df, cancel_df, threshold=100_000):
         </div>
         </details>"""
 
-    table_html = render_simple_table(['계약번호', '고객상호', '본부', '지사', '월정료'], nudge['rows'])
+    table_html = render_simple_table(nudge.get('columns') or ['계약번호', '고객상호', '본부', '지사', '월정료'], nudge['rows'])
 
     return f"""
     <details class="section-collapse" open><summary class="section-title">고액 해지 미등록 알림</summary>

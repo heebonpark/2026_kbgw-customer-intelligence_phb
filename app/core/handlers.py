@@ -61,15 +61,24 @@ def _normalize_branch_raw(val):
     return re.sub(r'지사$', '', str(val).strip())
 
 
+def _clean_amount_string(series):
+    """Strips thousands-separator commas and any non-numeric junk (원, spaces)
+    while KEEPING the decimal point. Stripping the point too (the old regex
+    was r'[^\d\-]', dropping '.' along with everything else) silently turns
+    '150000.0' into '1500000' -- a false 10x inflation on any amount column
+    that happens to arrive decimal-formatted (e.g. from an Excel float cell)."""
+    return series.astype(str).str.replace(',', '', regex=False).str.replace(r'[^\d.\-]', '', regex=True)
+
+
 def to_numeric_amount(series):
-    return pd.to_numeric(series.astype(str).str.replace(r'[^\d\-]', '', regex=True), errors='coerce').fillna(0)
+    return pd.to_numeric(_clean_amount_string(series), errors='coerce').fillna(0)
 
 
 def to_numeric_amount_raw(series):
     """Like to_numeric_amount but keeps missing values as NaN (no fillna(0))
     so callers can fall through a priority list of amount candidates via
     combine_first() without an absent source masquerading as a real zero."""
-    return pd.to_numeric(series.astype(str).str.replace(r'[^\d\-]', '', regex=True), errors='coerce')
+    return pd.to_numeric(_clean_amount_string(series), errors='coerce')
 
 
 def _first_matching_col(df, candidates):

@@ -9,6 +9,7 @@ so chart totals always reconcile with the underlying row count.
 """
 
 import math
+import re
 from datetime import datetime
 from urllib.parse import quote
 
@@ -781,6 +782,36 @@ AMOUNT_COL_CANDIDATES = ['월정료', 'KTT월정료', 'KTT월정료(조정)', '�
 NAME_COL_CANDIDATES = ['상호', '상호명', '고객명']
 HQ_COL_CANDIDATES = ['관리본부명', '관리본부']
 BRANCH_COL_CANDIDATES = ['관리지사명', '관리지사']
+CONTRACT_STATUS_COL_CANDIDATES = ['계약상태(중)', '계약상태중', '계약상태']
+CANCEL_DATE_COL_CANDIDATES = ['해지일자', '해지일', '해지날짜']
+SALES_ZONE_COL_CANDIDATES = ['영업구역번호', '영업구역', '영업구역정보']
+FIRST_SERVICE_DATE_COL_CANDIDATES = ['계약최초서비스게시일', '계약최초서비스개시일', '최초서비스개시일', '최초서비스게시일']
+SALES_REP_COL_CANDIDATES = ['영업자명', '영업사원명', '영업담당자명', '영업담당자']
+CONTRACT_START_COL_CANDIDATES = ['계약시작일', '계약개시일']
+CONTRACT_END_COL_CANDIDATES = ['계약종료일', '계약만료일']
+LINE_TYPE_COL_CANDIDATES = ['회선방식']
+MIN_NUMBER_COL_CANDIDATES = ['MIN번호', 'MIN', 'min번호']
+
+
+def _fmt_numeric_date(v):
+    """YYYYMMDD or YYYYMMDDHHMMSS (however Excel handed it to us -- int,
+    float with a trailing .0, or plain string) -> 'YYYY-MM-DD'. Only the
+    date part matters here even for the 14-digit form, so both collapse to
+    the same first-8-digits parse. Falls back to pd.to_datetime for an
+    already-parsed Timestamp or a differently-formatted date string. None
+    if nothing usable is found."""
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return None
+    if isinstance(v, pd.Timestamp):
+        return v.strftime('%Y-%m-%d') if pd.notna(v) else None
+    s = str(v).strip()
+    if not s or s.lower() in ('nan', 'nat', 'none'):
+        return None
+    digits = re.sub(r'\D', '', s.split('.')[0])
+    if len(digits) >= 8:
+        return f"{digits[0:4]}-{digits[4:6]}-{digits[6:8]}"
+    parsed = pd.to_datetime(v, errors='coerce')
+    return parsed.strftime('%Y-%m-%d') if pd.notna(parsed) else None
 
 
 def find_unregistered_high_value_cancellations(cancelled_facility_df, cancel_df, threshold=100_000):
@@ -810,11 +841,31 @@ def find_unregistered_high_value_cancellations(cancelled_facility_df, cancel_df,
     if cancel_df is not None and '계약번호' in cancel_df.columns:
         registered_ids = set(cancel_df['계약번호'].dropna().tolist())
 
-    unregistered = high_value[~high_value[contract_col].isin(registered_ids)]
+    unregistered = high_value[~high_value[contract_col].isin(registered_ids)].copy()
 
     name_col = _first_matching_col(unregistered, NAME_COL_CANDIDATES)
     hq_col = _first_matching_col(unregistered, HQ_COL_CANDIDATES)
     branch_col = _first_matching_col(unregistered, BRANCH_COL_CANDIDATES)
+    status_col = _first_matching_col(unregistered, CONTRACT_STATUS_COL_CANDIDATES)
+    cancel_date_col = _first_matching_col(unregistered, CANCEL_DATE_COL_CANDIDATES)
+    zone_col = _first_matching_col(unregistered, SALES_ZONE_COL_CANDIDATES)
+    first_service_col = _first_matching_col(unregistered, FIRST_SERVICE_DATE_COL_CANDIDATES)
+    rep_col = _first_matching_col(unregistered, SALES_REP_COL_CANDIDATES)
+    start_col = _first_matching_col(unregistered, CONTRACT_START_COL_CANDIDATES)
+    end_col = _first_matching_col(unregistered, CONTRACT_END_COL_CANDIDATES)
+    line_type_col = _first_matching_col(unregistered, LINE_TYPE_COL_CANDIDATES)
+    min_col = _first_matching_col(unregistered, MIN_NUMBER_COL_CANDIDATES)
+
+    # YYYYMMDD(HHMMSS) numeric date columns need reformatting before they can
+    # just be renamed+selected like the plain passthrough columns below.
+    if cancel_date_col:
+        unregistered['_해지일자'] = unregistered[cancel_date_col].apply(_fmt_numeric_date)
+    if first_service_col:
+        unregistered['_계약최초서비스게시일'] = unregistered[first_service_col].apply(_fmt_numeric_date)
+    if start_col:
+        unregistered['_계약시작일'] = unregistered[start_col].apply(_fmt_numeric_date)
+    if end_col:
+        unregistered['_계약종료일'] = unregistered[end_col].apply(_fmt_numeric_date)
 
     display_cols = {contract_col: '계약번호'}
     if name_col:
@@ -824,6 +875,24 @@ def find_unregistered_high_value_cancellations(cancelled_facility_df, cancel_df,
     if branch_col:
         display_cols[branch_col] = '지사'
     display_cols['_amount'] = '월정료'
+    if status_col:
+        display_cols[status_col] = '계약상태(중)'
+    if cancel_date_col:
+        display_cols['_해지일자'] = '해지일자'
+    if zone_col:
+        display_cols[zone_col] = '영업구역번호'
+    if first_service_col:
+        display_cols['_계약최초서비스게시일'] = '계약최초서비스게시일'
+    if rep_col:
+        display_cols[rep_col] = '영업자명'
+    if start_col:
+        display_cols['_계약시작일'] = '계약시작일'
+    if end_col:
+        display_cols['_계약종료일'] = '계약종료일'
+    if line_type_col:
+        display_cols[line_type_col] = '회선방식'
+    if min_col:
+        display_cols[min_col] = 'MIN번호'
 
     view = unregistered[list(display_cols.keys())].rename(columns=display_cols)
     view['월정료'] = view['월정료'].round(0).astype(int)
@@ -846,4 +915,5 @@ def find_unregistered_high_value_cancellations(cancelled_facility_df, cancel_df,
         "count": int(len(unregistered)),
         "amount_sum": float(unregistered['_amount'].sum()) if len(unregistered) else 0.0,
         "rows": rows,
+        "columns": list(display_cols.values()),
     }
