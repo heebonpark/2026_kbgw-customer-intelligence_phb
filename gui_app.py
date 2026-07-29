@@ -32,6 +32,9 @@ class DataIntelGUI:
             'facility': tk.StringVar()
         }
         
+        self.report_password = tk.StringVar()
+        self.report_expiry = tk.StringVar()
+        
         self.create_widgets()
         
     def create_widgets(self):
@@ -60,6 +63,17 @@ class DataIntelGUI:
             
             btn = ttk.Button(frame, text="찾아보기", command=lambda k=key: self.browse_file(k))
             btn.grid(row=i, column=2, pady=10)
+            
+        # Add password and expiry inputs
+        pwd_lbl = tk.Label(frame, text="★사용자 비밀번호 (빈칸=랜덤):", width=32, anchor="w", font=("Helvetica", 12))
+        pwd_lbl.grid(row=6, column=0, pady=10, sticky="w")
+        pwd_ent = tk.Entry(frame, textvariable=self.report_password, width=40, font=("Helvetica", 11))
+        pwd_ent.grid(row=6, column=1, pady=10, padx=10)
+        
+        exp_lbl = tk.Label(frame, text="★리포트 만료일 (YYYY-MM-DD):", width=32, anchor="w", font=("Helvetica", 12))
+        exp_lbl.grid(row=7, column=0, pady=10, sticky="w")
+        exp_ent = tk.Entry(frame, textvariable=self.report_expiry, width=40, font=("Helvetica", 11))
+        exp_ent.grid(row=7, column=1, pady=10, padx=10)
             
         self.run_btn = ttk.Button(self.root, text="데이터 병합 및 리포트 생성 실행", 
                                  style="Action.TButton", command=self.run_process)
@@ -115,7 +129,21 @@ class DataIntelGUI:
                 return
                 
             self.log("HTML 리포트를 생성합니다...")
-            html_content, pwd, expiry = generate_html_report(merged_df, branch_stats)
+            
+            pwd_val = self.report_password.get().strip() or None
+            exp_val = self.report_expiry.get().strip() or None
+            
+            html_content, pwd, expiry, admin_pwd = generate_html_report(
+                merged_df, 
+                voc_df=files_dict.get('voc'),
+                patrol_df=files_dict.get('patrol'),
+                cancel_df=files_dict.get('cancel'),
+                cancelled_facility_df=files_dict.get('facility') if files_dict.get('facility') is not None else None, # For now
+                raw_files=files_dict,
+                matching_config=None,
+                password=pwd_val,
+                expiry_date=exp_val
+            )
             
             output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Data_Intel_PRO_Report.html")
             with open(output_path, "w", encoding="utf-8") as f:
@@ -125,11 +153,12 @@ class DataIntelGUI:
             self.log("성공적으로 HTML 리포트가 생성되었습니다!")
             self.log(f"저장 위치: {output_path}")
             self.log(f"만료일: {expiry}")
-            self.log(f"비밀번호: {pwd}")
+            self.log(f"사용자 비밀번호: {pwd}")
+            self.log(f"관리자 비밀번호: {admin_pwd}")
             self.log("=========================================")
             
             # Show summary popup
-            messagebox.showinfo("성공", f"리포트 생성 완료!\n비밀번호: {pwd}\n만료일: {expiry}")
+            messagebox.showinfo("성공", f"리포트 생성 완료!\n만료일: {expiry}\n사용자용 암호: {pwd}\n관리자용 암호: {admin_pwd}")
             
             # Automatically open the generated HTML
             webbrowser.open(f"file://{output_path}")

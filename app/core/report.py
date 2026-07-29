@@ -25,16 +25,11 @@ from .matching_config import (
 # Small helpers
 # ---------------------------------------------------------------------------
 
-# Fixed on purpose: a random password per regeneration meant the report had
-# to be re-shared with a new password every time it was rebuilt. Change this
-# to rotate it.
-DEFAULT_REPORT_PASSWORD = "0303"
-
 # A second, separate password that unlocks the admin-only matching-config
 # panel on top of normal viewing access (entering this instead of the viewer
 # password grants both). Keeps 매칭설정 restricted the same way the Streamlit
 # app restricts it to the 'admin' role -- see app/main.py render_matching_admin().
-DEFAULT_ADMIN_PASSWORD = "admin0303"
+DEFAULT_ADMIN_PASSWORD = "0303"
 
 
 def generate_random_password(length=5):
@@ -2978,7 +2973,7 @@ document.addEventListener('DOMContentLoaded', attachFilterListeners);
 
 def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
                           cancelled_facility_df=None, raw_files=None, matching_config=None,
-                          password=None, admin_password=None):
+                          password=None, admin_password=None, expiry_date=None):
     """Generates the password-protected HTML dashboard report.
 
     df: already-merged 총괄DB dataframe (server-rendered initial dashboard).
@@ -3003,10 +2998,12 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
         Streamlit app's admin/user role split (see app/main.py).
     """
     if password is None:
-        password = DEFAULT_REPORT_PASSWORD
+        import random
+        password = str(random.randint(1000, 9999))
     if admin_password is None:
         admin_password = DEFAULT_ADMIN_PASSWORD
-    expiry_date = get_end_of_month_iso()
+    if expiry_date is None:
+        expiry_date = get_end_of_month_iso()
 
     dashboard = build_dashboard(df, voc_df=voc_df, patrol_df=patrol_df)
     columns, rows = build_table(df)

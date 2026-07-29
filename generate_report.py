@@ -17,7 +17,7 @@ def _load(base_dir, key):
     return load_data(path, is_csv=is_csv_path(path))
 
 
-def build_report(base_dir, matching_config=None):
+def build_report(base_dir, matching_config=None, password=None, expiry_date=None):
     """Reads whatever source files are currently on disk (by their canonical
     stem -- see core/source_files.py) and builds the report. Shared by the
     CLI entry point below and the Streamlit admin '디스크의 최신 파일로
@@ -61,16 +61,28 @@ def build_report(base_dir, matching_config=None):
         cancelled_facility_df=cancelled_facility_df,
         raw_files=files_dict,
         matching_config=matching_config,
+        password=password,
+        expiry_date=expiry_date,
     )
     full_msg = msg + " (" + ", ".join(match_lines) + ")"
     return html_content, pwd, expiry, full_msg, merged_df, admin_pwd
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Data Intel PRO Report Generator")
+    parser.add_argument("--password", type=str, help="사용자 조회용 비밀번호 (지정하지 않으면 랜덤 생성)", default=None)
+    parser.add_argument("--expiry", type=str, help="리포트 만료일 (YYYY-MM-DD, 지정하지 않으면 월말)", default=None)
+    args = parser.parse_args()
+
     base_dir = "/Users/heebonpark/Downloads/관리고객통합솔루션"
 
     print("파일 로딩 및 병합 중...")
-    html_content, pwd, expiry, msg, merged_df, admin_pwd = build_report(base_dir)
+    html_content, pwd, expiry, msg, merged_df, admin_pwd = build_report(
+        base_dir, 
+        password=args.password, 
+        expiry_date=args.expiry
+    )
 
     if html_content is None:
         print(f"오류 발생: {msg}")
