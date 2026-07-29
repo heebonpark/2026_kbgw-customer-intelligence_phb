@@ -17,6 +17,8 @@ import os
 import shutil
 from datetime import datetime
 
+ALLOWED_UPLOAD_EXTENSIONS = ('.xlsx', '.xls', '.csv')
+
 SOURCE_FILES = {
     'db': {'stem': '총괄DB', 'label': '총괄관리DB', 'is_csv_default': False, 'required': True},
     'voc': {'stem': 'VOC정보조회', 'label': 'VOC정보조회 (월/일일 SP관리활동)', 'is_csv_default': False, 'required': False},
@@ -52,9 +54,16 @@ def save_uploaded_file(base_dir, key, uploaded_file, make_backup=True):
     guess which one is current.
 
     Returns (target_path, backup_path_or_None).
+
+    Raises ValueError if the uploaded filename's extension isn't one of
+    ALLOWED_UPLOAD_EXTENSIONS -- Streamlit's file_uploader(type=...) already
+    filters this in the UI, but that's a client-side hint, not a guarantee,
+    so it's re-checked here before anything gets written to disk.
     """
     stem = SOURCE_FILES[key]['stem']
     ext = os.path.splitext(uploaded_file.name)[1].lower() or '.xlsx'
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise ValueError(f"허용되지 않는 파일 형식입니다: {ext} (허용: {', '.join(ALLOWED_UPLOAD_EXTENSIONS)})")
     target_path = os.path.join(base_dir, stem + ext)
 
     existing = find_source_path(base_dir, key)

@@ -125,7 +125,11 @@ def render_admin_file_update():
                 key=f"replace_{row['key']}", label_visibility="collapsed",
             )
             if uploaded is not None and st.button(f"✅ 이 파일로 교체 확정 -- {row['label']}", key=f"confirm_{row['key']}"):
-                target_path, backup_path = save_uploaded_file(PROJECT_ROOT, row['key'], uploaded)
+                try:
+                    target_path, backup_path = save_uploaded_file(PROJECT_ROOT, row['key'], uploaded)
+                except ValueError as e:
+                    st.error(str(e))
+                    st.stop()
                 add_log(f"file_update:{row['key']}:{os.path.basename(target_path)}", st.session_state['username'])
                 if backup_path:
                     st.success(f"업데이트됨: {os.path.basename(target_path)} (이전 파일은 backups/{os.path.basename(backup_path)}로 백업됨)")

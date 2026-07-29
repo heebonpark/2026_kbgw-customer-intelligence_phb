@@ -530,7 +530,6 @@ def render_sp_rep_section(sp_perf, section_id="spRepSection"):
         table_html = render_simple_table(columns, rows)
 
     return f"""
-    <h3 class="chart-title" id="{section_id}Title" style="margin-top:32px;">SP 부진자 추가분석 (담당자 기준)</h3>
     <p class="section-desc">{note}</p>
     <div class="chart-grid" id="{section_id}ChartWrap">{chart_html}</div>
     <div class="table-section" id="{section_id}TableWrap">{table_html}</div>"""
@@ -662,25 +661,28 @@ def render_global_filter_bar(df):
 def render_cancel_section(cancel_df, hq_filter='강북/강원'):
     if cancel_df is None or cancel_df.empty:
         return f"""
-        <h2 class="section-title">해지 파이프라인 현황 <span class="badge">독립 데이터 · 강북/강원본부 기준</span></h2>
-        <div class="empty-card">해지 파이프라인 파일이 업로드되지 않았습니다. 업로드 시 총괄DB와 무관하게 별도 섹션으로 표시됩니다.</div>"""
+        <details class="section-collapse" open><summary class="section-title">해지 파이프라인 현황 <span class="badge">독립 데이터 · 강북/강원본부 기준</span></summary>
+        <div class="empty-card">해지 파이프라인 파일이 업로드되지 않았습니다. 업로드 시 총괄DB와 무관하게 별도 섹션으로 표시됩니다.</div>
+        </details>"""
 
     dash = build_cancel_dashboard(cancel_df, hq_filter=hq_filter)
     if dash is None:
         return f"""
-        <h2 class="section-title">해지 파이프라인 현황 <span class="badge">독립 데이터 · 강북/강원본부 기준</span></h2>
-        <div class="empty-card">해지 파이프라인 데이터 중 강북/강원본부 소속 시설이 없습니다.</div>"""
+        <details class="section-collapse" open><summary class="section-title">해지 파이프라인 현황 <span class="badge">독립 데이터 · 강북/강원본부 기준</span></summary>
+        <div class="empty-card">해지 파이프라인 데이터 중 강북/강원본부 소속 시설이 없습니다.</div>
+        </details>"""
 
     stat_html = render_stat_tiles(dash['kpis'])
     chart_html = render_chart_grid(dash['charts'], CANCEL_CHART_SPECS)
     table_html = render_simple_table(dash['table_columns'], dash['table_rows'])
 
     return f"""
-    <h2 class="section-title">해지 파이프라인 현황 <span class="badge">독립 데이터 · 강북/강원본부 기준</span></h2>
+    <details class="section-collapse" open><summary class="section-title">해지 파이프라인 현황 <span class="badge">독립 데이터 · 강북/강원본부 기준</span></summary>
     <p class="section-desc">총괄DB와 매칭하지 않고 원본 그대로 집계한, 강북/강원본부 소속 해지 파이프라인 현황입니다.</p>
     <div class="stat-grid">{stat_html}</div>
     <div class="chart-grid">{chart_html}</div>
-    <div class="table-section">{table_html}</div>"""
+    <div class="table-section">{table_html}</div>
+    </details>"""
 
 
 # ---------------------------------------------------------------------------
@@ -692,34 +694,38 @@ def render_nudge_section(cancelled_facility_df, cancel_df, threshold=100_000):
 
     if nudge is None:
         return f"""
-        <h2 class="section-title">고액 해지 미등록 알림 <span class="badge badge-soon">확장 예정</span></h2>
+        <details class="section-collapse" open><summary class="section-title">고액 해지 미등록 알림 <span class="badge badge-soon">확장 예정</span></summary>
         <div class="empty-card">
             '해지시설 내역' 파일을 업로드하면, 월정료 {threshold:,}원 이상인데 해지 파이프라인에
             등록되지 않은 계약을 자동으로 찾아 등록을 독려하는 알림이 여기에 표시됩니다.
-        </div>"""
+        </div>
+        </details>"""
 
     if not nudge.get('active'):
         return f"""
-        <h2 class="section-title">고액 해지 미등록 알림</h2>
-        <div class="empty-card">{_e(nudge.get('reason', '컬럼을 확인할 수 없습니다.'))}</div>"""
+        <details class="section-collapse" open><summary class="section-title">고액 해지 미등록 알림</summary>
+        <div class="empty-card">{_e(nudge.get('reason', '컬럼을 확인할 수 없습니다.'))}</div>
+        </details>"""
 
     if nudge['count'] == 0:
         return f"""
-        <h2 class="section-title">고액 해지 미등록 알림</h2>
+        <details class="section-collapse" open><summary class="section-title">고액 해지 미등록 알림</summary>
         <div class="empty-card">
             월정료 {threshold:,}원 이상 해지 건 {nudge['total_high_value']:,}건 모두 해지 파이프라인에 등록되어 있습니다.
-        </div>"""
+        </div>
+        </details>"""
 
     table_html = render_simple_table(['계약번호', '고객상호', '본부', '지사', '월정료'], nudge['rows'])
 
     return f"""
-    <h2 class="section-title">고액 해지 미등록 알림</h2>
+    <details class="section-collapse" open><summary class="section-title">고액 해지 미등록 알림</summary>
     <div class="callout callout-warning">
         월정료 {threshold:,}원 이상 해지 건 {nudge['total_high_value']:,}건 중
         <strong>{nudge['count']:,}건({_fmt_won(nudge['amount_sum'])})이 해지 파이프라인에 미등록</strong> 상태입니다.
         아래 목록을 해지 파이프라인에 등록하도록 담당자에게 독려하세요.
     </div>
-    <div class="table-section">{table_html}</div>"""
+    <div class="table-section">{table_html}</div>
+    </details>"""
 
 
 def _fmt_won(v):
@@ -1104,8 +1110,21 @@ tbody tr:hover { background: var(--page-plane); }
 .progress-chart-bar { width: 14px; border-radius: 4px 4px 0 0; min-height: 2px; }
 .progress-chart-label { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
 
-h2.section-title { font-size: 16px; font-weight: 700; margin: 40px 0 6px; display: flex; align-items: center; gap: 10px; }
+.section-title { font-size: 16px; font-weight: 700; margin: 40px 0 6px; display: flex; align-items: center; gap: 10px; }
 .section-desc { font-size: 12.5px; color: var(--text-muted); margin: 0 0 16px; }
+
+/* ---- collapsible sections (접기/펼치기) ---- */
+details.section-collapse, details.subsection-collapse { margin: 0; }
+summary.section-title, summary.subsection-title {
+    cursor: pointer; list-style: none; user-select: none;
+}
+summary.section-title::-webkit-details-marker, summary.subsection-title::-webkit-details-marker { display: none; }
+summary.section-title::before, summary.subsection-title::before {
+    content: '▸'; display: inline-block; font-size: 12px; color: var(--text-muted);
+    transition: transform 0.15s ease; margin-right: 8px;
+}
+details[open] > summary.section-title::before, details[open] > summary.subsection-title::before { transform: rotate(90deg); }
+.subsection-title { font-size: 14px; font-weight: 700; margin: 32px 0 4px; color: var(--text-primary); display: flex; align-items: center; }
 .badge {
     font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px;
     background: var(--page-plane); border: 1px solid var(--border); color: var(--text-secondary);
@@ -2382,12 +2401,9 @@ document.addEventListener('DOMContentLoaded', attachFilterListeners);
     function renderSpRepSectionEl(containerEl, spPerf) {
         containerEl.innerHTML = '';
         if (!spPerf || !spPerf.reps.length) {
-            const empty = mkEl('div', 'empty-card', 'SP 활동 데이터가 없어 담당자별 분석을 표시할 수 없습니다.');
-            containerEl.appendChild(mkEl('h3', 'chart-title', 'SP 부진자 추가분석 (담당자 기준)'));
-            containerEl.appendChild(empty);
+            containerEl.appendChild(mkEl('div', 'empty-card', 'SP 활동 데이터가 없어 담당자별 분석을 표시할 수 없습니다.'));
             return;
         }
-        containerEl.appendChild(mkEl('h3', 'chart-title', 'SP 부진자 추가분석 (담당자 기준)'));
         const note = mkEl('p', 'section-desc');
         note.appendChild(document.createTextNode(
             'SP 담당자 전체 평균 진척율 ' + spPerf.avg_pct.toFixed(1) + '% 기준, 최소 ' + spPerf.min_count + '건 이상 처리한 담당자 중 평균 미달 인원은 '
@@ -3087,16 +3103,18 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
             <a href="Data_Intel_PRO_EDA.html" target="_blank" class="eda-btn">🚀 딥 다이브 EDA 분석기 열기 (별도 창)</a>
         </div>
 
-        <h2 class="section-title">총괄DB 기준 대시보드</h2>
+        <details class="section-collapse" open>
+        <summary class="section-title">총괄DB 기준 대시보드</summary>
         <div class="stat-grid" id="statGrid">{stat_html}</div>
         <div class="chart-grid" id="chartGrid">{chart_grid_html}</div>
-
 
         <div id="top10Section"></div>
 
         <div id="treeSummarySection"></div>
+        </details>
 
-        <h2 class="section-title">지사별 활동 진척율 (SP/SE/SG)</h2>
+        <details class="section-collapse" open>
+        <summary class="section-title">지사별 활동 진척율 (SP/SE/SG)</summary>
         <div id="progressInsightWrap">
             {branch_insights_html}
         </div>
@@ -3107,27 +3125,36 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
             {progress_table_html}
             {progress_chart_html}
         </div>
+        </details>
 
+        <details class="subsection-collapse" open>
+        <summary class="subsection-title">SP 부진자 추가분석 (담당자 기준)</summary>
         <div id="spRepSectionWrap">
             {sp_rep_section_html}
         </div>
+        </details>
 
-        <h3 class="chart-title" style="margin-top:32px;">SP 미접수/접수 발송용 리스트 (담당자별)</h3>
+        <details class="subsection-collapse" open>
+        <summary class="subsection-title">SP 미접수/접수 발송용 리스트 (담당자별)</summary>
         <div id="spPendingSectionWrap">
             {sp_pending_section_html}
         </div>
+        </details>
 
-        <h2 class="section-title">데이터 분포/이상치 분석 (EDA, 월정산금액 기준)</h2>
+        <details class="section-collapse" open>
+        <summary class="section-title">데이터 분포/이상치 분석 (EDA, 월정산금액 기준)</summary>
         <div id="edaSectionWrap">
             {eda_section_html}
         </div>
+        </details>
 
+        <details class="section-collapse" open>
+        <summary class="section-title">관리고객 상세 (필터/검색 가능)</summary>
         <button id="btnExportCSV" class="export-btn" title="현재 조건으로 필터링된 모든 데이터를 엑셀(CSV)로 다운로드합니다.">📥 필터링된 데이터 엑셀(CSV) 다운로드</button>
-
-        <h2 class="section-title">관리고객 상세 (필터/검색 가능)</h2>
         <div class="table-section" id="tableSection">
             {table_html}
         </div>
+        </details>
 
         {cancel_section_html}
         {nudge_section_html}
