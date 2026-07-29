@@ -26,6 +26,7 @@ pip install -r requirements.txt > nul 2>&1
 
 echo.
 echo [안내] Data Intel PRO (GUI) 를 실행합니다!
+set PYTHONUTF8=1
 python gui_app.py
 
 pause

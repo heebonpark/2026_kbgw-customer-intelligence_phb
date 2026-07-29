@@ -120,6 +120,11 @@ def load_data(file_path, is_csv=False):
         if _has_title_row(df.columns):
             df = (pd.read_csv(file_path, encoding='cp949', header=1) if is_csv
                   else pd.read_excel(file_path, header=1))
+        
+        # Sanitize column names (remove \xa0 and extra whitespace) to prevent
+        # UnicodeEncodeError in Pandas warnings on Windows and fix matching bugs
+        df.columns = [str(c).replace('\xa0', ' ').strip() for c in df.columns]
+        
         return df
     except Exception as e:
         print(f"Error loading {file_path}: {e}")

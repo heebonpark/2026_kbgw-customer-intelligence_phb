@@ -4,6 +4,11 @@ from tkinter import ttk
 import os
 import sys
 import webbrowser
+import warnings
+
+# Suppress all warnings to prevent UnicodeEncodeError in PyInstaller
+# when Pandas tries to print warnings containing \xa0 to sys.stderr on Windows
+warnings.filterwarnings("ignore")
 
 # Ensure we can import from app.core
 sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
