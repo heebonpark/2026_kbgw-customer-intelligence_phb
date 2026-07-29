@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 chcp 65001 > nul
 echo ===================================================
 echo Data Intel PRO - Windows 원클릭 실행 스크립트
