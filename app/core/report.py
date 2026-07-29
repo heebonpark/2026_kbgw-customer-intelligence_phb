@@ -12,7 +12,7 @@ from .analytics import (
     build_dashboard, build_table, build_cancel_dashboard, build_eda_stats,
     find_unregistered_high_value_cancellations, build_progress_matrix, PROGRESS_TYPES,
     build_progress_type_charts, build_branch_insights, build_sp_rep_performance,
-    build_sp_pending_contact_list,
+    build_sp_pending_contact_list, build_recontract_target_analysis, kakao_map_link,
     _fmt_compact_won,
 )
 from .handlers import HQ_ORDER, BRANCH_ORDER
@@ -580,6 +580,86 @@ def render_sp_pending_section(pending, section_id="spPendingSection"):
         각 담당자 카드의 '복사' 버튼을 누르면 계약번호/상호/월정료 목록이 클립보드에 복사되어 메일이나 문자에 바로 붙여넣을 수 있습니다.
     </p>
     <div id="{section_id}Cards">{"".join(cards)}</div>"""
+
+
+def _recontract_detail_row_html(r):
+    badge_cls = 'recontract-badge-achieved' if r['구분'] == '실적' else 'recontract-badge-focus'
+    badge_label = '실적' if r['구분'] == '실적' else '집중'
+    status_bits = [b for b in [r.get('계약상태'), r.get('만기도래월')] if b and not (isinstance(b, float) and math.isnan(b))]
+    map_link_url = kakao_map_link(r.get('설치주소'))
+    map_link = (
+        f'<a class="pending-map-link" href="{_e(map_link_url)}" target="_blank" rel="noopener">🗺 지도</a>'
+        if map_link_url else '<span class="pending-map-link disabled">🗺 지도</span>'
+    )
+    return f"""
+    <div class="pending-detail-row">
+        <span class="recontract-badge {badge_cls}">{_e(badge_label)}</span>
+        <span>{_e(r['계약번호'] if r['계약번호'] is not None else '-')} · {_e(r['상호'] or '-')} ({_e(' · '.join(str(b) for b in status_bits) or '-')})</span>
+        <span class="cell-num">{_e(r.get('재계약여부') or '-')}</span>
+        {map_link}
+    </div>"""
+
+
+def render_recontract_section(analysis, section_id="recontractSection"):
+    """재계약대상(SP) 분석 -- analytics.py build_recontract_target_analysis()
+    결과를 KPI + 지사별/담당별 리더보드 + 담당자별 상세 리스트(지도 링크 포함)
+    로 렌더링한다."""
+    if analysis is None:
+        return f'<div class="empty-card" id="{section_id}">재계약대상(SP)으로 분류할 데이터가 없습니다 (총괄DB와 관리고객원본이 매칭된 SP 건이 없음).</div>'
+
+    stat_html = render_stat_tiles(analysis['kpis'])
+
+    branch_items = [
+        {"label": r['label'], "value": r['pct'], "sub": f"{r['achieved']:,}/{r['total']:,}건"}
+        for r in analysis['by_branch']
+    ]
+    branch_chart_html = render_progress_type_chart(
+        {"title": "지사별 재계약 실적율", "items": branch_items}, PROGRESS_SERIES_ROLE['SP'], f'{section_id}BranchChart',
+    ) if branch_items else '<div class="empty-card">지사 정보가 없습니다.</div>'
+
+    owner_items_sorted = sorted(analysis['by_owner'], key=lambda r: r['pct'])
+    owner_items = [
+        {"label": r['label'], "value": r['pct'], "sub": f"{r['achieved']:,}/{r['total']:,}건"}
+        for r in owner_items_sorted
+    ]
+    owner_chart_html = render_progress_type_chart(
+        {"title": "담당자별 재계약 실적율 (집중 필요 우선)", "items": owner_items}, PROGRESS_SERIES_ROLE['SP'], f'{section_id}OwnerChart',
+    ) if owner_items else '<div class="empty-card">담당자 정보가 없습니다.</div>'
+
+    groups = []
+    for r in analysis['detail_rows']:
+        owner = r['담당자']
+        if not groups or groups[-1]['owner'] != owner:
+            groups.append({"owner": owner, "rows": []})
+        groups[-1]['rows'].append(r)
+
+    if not groups:
+        list_html = '<div class="empty-card">표시할 재계약대상 건이 없습니다.</div>'
+    else:
+        cards = []
+        for g in groups:
+            achieved_n = sum(1 for r in g['rows'] if r['구분'] == '실적')
+            focus_n = len(g['rows']) - achieved_n
+            rows_html = "".join(_recontract_detail_row_html(r) for r in g['rows'])
+            cards.append(f"""
+            <div class="pending-rep-card">
+                <div class="pending-rep-header">
+                    <span class="pending-rep-title">{_e(g['owner'])}</span>
+                    <span class="pending-rep-counts">실적 {achieved_n:,} · 집중대상 {focus_n:,} · 계 {len(g['rows']):,}건</span>
+                </div>
+                <div class="pending-detail-list">{rows_html}</div>
+            </div>""")
+        list_html = "".join(cards)
+
+    return f"""
+    <p class="section-desc" id="{section_id}Note">
+        총괄DB(SP)와 관리고객원본을 계약번호로 매칭해 계약상태·만기도래월이 확인된 <strong>{analysis['total']:,}건</strong>을 재계약대상으로 삼았습니다.
+        이 중 수동재계약이면서 서비스재개시일이 {analysis['current_year']}년인 <strong>{analysis['achieved_count']:,}건</strong>은 실적,
+        나머지 <strong>{analysis['focus_count']:,}건</strong>은 집중 재계약 활동 대상입니다.
+    </p>
+    <div class="stat-grid" id="{section_id}Stats">{stat_html}</div>
+    <div class="chart-grid" id="{section_id}Charts">{branch_chart_html}{owner_chart_html}</div>
+    <div id="{section_id}List">{list_html}</div>"""
 
 
 # ---------------------------------------------------------------------------
@@ -1171,6 +1251,9 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
 }
 .pending-map-link:hover { background: var(--brand); color: white; }
 .pending-map-link.disabled { color: var(--text-muted); border-color: var(--border); pointer-events: none; opacity: 0.5; }
+.recontract-badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+.recontract-badge-achieved { background: color-mix(in srgb, var(--good) 16%, var(--surface-1)); color: var(--good); }
+.recontract-badge-focus { background: color-mix(in srgb, var(--critical) 14%, var(--surface-1)); color: var(--critical); }
 
 /* ---- global filter bar (본부/지사/담당자) ---- */
 .global-filter-bar {
@@ -2568,6 +2651,148 @@ document.addEventListener('DOMContentLoaded', attachFilterListeners);
         containerEl.appendChild(cardsWrap);
     }
 
+    // ---- 재계약대상(SP) -- mirrors analytics.py build_recontract_target_analysis ----
+    function serviceRestartYear(v) {
+        if (v === null || v === undefined || v === '' || isNaN(v)) return null;
+        const s = String(Math.trunc(Number(v)));
+        return s.length >= 4 ? parseInt(s.slice(0, 4), 10) : null;
+    }
+    function buildRecontractAnalysisJS(rows, currentYear) {
+        currentYear = currentYear || new Date().getFullYear();
+        const target = rows.filter(r => r['활동대상구분'] === 'SP' && r['계약상태'] !== null && r['계약상태'] !== undefined && r['계약상태'] !== '');
+        if (!target.length) return null;
+
+        target.forEach(r => {
+            const achieved = r['재계약여부'] === '수동재계약' && serviceRestartYear(r['서비스재개시일']) === currentYear;
+            r._구분 = achieved ? '실적' : '집중 재계약 활동 대상';
+        });
+
+        const total = target.length;
+        const achievedCount = target.filter(r => r._구분 === '실적').length;
+        const focusCount = total - achievedCount;
+
+        const kpis = [
+            { label: '재계약대상(SP) 전체', value: fmtInt(total), sub: '건' },
+            { label: '실적 (수동재계약·당해년도)', value: fmtInt(achievedCount), sub: total ? ('전체의 ' + (achievedCount / total * 100).toFixed(1) + '%') : '0%' },
+            { label: '집중 재계약 활동 대상', value: fmtInt(focusCount), sub: total ? ('전체의 ' + (focusCount / total * 100).toFixed(1) + '%') : '0%' },
+        ];
+
+        function groupStats(col) {
+            const groups = new Map();
+            target.forEach(r => {
+                const key = (r[col] === null || r[col] === undefined || r[col] === '') ? UNKNOWN_LABEL : r[col];
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(r);
+            });
+            const out = [];
+            for (const [label, g] of groups) {
+                const done = g.filter(r => r._구분 === '실적').length;
+                out.push({ label, achieved: done, focus: g.length - done, total: g.length, pct: g.length ? (done / g.length * 100) : 0 });
+            }
+            return out;
+        }
+
+        const branchRank = new Map(DATA.branchOrder.map((v, i) => [v, i]));
+        const byBranch = groupStats('관리지사');
+        byBranch.sort((a, b) => (branchRank.has(a.label) ? branchRank.get(a.label) : DATA.branchOrder.length) - (branchRank.has(b.label) ? branchRank.get(b.label) : DATA.branchOrder.length));
+
+        const byOwner = groupStats('SP담당');
+        byOwner.sort((a, b) => b.total - a.total);
+
+        const detailRows = target.map(r => ({
+            계약번호: r['계약번호'] != null ? r['계약번호'] : null,
+            상호: r['상호'] != null ? r['상호'] : null,
+            지사: r['관리지사'] != null ? r['관리지사'] : null,
+            담당자: r['SP담당'] || '미담당',
+            계약상태: r['계약상태'] != null ? r['계약상태'] : null,
+            만기도래월: r['만기도래_월'] != null ? r['만기도래_월'] : null,
+            재계약여부: r['재계약여부'] != null ? r['재계약여부'] : null,
+            구분: r._구분,
+            설치주소: r['설치주소'] != null ? r['설치주소'] : null,
+        }));
+        detailRows.sort((a, b) => {
+            const fa = a.구분 === '집중 재계약 활동 대상' ? 0 : 1, fb = b.구분 === '집중 재계약 활동 대상' ? 0 : 1;
+            if (fa !== fb) return fa - fb;
+            const ra = branchRank.has(a.지사) ? branchRank.get(a.지사) : DATA.branchOrder.length;
+            const rb = branchRank.has(b.지사) ? branchRank.get(b.지사) : DATA.branchOrder.length;
+            if (ra !== rb) return ra - rb;
+            return String(a.담당자).localeCompare(String(b.담당자));
+        });
+
+        return { current_year: currentYear, total, achieved_count: achievedCount, focus_count: focusCount, kpis, by_branch: byBranch, by_owner: byOwner, detail_rows: detailRows };
+    }
+
+    function recontractDetailRowEl(r) {
+        const isAchieved = r.구분 === '실적';
+        const row = mkEl('div', 'pending-detail-row');
+        row.appendChild(mkEl('span', 'recontract-badge ' + (isAchieved ? 'recontract-badge-achieved' : 'recontract-badge-focus'), isAchieved ? '실적' : '집중'));
+        const statusBits = [r.계약상태, r.만기도래월].filter(b => b !== null && b !== undefined && b !== '');
+        const mainText = (r.계약번호 !== null ? r.계약번호 : '-') + ' · ' + (r.상호 || '-') + ' (' + (statusBits.length ? statusBits.join(' · ') : '-') + ')';
+        row.appendChild(mkEl('span', null, mainText));
+        row.appendChild(mkEl('span', 'cell-num', r.재계약여부 || '-'));
+        const link = kakaoMapLinkJS(r.설치주소);
+        if (link) {
+            const a = document.createElement('a');
+            a.className = 'pending-map-link'; a.href = link; a.target = '_blank'; a.rel = 'noopener'; a.textContent = '🗺 지도';
+            row.appendChild(a);
+        } else {
+            row.appendChild(mkEl('span', 'pending-map-link disabled', '🗺 지도'));
+        }
+        return row;
+    }
+
+    function renderRecontractSectionEl(containerEl, analysis) {
+        containerEl.innerHTML = '';
+        if (!analysis) {
+            containerEl.appendChild(mkEl('div', 'empty-card', '재계약대상(SP)으로 분류할 데이터가 없습니다.'));
+            return;
+        }
+        const note = mkEl('p', 'section-desc');
+        note.appendChild(document.createTextNode(
+            '총괄DB(SP)와 관리고객원본을 계약번호로 매칭해 계약상태·만기도래월이 확인된 ' + fmtInt(analysis.total) + '건을 재계약대상으로 삼았습니다. ' +
+            '이 중 수동재계약이면서 서비스재개시일이 ' + analysis.current_year + '년인 ' + fmtInt(analysis.achieved_count) + '건은 실적, 나머지 ' + fmtInt(analysis.focus_count) + '건은 집중 재계약 활동 대상입니다.'
+        ));
+        containerEl.appendChild(note);
+
+        const statGrid = mkEl('div', 'stat-grid');
+        renderStatTilesEl(statGrid, analysis.kpis);
+        containerEl.appendChild(statGrid);
+
+        const chartGrid = mkEl('div', 'chart-grid');
+        const branchItems = analysis.by_branch.map(r => ({ label: r.label, value: r.pct, sub: fmtInt(r.achieved) + '/' + fmtInt(r.total) + '건' }));
+        const branchEl = renderProgressTypeChartEl({ title: '지사별 재계약 실적율', items: branchItems }, PROGRESS_SERIES_ROLE.SP, 'recontractBranchChart');
+        if (branchEl) chartGrid.appendChild(branchEl);
+        const ownerSorted = analysis.by_owner.slice().sort((a, b) => a.pct - b.pct);
+        const ownerItems = ownerSorted.map(r => ({ label: r.label, value: r.pct, sub: fmtInt(r.achieved) + '/' + fmtInt(r.total) + '건' }));
+        const ownerEl = renderProgressTypeChartEl({ title: '담당자별 재계약 실적율 (집중 필요 우선)', items: ownerItems }, PROGRESS_SERIES_ROLE.SP, 'recontractOwnerChart');
+        if (ownerEl) chartGrid.appendChild(ownerEl);
+        containerEl.appendChild(chartGrid);
+
+        const listWrap = mkEl('div');
+        const groups = [];
+        analysis.detail_rows.forEach(r => {
+            if (!groups.length || groups[groups.length - 1].owner !== r.담당자) groups.push({ owner: r.담당자, rows: [] });
+            groups[groups.length - 1].rows.push(r);
+        });
+        if (!groups.length) {
+            listWrap.appendChild(mkEl('div', 'empty-card', '표시할 재계약대상 건이 없습니다.'));
+        } else {
+            groups.forEach(g => {
+                const achievedN = g.rows.filter(r => r.구분 === '실적').length;
+                const card = mkEl('div', 'pending-rep-card');
+                const header = mkEl('div', 'pending-rep-header');
+                header.appendChild(mkEl('span', 'pending-rep-title', g.owner));
+                header.appendChild(mkEl('span', 'pending-rep-counts', '실적 ' + fmtInt(achievedN) + ' · 집중대상 ' + fmtInt(g.rows.length - achievedN) + ' · 계 ' + fmtInt(g.rows.length) + '건'));
+                card.appendChild(header);
+                const list = mkEl('div', 'pending-detail-list');
+                g.rows.forEach(r => list.appendChild(recontractDetailRowEl(r)));
+                card.appendChild(list);
+                listWrap.appendChild(card);
+            });
+        }
+        containerEl.appendChild(listWrap);
+    }
+
     function progressCellStyle(pct) {
         const opacity = 12 + Math.max(0, Math.min(100, pct)) * 0.8;
         return {
@@ -2834,6 +3059,9 @@ document.addEventListener('DOMContentLoaded', attachFilterListeners);
         const spPendingSectionWrap = document.getElementById('spPendingSectionWrap');
         if (spPendingSectionWrap) renderSpPendingSectionEl(spPendingSectionWrap, buildSpPendingContactListJS(filtered), 'spPendingSection');
 
+        const recontractSectionWrap = document.getElementById('recontractSectionWrap');
+        if (recontractSectionWrap) renderRecontractSectionEl(recontractSectionWrap, buildRecontractAnalysisJS(filtered));
+
         const edaSectionWrap = document.getElementById('edaSectionWrap');
         if (edaSectionWrap) renderEdaSectionEl(edaSectionWrap, buildEdaStatsJS(filtered));
 
@@ -3035,6 +3263,7 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
     branch_insights_html = render_branch_insights(build_branch_insights(progress_matrix))
     sp_rep_section_html = render_sp_rep_section(build_sp_rep_performance(df))
     sp_pending_section_html = render_sp_pending_section(build_sp_pending_contact_list(df))
+    recontract_section_html = render_recontract_section(build_recontract_target_analysis(df))
 
     eda_stats = build_eda_stats(df)
     eda_section_html = render_eda_section_body(eda_stats)
@@ -3102,6 +3331,13 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
         <div class="eda-btn-wrap">
             <a href="Data_Intel_PRO_EDA.html" target="_blank" class="eda-btn">🚀 딥 다이브 EDA 분석기 열기 (별도 창)</a>
         </div>
+
+        <details class="section-collapse">
+        <summary class="section-title">🔄 재계약대상(SP)</summary>
+        <div id="recontractSectionWrap">
+            {recontract_section_html}
+        </div>
+        </details>
 
         <details class="section-collapse" open>
         <summary class="section-title">총괄DB 기준 대시보드</summary>

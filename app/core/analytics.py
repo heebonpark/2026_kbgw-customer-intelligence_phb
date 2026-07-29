@@ -9,6 +9,7 @@ so chart totals always reconcile with the underlying row count.
 """
 
 import math
+from datetime import datetime
 from urllib.parse import quote
 
 import pandas as pd
@@ -451,6 +452,92 @@ def build_sp_pending_contact_list(df, hq_filter='강북/강원'):
     reps.sort(key=lambda r: -r['count'])
 
     return {"reps": reps, "total_count": sum(r['count'] for r in reps)}
+
+
+def _service_restart_year(v):
+    """서비스재개시일은 YYYYMMDD 형태의 숫자(예: 20260701.0)로 들어온다."""
+    if pd.isna(v):
+        return None
+    try:
+        return int(str(int(float(v)))[:4])
+    except (ValueError, TypeError):
+        return None
+
+
+def build_recontract_target_analysis(df, current_year=None):
+    """재계약대상(SP) 분석 -- 총괄DB(SP)와 관리고객원본('관리고객리스트_재계약
+    여부') 파일이 계약번호로 매칭되어 계약상태/만기도래_월이 채워진 SP 건을
+    재계약대상으로 삼는다 (이 매칭 자체는 process_and_merge에서 이미 끝나
+    있으므로 여기서는 그 결과 컬럼만 읽는다). 그중 수동재계약 + 서비스재개시일이
+    당해년도인 건은 '실적', 나머지는 '집중 재계약 활동 대상'으로 분류한다."""
+    if df is None or '활동대상구분' not in df.columns or '계약상태' not in df.columns:
+        return None
+    if current_year is None:
+        current_year = datetime.now().year
+
+    target = df[(df['활동대상구분'] == 'SP') & df['계약상태'].notna()].copy()
+    if target.empty:
+        return None
+
+    service_year = target['서비스재개시일'].apply(_service_restart_year) if '서비스재개시일' in target.columns else None
+    achieved = (target.get('재계약여부') == '수동재계약') & (service_year == current_year)
+    target['_구분'] = achieved.map({True: '실적', False: '집중 재계약 활동 대상'})
+
+    total = len(target)
+    achieved_count = int(achieved.sum())
+    focus_count = total - achieved_count
+
+    kpis = [
+        {"label": "재계약대상(SP) 전체", "value": _fmt_int(total), "sub": "건"},
+        {"label": "실적 (수동재계약·당해년도)", "value": _fmt_int(achieved_count),
+         "sub": f"전체의 {achieved_count / total * 100:.1f}%" if total else "0%"},
+        {"label": "집중 재계약 활동 대상", "value": _fmt_int(focus_count),
+         "sub": f"전체의 {focus_count / total * 100:.1f}%" if total else "0%"},
+    ]
+
+    def _group_stats(col):
+        if col not in target.columns:
+            return []
+        rows = []
+        for name, g in target.groupby(target[col].fillna(UNKNOWN_LABEL)):
+            done = int((g['_구분'] == '실적').sum())
+            tot = len(g)
+            rows.append({
+                "label": str(name), "achieved": done, "focus": tot - done, "total": tot,
+                "pct": (done / tot * 100) if tot else 0.0,
+            })
+        return rows
+
+    branch_rank = {b: i for i, b in enumerate(BRANCH_ORDER)}
+    by_branch = _group_stats('관리지사')
+    by_branch.sort(key=lambda r: branch_rank.get(r['label'], len(BRANCH_ORDER)))
+
+    by_owner = _group_stats('SP담당')
+    by_owner.sort(key=lambda r: -r['total'])
+
+    def _clean(v):
+        return None if pd.isna(v) else v
+
+    def _row(r):
+        owner = _clean(r.get('SP담당'))
+        return {
+            "계약번호": _clean(r.get('계약번호')), "상호": _clean(r.get('상호')), "지사": _clean(r.get('관리지사')),
+            "담당자": owner if owner is not None else '미담당', "계약상태": _clean(r.get('계약상태')),
+            "만기도래월": _clean(r.get('만기도래_월')), "재계약여부": _clean(r.get('재계약여부')),
+            "구분": r['_구분'], "설치주소": _clean(r.get('설치주소')),
+        }
+    detail_rows = [_row(r) for _, r in target.iterrows()]
+    detail_rows.sort(key=lambda r: (
+        0 if r['구분'] == '집중 재계약 활동 대상' else 1,
+        branch_rank.get(r['지사'], len(BRANCH_ORDER)),
+        str(r['담당자']),
+    ))
+
+    return {
+        "current_year": current_year, "total": total,
+        "achieved_count": achieved_count, "focus_count": focus_count,
+        "kpis": kpis, "by_branch": by_branch, "by_owner": by_owner, "detail_rows": detail_rows,
+    }
 
 
 TABLE_COLUMNS = [
