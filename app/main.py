@@ -14,6 +14,7 @@ from ui.styles import apply_custom_css
 from core.auth import init_app_dir, setup_session_state, render_login, add_log
 from core.handlers import load_data, process_and_merge
 from core.report import generate_html_report
+from core.expert_config import load_expert_config, save_expert_config, apply_value_replacements
 from core.matching_config import (
     load_matching_config, save_matching_config, default_config,
     MATCHABLE_FILES, FILE_LABELS, DB_KEY_CANDIDATES, FILE_KEY_CANDIDATES,
@@ -156,11 +157,78 @@ def render_admin_file_update():
                 )
 
 
+def render_expert_admin():
+    if 'expert_config' not in st.session_state:
+        st.session_state['expert_config'] = load_expert_config()
+    
+    if st.session_state.get('user_role') != 'admin':
+        return st.session_state['expert_config']
+        
+    config = st.session_state['expert_config']
+    
+    with st.expander("🛠 전문가 설정: 값 치환 & 자주 쓰는 컬럼 (저장 가능)", expanded=False):
+        st.caption("여기서 설정한 '값 치환 규칙'은 데이터 로드 즉시 반영되며, '자주 쓰는 컬럼'은 대시보드 탭에 기본 필터로 적용됩니다.")
+        
+        tab_titles = ["1. 총괄DB", "2. VOC", "3. 순찰", "4. 원본", "5. 시설", "6. 해지", "7. 해지시설"]
+        keys = ['db', 'voc', 'patrol', 'original', 'facility', 'cancel', 'cancelled_facility']
+        tabs = st.tabs(tab_titles)
+        
+        for i, key in enumerate(keys):
+            with tabs[i]:
+                st.markdown("##### 자주 쓰는 컬럼 설정")
+                raw_df = st.session_state.get('raw_files', {}).get(key)
+                if raw_df is not None:
+                    all_cols = list(raw_df.columns)
+                    saved_cols = [c for c in config["favorite_columns"].get(key, []) if c in all_cols]
+                    selected = st.multiselect("보여줄 컬럼 선택 (비워두면 모두 표시)", all_cols, default=saved_cols, key=f"fav_{key}")
+                    config["favorite_columns"][key] = selected
+                else:
+                    st.info("데이터를 업로드하고 병합하면 컬럼을 선택할 수 있습니다.")
+                    
+                st.markdown("##### 특정 컬럼 값 치환 (전문가 기법)")
+                if "value_replacements" not in config:
+                    config["value_replacements"] = {}
+                replacements = config["value_replacements"].get(key, [])
+                
+                remove_idx = None
+                for r_idx, rule in enumerate(replacements):
+                    c1, c2, c3, c4 = st.columns([3,3,3,1])
+                    if raw_df is not None:
+                        col_opts = list(raw_df.columns)
+                        c_idx = col_opts.index(rule['col']) if rule.get('col') in col_opts else 0
+                        rule['col'] = c1.selectbox("대상 컬럼", col_opts, index=c_idx, key=f"repl_col_{key}_{r_idx}", label_visibility="collapsed")
+                    else:
+                        rule['col'] = c1.text_input("대상 컬럼", value=rule.get('col',''), key=f"repl_col_{key}_{r_idx}", label_visibility="collapsed", placeholder="대상 컬럼")
+                        
+                    rule['old'] = c2.text_input("원본 값", value=rule.get('old',''), key=f"repl_old_{key}_{r_idx}", label_visibility="collapsed", placeholder="원본 값")
+                    rule['new'] = c3.text_input("변경할 값", value=rule.get('new',''), key=f"repl_new_{key}_{r_idx}", label_visibility="collapsed", placeholder="변경할 값")
+                    
+                    if c4.button("삭제", key=f"repl_del_{key}_{r_idx}"):
+                        remove_idx = r_idx
+                        
+                if remove_idx is not None:
+                    replacements.pop(remove_idx)
+                    st.rerun()
+                    
+                if st.button("➕ 치환 규칙 추가", key=f"repl_add_{key}"):
+                    replacements.append({"col": "", "old": "", "new": ""})
+                    st.rerun()
+                    
+                config["value_replacements"][key] = replacements
+        
+        st.divider()
+        if st.button("💾 전문가 설정 저장", type="primary"):
+            save_expert_config(config)
+            st.success("설정이 저장되었습니다. '데이터 병합 및 처리'를 다시 누르면 치환된 데이터가 반영됩니다.")
+            
+    return config
+
 def render_dashboard():
     st.markdown("<h1>Data Intel PRO Dashboard</h1>", unsafe_allow_html=True)
 
     render_admin_file_update()
     matching_config = render_matching_admin()
+    expert_config = render_expert_admin()
 
     col1, col2 = st.columns([3, 1])
 
@@ -209,6 +277,13 @@ def render_dashboard():
                 'cancel': cancel_df,
                 'cancelled_facility': cancelled_facility_df,
             }
+            
+            for k, df_ in files_dict.items():
+                if df_ is not None:
+                    files_dict[k] = apply_value_replacements(df_, k, expert_config)
+            
+            cancel_df = files_dict.get('cancel')
+            cancelled_facility_df = files_dict.get('cancelled_facility')
 
             merged_df, msg, match_report = process_and_merge(files_dict, matching_config=matching_config)
 
@@ -291,6 +366,16 @@ def render_dashboard():
                 return filtered_df
 
         df = st.session_state['merged_df']
+        
+        def get_display_df(df_view, key):
+            if df_view is None or df_view.empty:
+                return df_view
+            fav_cols = st.session_state['expert_config'].get("favorite_columns", {}).get(key, [])
+            if fav_cols:
+                valid_cols = [c for c in fav_cols if c in df_view.columns]
+                if valid_cols:
+                    return df_view[valid_cols]
+            return df_view
 
         tabs = st.tabs([
             "1. 총괄DB(처리결과)", 
@@ -305,14 +390,14 @@ def render_dashboard():
         with tabs[0]:
             st.markdown("#### 총괄DB 및 병합결과")
             df_filtered = dynamic_filter(df, "db")
-            st.dataframe(df_filtered, use_container_width=True)
+            st.dataframe(get_display_df(df_filtered, "db"), use_container_width=True)
 
         with tabs[1]:
             st.markdown("#### VOC정보조회 (원본)")
             voc_df = st.session_state.get('raw_voc_df')
             if voc_df is not None:
                 voc_df = dynamic_filter(voc_df, "voc")
-                st.dataframe(voc_df, use_container_width=True)
+                st.dataframe(get_display_df(voc_df, "voc"), use_container_width=True)
             else: st.warning("업로드된 데이터가 없습니다.")
 
         with tabs[2]:
@@ -320,7 +405,7 @@ def render_dashboard():
             patrol_df = st.session_state.get('raw_patrol_df')
             if patrol_df is not None:
                 patrol_df = dynamic_filter(patrol_df, "patrol")
-                st.dataframe(patrol_df, use_container_width=True)
+                st.dataframe(get_display_df(patrol_df, "patrol"), use_container_width=True)
             else: st.warning("업로드된 데이터가 없습니다.")
 
         with tabs[3]:
@@ -328,7 +413,7 @@ def render_dashboard():
             original_df = st.session_state.get('raw_original_df')
             if original_df is not None:
                 original_df = dynamic_filter(original_df, "original")
-                st.dataframe(original_df, use_container_width=True)
+                st.dataframe(get_display_df(original_df, "original"), use_container_width=True)
             else: st.warning("업로드된 데이터가 없습니다.")
 
         with tabs[4]:
@@ -336,7 +421,7 @@ def render_dashboard():
             facility_df = st.session_state.get('raw_facility_df')
             if facility_df is not None:
                 facility_df = dynamic_filter(facility_df, "facility")
-                st.dataframe(facility_df, use_container_width=True)
+                st.dataframe(get_display_df(facility_df, "facility"), use_container_width=True)
             else: st.warning("업로드된 데이터가 없습니다.")
 
         with tabs[5]:
@@ -344,7 +429,7 @@ def render_dashboard():
             cancel_df = st.session_state.get('raw_cancel_df')
             if cancel_df is not None:
                 cancel_df = dynamic_filter(cancel_df, "cancel")
-                st.dataframe(cancel_df, use_container_width=True)
+                st.dataframe(get_display_df(cancel_df, "cancel"), use_container_width=True)
             else: st.warning("업로드된 데이터가 없습니다.")
 
         with tabs[6]:
@@ -352,7 +437,7 @@ def render_dashboard():
             cancelled_facility_df = st.session_state.get('raw_cancelled_facility_df')
             if cancelled_facility_df is not None:
                 cancelled_facility_df = dynamic_filter(cancelled_facility_df, "cancelled_facility")
-                st.dataframe(cancelled_facility_df, use_container_width=True)
+                st.dataframe(get_display_df(cancelled_facility_df, "cancelled_facility"), use_container_width=True)
             else: st.warning("업로드된 데이터가 없습니다.")
 
         st.markdown("### EDA 분석 (인터랙티브 시각화)")
