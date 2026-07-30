@@ -258,7 +258,7 @@ def process_and_merge(files_dict, matching_config):
     merged_df = db_df.copy()
     match_report = {}
 
-    for key, suffix in [('original', 'origin'), ('facility', 'fac')]:
+    for key, suffix in [('original', 'origin'), ('facility', 'fac'), ('cancel', 'cancel'), ('cancelled_facility', 'cancelfac')]:
         file_df = files_dict.get(key)
         conditions = enabled_conditions(matching_config, key) if file_df is not None else []
         if file_df is None or not conditions:
@@ -318,5 +318,24 @@ def process_and_merge(files_dict, matching_config):
     merged_df['계약상태'] = _first_non_null(
         col('계약상태_origin').astype(object), col('계약상태(중)_fac').astype(object), col('계약상태(대)_fac').astype(object),
     )
+
+    # --- 상태값 역반영 (총괄DB 업데이트) 로직 ---
+    if 'sp 담당자 상태값' not in merged_df.columns:
+        merged_df['sp 담당자 상태값'] = None
+    
+    # 1. 2번 voc 상태 컬럼에 처리완료, 접수, 미접수 값을 1번 sp 담당자 상태값 반영
+    if '최근VOC상태' in merged_df.columns:
+        voc_mask = merged_df['최근VOC상태'].isin(['처리완료', '접수', '미접수'])
+        merged_df.loc[voc_mask, 'sp 담당자 상태값'] = merged_df.loc[voc_mask, '최근VOC상태']
+    
+    # 2. 7번 계약상태(중) 컬럼에 일반해지는 1번에 처리완료
+    if '계약상태(중)_cancelfac' in merged_df.columns:
+        cancel_mask = merged_df['계약상태(중)_cancelfac'] == '일반해지'
+        merged_df.loc[cancel_mask, 'sp 담당자 상태값'] = '처리완료'
+        
+    # 3. 순찰정기점검내역 매칭되는 것은 처리완료로 처리
+    if '순찰건수' in merged_df.columns:
+        patrol_mask = merged_df['순찰건수'] > 0
+        merged_df.loc[patrol_mask, 'sp 담당자 상태값'] = '처리완료'
 
     return merged_df, "성공적으로 병합되었습니다.", match_report

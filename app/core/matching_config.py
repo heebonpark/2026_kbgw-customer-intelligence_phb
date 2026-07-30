@@ -4,10 +4,6 @@ the auxiliary files. Replaces hardcoded join columns with an admin-editable,
 persisted set of conditions so a match can require more than one column to
 agree at once (a composite AND key) -- e.g. 계약번호 AND 서비스번호 must both
 match, not just one.
-
-해지 파이프라인(cancel) is intentionally NOT part of this config: it is
-treated as an independent, company-wide dataset and is never joined onto the
-per-contract master table (see app/core/report.py 해지 파이프라인 section).
 """
 
 import json
@@ -16,14 +12,16 @@ import os
 CONFIG_DIR = os.path.expanduser("~/.dataintelligence_pro")
 CONFIG_PATH = os.path.join(CONFIG_DIR, "matching_config.json")
 
-# The join-able files (cancel/해지시설내역 are handled separately -- see analytics.py)
-MATCHABLE_FILES = ['original', 'facility', 'patrol', 'voc']
+# The join-able files
+MATCHABLE_FILES = ['original', 'facility', 'patrol', 'voc', 'cancel', 'cancelled_facility']
 
 FILE_LABELS = {
     'original': '2026년 관리고객원본',
     'facility': '시설현황',
     'patrol': '순찰 정기점검 내역',
     'voc': 'VOC정보조회',
+    'cancel': '해지 파이프라인',
+    'cancelled_facility': '해지시설 내역',
 }
 
 # Columns offered as match-key candidates for each side. Kept to identifier
@@ -37,6 +35,8 @@ FILE_KEY_CANDIDATES = {
     'facility': ['계약번호', '고객번호', '서비스번호'],
     'patrol': ['고객번호'],
     'voc': ['계약번호', '고객번호', '서비스번호'],
+    'cancel': ['계약번호', '고객번호', '서비스번호'],
+    'cancelled_facility': ['계약번호', '고객번호', '서비스번호'],
 }
 
 # Extra (non-key) columns worth carrying over from each file once matched --
@@ -46,6 +46,8 @@ FILE_DISPLAY_COLUMNS = {
     'facility': ['서비스재개시일', 'KTT월정료', '계약상태(중)', '계약상태(대)', '쟤계약여부', '재계약여부', '관리본부명', '관리지사명'],
     'patrol': ['결과', '특이사항', '도착시간', '출발시간'],
     'voc': ['상태', 'VOC유형대', '접수일시'],
+    'cancel': ['계약상태'],
+    'cancelled_facility': ['계약상태(중)', '계약상태(대)'],
 }
 
 DEFAULT_CONDITIONS = {
@@ -53,6 +55,8 @@ DEFAULT_CONDITIONS = {
     'facility': [{'db_col': '계약번호', 'file_col': '계약번호', 'enabled': True}],
     'patrol': [{'db_col': '서비스번호', 'file_col': '고객번호', 'enabled': True}],
     'voc': [{'db_col': '계약번호', 'file_col': '계약번호', 'enabled': True}],
+    'cancel': [{'db_col': '계약번호', 'file_col': '계약번호', 'enabled': True}],
+    'cancelled_facility': [{'db_col': '계약번호', 'file_col': '계약번호', 'enabled': True}],
 }
 
 

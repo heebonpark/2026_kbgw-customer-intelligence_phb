@@ -195,18 +195,20 @@ def render_dashboard():
             return
 
         with st.spinner("데이터 처리 중..."):
+            cancel_df = load_data(cancel_file, cancel_file.name.endswith('.csv')) if cancel_file else None
+            cancelled_facility_df = (
+                load_data(cancelled_facility_file, cancelled_facility_file.name.endswith('.csv'))
+                if cancelled_facility_file else None
+            )
             files_dict = {
                 'db': load_data(db_file),
                 'voc': load_data(voc_file, voc_file.name.endswith('.csv')) if voc_file else None,
                 'patrol': load_data(patrol_file, patrol_file.name.endswith('.csv')) if patrol_file else None,
                 'original': load_data(original_file, original_file.name.endswith('.csv')) if original_file else None,
                 'facility': load_data(facility_file, facility_file.name.endswith('.csv')) if facility_file else None,
+                'cancel': cancel_df,
+                'cancelled_facility': cancelled_facility_df,
             }
-            cancel_df = load_data(cancel_file, cancel_file.name.endswith('.csv')) if cancel_file else None
-            cancelled_facility_df = (
-                load_data(cancelled_facility_file, cancelled_facility_file.name.endswith('.csv'))
-                if cancelled_facility_file else None
-            )
 
             merged_df, msg, match_report = process_and_merge(files_dict, matching_config=matching_config)
 
@@ -216,6 +218,8 @@ def render_dashboard():
                 st.session_state['raw_files'] = files_dict
                 st.session_state['raw_voc_df'] = files_dict.get('voc')
                 st.session_state['raw_patrol_df'] = files_dict.get('patrol')
+                st.session_state['raw_original_df'] = files_dict.get('original')
+                st.session_state['raw_facility_df'] = files_dict.get('facility')
                 st.session_state['raw_cancel_df'] = cancel_df
                 st.session_state['raw_cancelled_facility_df'] = cancelled_facility_df
                 st.session_state['match_report'] = match_report
@@ -235,26 +239,121 @@ def render_dashboard():
                 else:
                     st.write(f"⚪ {label}: 매칭 조건 미적용 (파일 없음 또는 조건 비활성화)")
 
+        def dynamic_filter(df, key_prefix):
+            import pandas as pd
+            if df is None or df.empty:
+                return df
+            
+            with st.expander(f"🔍 {key_prefix} 데이터 다중 조건 검색", expanded=False):
+                if f'{key_prefix}_filter_count' not in st.session_state:
+                    st.session_state[f'{key_prefix}_filter_count'] = 1
+                
+                cols = st.columns([2, 2, 3])
+                cols[0].write("컬럼")
+                cols[1].write("연산자")
+                cols[2].write("값")
+                
+                filters = []
+                for i in range(st.session_state[f'{key_prefix}_filter_count']):
+                    c1, c2, c3 = st.columns([2, 2, 3])
+                    selected_col = c1.selectbox("컬럼", df.columns, key=f'{key_prefix}_col_{i}', label_visibility="collapsed")
+                    operator = c2.selectbox("연산자", ["포함", "일치", "제외", "크거나 같음", "작거나 같음"], key=f'{key_prefix}_op_{i}', label_visibility="collapsed")
+                    val = c3.text_input("값", key=f'{key_prefix}_val_{i}', label_visibility="collapsed")
+                    filters.append((selected_col, operator, val))
+                
+                c_add, c_reset = st.columns(2)
+                if c_add.button("➕ 조건 추가", key=f'{key_prefix}_add_btn'):
+                    st.session_state[f'{key_prefix}_filter_count'] += 1
+                    st.rerun()
+                if c_reset.button("🔄 조건 초기화", key=f'{key_prefix}_reset_btn'):
+                    st.session_state[f'{key_prefix}_filter_count'] = 1
+                    st.rerun()
+                    
+                filtered_df = df.copy()
+                for col_name, op, val in filters:
+                    if not val:
+                        continue
+                    if op == "포함":
+                        filtered_df = filtered_df[filtered_df[col_name].astype(str).str.contains(val, case=False, na=False)]
+                    elif op == "일치":
+                        filtered_df = filtered_df[filtered_df[col_name].astype(str) == val]
+                    elif op == "제외":
+                        filtered_df = filtered_df[~filtered_df[col_name].astype(str).str.contains(val, case=False, na=False)]
+                    elif op == "크거나 같음":
+                        try:
+                            filtered_df = filtered_df[pd.to_numeric(filtered_df[col_name], errors='coerce') >= float(val)]
+                        except: pass
+                    elif op == "작거나 같음":
+                        try:
+                            filtered_df = filtered_df[pd.to_numeric(filtered_df[col_name], errors='coerce') <= float(val)]
+                        except: pass
+                
+                return filtered_df
+
         df = st.session_state['merged_df']
 
-        if '관리본부' in df.columns:
-            hqs = ["전체"] + [h for h in df['관리본부'].dropna().unique()]
-            selected_hq = st.selectbox("본부 선택", hqs)
-            if selected_hq != "전체":
-                df = df[df['관리본부'] == selected_hq]
+        tabs = st.tabs([
+            "1. 총괄DB(처리결과)", 
+            "2. VOC정보조회", 
+            "3. 순찰정기점검", 
+            "4. 관리고객원본", 
+            "5. 시설현황", 
+            "6. 해지 파이프라인", 
+            "7. 해지시설 내역"
+        ])
 
-        if '관리지사' in df.columns:
-            branches = ["전체"] + [b for b in df['관리지사'].dropna().unique()]
-            selected_branch = st.selectbox("지사 선택", branches)
-            if selected_branch != "전체":
-                df = df[df['관리지사'] == selected_branch]
+        with tabs[0]:
+            st.markdown("#### 총괄DB 및 병합결과")
+            df_filtered = dynamic_filter(df, "db")
+            st.dataframe(df_filtered, use_container_width=True)
 
-        st.dataframe(df, use_container_width=True)
+        with tabs[1]:
+            st.markdown("#### VOC정보조회 (원본)")
+            voc_df = st.session_state.get('raw_voc_df')
+            if voc_df is not None:
+                voc_df = dynamic_filter(voc_df, "voc")
+                st.dataframe(voc_df, use_container_width=True)
+            else: st.warning("업로드된 데이터가 없습니다.")
 
-        cancel_df = st.session_state.get('raw_cancel_df')
-        if cancel_df is not None:
-            st.markdown("### 해지 파이프라인 (독립 데이터, 전사 기준)")
-            st.dataframe(cancel_df, use_container_width=True)
+        with tabs[2]:
+            st.markdown("#### 순찰정기점검 (원본)")
+            patrol_df = st.session_state.get('raw_patrol_df')
+            if patrol_df is not None:
+                patrol_df = dynamic_filter(patrol_df, "patrol")
+                st.dataframe(patrol_df, use_container_width=True)
+            else: st.warning("업로드된 데이터가 없습니다.")
+
+        with tabs[3]:
+            st.markdown("#### 관리고객원본")
+            original_df = st.session_state.get('raw_original_df')
+            if original_df is not None:
+                original_df = dynamic_filter(original_df, "original")
+                st.dataframe(original_df, use_container_width=True)
+            else: st.warning("업로드된 데이터가 없습니다.")
+
+        with tabs[4]:
+            st.markdown("#### 시설현황")
+            facility_df = st.session_state.get('raw_facility_df')
+            if facility_df is not None:
+                facility_df = dynamic_filter(facility_df, "facility")
+                st.dataframe(facility_df, use_container_width=True)
+            else: st.warning("업로드된 데이터가 없습니다.")
+
+        with tabs[5]:
+            st.markdown("#### 해지 파이프라인")
+            cancel_df = st.session_state.get('raw_cancel_df')
+            if cancel_df is not None:
+                cancel_df = dynamic_filter(cancel_df, "cancel")
+                st.dataframe(cancel_df, use_container_width=True)
+            else: st.warning("업로드된 데이터가 없습니다.")
+
+        with tabs[6]:
+            st.markdown("#### 해지시설 내역")
+            cancelled_facility_df = st.session_state.get('raw_cancelled_facility_df')
+            if cancelled_facility_df is not None:
+                cancelled_facility_df = dynamic_filter(cancelled_facility_df, "cancelled_facility")
+                st.dataframe(cancelled_facility_df, use_container_width=True)
+            else: st.warning("업로드된 데이터가 없습니다.")
 
         st.markdown("### EDA 분석 (인터랙티브 시각화)")
         with st.expander("📊 PyGWalker EDA 열기", expanded=False):
@@ -273,7 +372,7 @@ def render_dashboard():
             df,
             voc_df=st.session_state.get('raw_voc_df'),
             patrol_df=st.session_state.get('raw_patrol_df'),
-            cancel_df=cancel_df,
+            cancel_df=st.session_state.get('raw_cancel_df'),
             cancelled_facility_df=st.session_state.get('raw_cancelled_facility_df'),
             raw_files=st.session_state.get('raw_files'),
             matching_config=st.session_state.get('used_matching_config'),
