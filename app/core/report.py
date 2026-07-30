@@ -284,9 +284,18 @@ def render_simple_table(columns, rows):
 # ---------------------------------------------------------------------------
 
 def _progress_cell_style(pct):
-    opacity = 12 + max(0.0, min(100.0, pct)) * 0.8  # 12% -> 92%
-    text_role = 'progress-text-light' if pct >= 55 else 'progress-text-dark'
-    return f'background: color-mix(in srgb, var(--s1) {opacity:.0f}%, var(--surface-1));', text_role
+    """진척율을 상태색(위험/주의/양호)으로 인코딩한다 -- 값이 높을수록 진해
+    지는 단색 그라데이션 대신, 부진 지사(낮은 진척율)가 즉시 눈에 띄도록
+    빨간 톤을 쓴다. 부진은 강하게(55%), 양호는 옅게(22%) 칠해서 '나쁜 것'
+    쪽으로 시선이 먼저 가게 한 것도 의도적이다."""
+    pct = max(0.0, min(100.0, pct))
+    if pct < 30:
+        var_name, opacity, text_role = '--critical', 55, 'progress-text-light'
+    elif pct < 55:
+        var_name, opacity, text_role = '--warning', 38, 'progress-text-dark'
+    else:
+        var_name, opacity, text_role = '--good', 22, 'progress-text-dark'
+    return f'background: color-mix(in srgb, var({var_name}) {opacity}%, var(--surface-1));', text_role
 
 
 def render_progress_matrix(matrix):
@@ -799,6 +808,7 @@ def render_nudge_section(cancelled_facility_df, cancel_df, threshold=100_000):
     table_html = _nudge_table_html(columns, nudge['rows'])
     filter_html = _nudge_status_filter_html(nudge.get('status_values') or [])
     branch_summary_html = _nudge_branch_summary_html(nudge.get('by_branch') or [])
+    charts_html = _nudge_charts_html(nudge.get('by_branch') or [], nudge['rows'])
 
     return f"""
     <details class="section-collapse" open><summary class="section-title">고액 해지 미등록 알림</summary>
@@ -807,6 +817,7 @@ def render_nudge_section(cancelled_facility_df, cancel_df, threshold=100_000):
         <strong>{nudge['count']:,}건({_fmt_won(nudge['amount_sum'])})이 해지 파이프라인에 미등록</strong> 상태입니다.
         아래 목록을 해지 파이프라인에 등록하도록 담당자에게 독려하세요.
     </div>
+    {charts_html}
     {filter_html}
     <div class="stat-grid" id="nudgeBranchSummary">{branch_summary_html}</div>
     <div class="table-section">{table_html}</div>
@@ -868,6 +879,41 @@ def _nudge_branch_summary_html(by_branch):
             <div class="stat-sub">{r['월정료합계']:,}원</div>
         </div>""")
     return "".join(tiles)
+
+
+def _nudge_charts_html(by_branch, rows, section_id="nudgeSection"):
+    """지사별 건수/금액 타일 옆에 실제 차트 두 개를 더해 한눈에 훑을 수
+    있게 한다 -- 지사별 미등록 금액(크기 비교) + 계약상태(중) 분포(구성비)."""
+    parts = []
+    if by_branch:
+        branch_chart = {
+            "title": "지사별 미등록 월정료 합계",
+            "unit": "원",
+            "items": [{"label": r['지사'], "value": r['월정료합계']} for r in by_branch],
+        }
+        chart_html = render_magnitude_chart(branch_chart, f'{section_id}BranchChart')
+        if chart_html:
+            parts.append(chart_html)
+
+    status_counts = {}
+    for r in rows:
+        s = r.get('계약상태(중)')
+        if s:
+            status_counts[s] = status_counts.get(s, 0) + 1
+    if status_counts:
+        status_items = sorted(status_counts.items(), key=lambda kv: -kv[1])
+        status_chart = {
+            "title": "계약상태(중) 분포",
+            "unit": "건",
+            "items": [{"label": k, "value": v} for k, v in status_items],
+        }
+        chart_html = render_stacked_chart(status_chart, f'{section_id}StatusChart', mode='categorical')
+        if chart_html:
+            parts.append(chart_html)
+
+    if not parts:
+        return ""
+    return f'<div class="chart-grid">{"".join(parts)}</div>'
 
 
 def render_eda_section_body(eda, section_id="edaSection"):
@@ -1229,6 +1275,7 @@ tbody tr:hover { background: var(--page-plane); }
 .progress-table-scroll { margin-bottom: 24px; }
 .progress-table { font-size: 12px; }
 .progress-table th { white-space: nowrap; }
+.progress-table .cell-num { text-align: center; }
 .progress-group-th { text-align: center; background: var(--brand-dark); }
 .progress-branch { font-weight: 600; white-space: nowrap; }
 .progress-cell { font-weight: 700; }
@@ -2903,10 +2950,14 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
     }
 
     function progressCellStyle(pct) {
-        const opacity = 12 + Math.max(0, Math.min(100, pct)) * 0.8;
+        pct = Math.max(0, Math.min(100, pct));
+        let varName, opacity, textRole;
+        if (pct < 30) { varName = '--critical'; opacity = 55; textRole = 'progress-text-light'; }
+        else if (pct < 55) { varName = '--warning'; opacity = 38; textRole = 'progress-text-dark'; }
+        else { varName = '--good'; opacity = 22; textRole = 'progress-text-dark'; }
         return {
-            bg: 'background: color-mix(in srgb, var(--s1) ' + opacity.toFixed(0) + '%, var(--surface-1));',
-            textRole: pct >= 55 ? 'progress-text-light' : 'progress-text-dark',
+            bg: 'background: color-mix(in srgb, var(' + varName + ') ' + opacity + '%, var(--surface-1));',
+            textRole: textRole,
         };
     }
     function progressNumTd(value) {
