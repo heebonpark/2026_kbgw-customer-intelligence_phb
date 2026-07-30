@@ -1,22 +1,21 @@
-ï»¿@echo off
-chcp 65001 > nul
+@echo off
 echo ===================================================
-echo Data Intel PRO - ìœˆë„ìš°ìš© ì‹¤í–‰íŒŒì¼ ë¹Œë“œ ìŠ¤í¬ë¦½íŠ¸
+echo Data Intel PRO - À©µµ¿ì¿ë ½ÇÇàÆÄÀÏ ºôµå ½ºÅ©¸³Æ®
 echo ===================================================
 echo.
-echo ì´ ìŠ¤í¬ë¦½íŠ¸ëŠ” PyInstallerë¥¼ ì‚¬ìš©í•˜ì—¬ gui_app.pyë¥¼
-echo ë‹¨ì¼ ì‹¤í–‰ íŒŒì¼(.exe)ë¡œ ë³€í™˜í•©ë‹ˆë‹¤.
-echo íŒŒì´ì¬ê³¼ ê´€ë ¨ íŒ¨í‚¤ì§€(pandas, openpyxl, pyinstaller ë“±)ê°€
-echo ìœˆë„ìš°ì— ì„¤ì¹˜ë˜ì–´ ìžˆì–´ì•¼ í•©ë‹ˆë‹¤.
+echo ÀÌ ½ºÅ©¸³Æ®´Â PyInstaller¸¦ »ç¿ëÇÏ¿© gui_app.py¸¦
+echo ´ÜÀÏ ½ÇÇà ÆÄÀÏ(.exe)·Î º¯È¯ÇÕ´Ï´Ù.
+echo ÆÄÀÌ½ã°ú °ü·Ã ÆÐÅ°Áö(pandas, openpyxl, pyinstaller µî)°¡
+echo À©µµ¿ì¿¡ ¼³Ä¡µÇ¾î ÀÖ¾î¾ß ÇÕ´Ï´Ù.
 echo.
 pause
 
 echo.
-echo PyInstallerë¡œ ë¹Œë“œ ì‹œìž‘...
+echo PyInstaller·Î ºôµå ½ÃÀÛ...
 pyinstaller --noconfirm --onedir --windowed --add-data "app;app"  gui_app.py
 
 echo.
-echo ë¹Œë“œê°€ ì™„ë£Œë˜ì—ˆìŠµë‹ˆë‹¤!
-echo ì‹¤í–‰ íŒŒì¼ì€ 'dist/gui_app/' í´ë” ë‚´ì— ìžˆìŠµë‹ˆë‹¤.
+echo ºôµå°¡ ¿Ï·áµÇ¾ú½À´Ï´Ù!
+echo ½ÇÇà ÆÄÀÏÀº 'dist/gui_app/' Æú´õ ³»¿¡ ÀÖ½À´Ï´Ù.
 echo.
 pause
