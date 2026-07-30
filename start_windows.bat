@@ -48,6 +48,20 @@ if not exist venv (
 call venv\Scripts\activate.bat
 echo.
 
+rem ---- tkinter 사전 점검 -- 이 GUI는 tkinter(파이썬 표준 GUI 모듈) 없이는
+rem      창이 아예 뜨지 않는데, 터미널만 열리고 아무 반응이 없는 것처럼
+rem      보이는 가장 흔한 원인이 이거다. Microsoft Store 파이썬이나 일부
+rem      최소 설치본에는 tkinter가 빠져 있는 경우가 있다.
+python -c "import tkinter" >nul 2>&1
+if errorlevel 1 (
+    echo   ❌ 이 파이썬에는 tkinter^(GUI 모듈^)가 없어서 창이 뜨지 않습니다.
+    echo      python.org 에서 파이썬을 다시 설치하면서 설치 화면에서
+    echo      "tcl/tk and IDLE"을 체크해주세요 ^(기본 설치에는 보통 포함됩니다^).
+    echo.
+    pause
+    exit /b 1
+)
+
 rem ---- [3/4] 패키지 설치 ----
 echo   [3/4] 필수 패키지 설치 확인 중... ^(최초 실행 시 몇 분 걸릴 수 있습니다^)
 python -m pip install --disable-pip-version-check -q -r requirements.txt

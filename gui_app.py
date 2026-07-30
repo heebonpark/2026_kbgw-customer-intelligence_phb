@@ -339,7 +339,27 @@ class DataIntelGUI:
             self.run_btn.config(state=tk.NORMAL)
 
 
+def _show_on_screen(root, width, height):
+    """Forces a known-good, on-screen position and brings the window to the
+    front. Without this, Windows sometimes restores a Tk window at whatever
+    position/monitor it last remembered (a disconnected second monitor, a
+    different DPI/resolution, etc.) -- the process is running and the window
+    technically exists, it's just not visible anywhere, which looks exactly
+    like "the terminal opened but the GUI never launched." """
+    root.update_idletasks()
+    screen_w, screen_h = root.winfo_screenwidth(), root.winfo_screenheight()
+    x = max(0, (screen_w - width) // 2)
+    y = max(0, (screen_h - height) // 3)
+    root.geometry(f"{width}x{height}+{x}+{y}")
+    root.deiconify()
+    root.lift()
+    root.attributes('-topmost', True)
+    root.after(400, lambda: root.attributes('-topmost', False))
+    root.focus_force()
+
+
 if __name__ == "__main__":
     root = tk.Tk()
     app = DataIntelGUI(root)
+    _show_on_screen(root, 820, 760)
     root.mainloop()
