@@ -15,6 +15,7 @@ from core.auth import init_app_dir, setup_session_state, render_login, add_log
 from core.handlers import load_data, process_and_merge
 from core.report import generate_html_report
 from core.expert_config import load_expert_config, save_expert_config, apply_value_replacements
+from core.ml_analytics import render_ml_pipeline
 from core.matching_config import (
     load_matching_config, save_matching_config, default_config,
     MATCHABLE_FILES, FILE_LABELS, DB_KEY_CANDIDATES, FILE_KEY_CANDIDATES,
@@ -314,6 +315,61 @@ def render_dashboard():
                 else:
                     st.write(f"⚪ {label}: 매칭 조건 미적용 (파일 없음 또는 조건 비활성화)")
 
+        def render_quick_filters_and_viz(df_to_render, key_prefix):
+            if df_to_render is None or df_to_render.empty:
+                return df_to_render
+            
+            hq_cols = [c for c in df_to_render.columns if c in ['관리본부명', '관리본부', '본부']]
+            branch_cols = [c for c in df_to_render.columns if c in ['관리지사명', '관리지사', '지사']]
+            zone_cols = [c for c in df_to_render.columns if c in ['영업구역정보', '영업구역명', '영업구역']]
+            status_cols = [c for c in df_to_render.columns if c in ['상태', '계약상태', '계약상태(중)', 'sp 담당자 상태값', '결과']]
+            
+            hq_col = hq_cols[0] if hq_cols else None
+            branch_col = branch_cols[0] if branch_cols else None
+            zone_col = zone_cols[0] if zone_cols else None
+            status_col = status_cols[0] if status_cols else None
+
+            has_quick_filter = hq_col or branch_col or zone_col
+            if has_quick_filter:
+                cols = st.columns(3)
+                if hq_col:
+                    unique_hqs = df_to_render[hq_col].dropna().unique()
+                    selected_hqs = cols[0].multiselect(f"🏢 {hq_col} 퀵필터", unique_hqs, key=f"qf_hq_{key_prefix}")
+                    if selected_hqs:
+                        df_to_render = df_to_render[df_to_render[hq_col].isin(selected_hqs)]
+                if branch_col:
+                    unique_branches = df_to_render[branch_col].dropna().unique()
+                    selected_branches = cols[1].multiselect(f"🏢 {branch_col} 퀵필터", unique_branches, key=f"qf_branch_{key_prefix}")
+                    if selected_branches:
+                        df_to_render = df_to_render[df_to_render[branch_col].isin(selected_branches)]
+                if zone_col:
+                    unique_zones = df_to_render[zone_col].dropna().unique()
+                    selected_zones = cols[2].multiselect(f"🗺️ {zone_col} 퀵필터", unique_zones, key=f"qf_zone_{key_prefix}")
+                    if selected_zones:
+                        df_to_render = df_to_render[df_to_render[zone_col].isin(selected_zones)]
+
+            with st.expander(f"📈 {key_prefix.upper()} 데이터 요약 시각화 및 EDA", expanded=False):
+                st.metric("총 데이터 건수", f"{len(df_to_render):,} 건")
+                chart_cols = st.columns(2)
+                if hq_col:
+                    with chart_cols[0]:
+                        st.markdown(f"**{hq_col}별 분포**")
+                        st.bar_chart(df_to_render[hq_col].value_counts())
+                if status_col:
+                    with chart_cols[1]:
+                        st.markdown(f"**{status_col}별 분포**")
+                        st.bar_chart(df_to_render[status_col].value_counts())
+                
+                st.markdown("---")
+                if st.button(f"🚀 {key_prefix.upper()} 상세 데이터 탐색 (EDA) 시작", key=f"start_eda_{key_prefix}"):
+                    import pygwalker as pyg
+                    from pygwalker.api.streamlit import StreamlitRenderer
+                    with st.spinner("EDA 환경 구성 중..."):
+                        walker = StreamlitRenderer(df_to_render, spec="")
+                        walker.explorer()
+                
+            return df_to_render
+
         def dynamic_filter(df, key_prefix):
             import pandas as pd
             if df is None or df.empty:
@@ -384,18 +440,21 @@ def render_dashboard():
             "4. 관리고객원본", 
             "5. 시설현황", 
             "6. 해지 파이프라인", 
-            "7. 해지시설 내역"
+            "7. 해지시설 내역",
+            "8. 🤖 AI 심층 분석 (ML/DL)"
         ])
 
         with tabs[0]:
             st.markdown("#### 총괄DB 및 병합결과")
-            df_filtered = dynamic_filter(df, "db")
+            df_view = render_quick_filters_and_viz(df, "db")
+            df_filtered = dynamic_filter(df_view, "db")
             st.dataframe(get_display_df(df_filtered, "db"), use_container_width=True)
 
         with tabs[1]:
             st.markdown("#### VOC정보조회 (원본)")
             voc_df = st.session_state.get('raw_voc_df')
             if voc_df is not None:
+                voc_df = render_quick_filters_and_viz(voc_df, "voc")
                 voc_df = dynamic_filter(voc_df, "voc")
                 st.dataframe(get_display_df(voc_df, "voc"), use_container_width=True)
             else: st.warning("업로드된 데이터가 없습니다.")
@@ -404,6 +463,7 @@ def render_dashboard():
             st.markdown("#### 순찰정기점검 (원본)")
             patrol_df = st.session_state.get('raw_patrol_df')
             if patrol_df is not None:
+                patrol_df = render_quick_filters_and_viz(patrol_df, "patrol")
                 patrol_df = dynamic_filter(patrol_df, "patrol")
                 st.dataframe(get_display_df(patrol_df, "patrol"), use_container_width=True)
             else: st.warning("업로드된 데이터가 없습니다.")
@@ -412,6 +472,7 @@ def render_dashboard():
             st.markdown("#### 관리고객원본")
             original_df = st.session_state.get('raw_original_df')
             if original_df is not None:
+                original_df = render_quick_filters_and_viz(original_df, "original")
                 original_df = dynamic_filter(original_df, "original")
                 st.dataframe(get_display_df(original_df, "original"), use_container_width=True)
             else: st.warning("업로드된 데이터가 없습니다.")
@@ -420,6 +481,7 @@ def render_dashboard():
             st.markdown("#### 시설현황")
             facility_df = st.session_state.get('raw_facility_df')
             if facility_df is not None:
+                facility_df = render_quick_filters_and_viz(facility_df, "facility")
                 facility_df = dynamic_filter(facility_df, "facility")
                 st.dataframe(get_display_df(facility_df, "facility"), use_container_width=True)
             else: st.warning("업로드된 데이터가 없습니다.")
@@ -428,6 +490,7 @@ def render_dashboard():
             st.markdown("#### 해지 파이프라인")
             cancel_df = st.session_state.get('raw_cancel_df')
             if cancel_df is not None:
+                cancel_df = render_quick_filters_and_viz(cancel_df, "cancel")
                 cancel_df = dynamic_filter(cancel_df, "cancel")
                 st.dataframe(get_display_df(cancel_df, "cancel"), use_container_width=True)
             else: st.warning("업로드된 데이터가 없습니다.")
@@ -436,22 +499,13 @@ def render_dashboard():
             st.markdown("#### 해지시설 내역")
             cancelled_facility_df = st.session_state.get('raw_cancelled_facility_df')
             if cancelled_facility_df is not None:
+                cancelled_facility_df = render_quick_filters_and_viz(cancelled_facility_df, "cancelled_facility")
                 cancelled_facility_df = dynamic_filter(cancelled_facility_df, "cancelled_facility")
                 st.dataframe(get_display_df(cancelled_facility_df, "cancelled_facility"), use_container_width=True)
             else: st.warning("업로드된 데이터가 없습니다.")
 
-        st.markdown("### EDA 분석 (인터랙티브 시각화)")
-        with st.expander("📊 PyGWalker EDA 열기", expanded=False):
-            st.caption("아래 'EDA 시작' 버튼을 누르면 데이터를 자유롭게 탐색하고 차트를 생성할 수 있는 태블로(Tableau) 스타일의 화면이 열립니다. 데이터 양에 따라 초기 로딩에 수 초가 걸릴 수 있습니다.")
-            if st.button("🚀 EDA 시작하기", key="start_eda"):
-                import pygwalker as pyg
-                # Extract Streamlit renderer
-                from pygwalker.api.streamlit import StreamlitRenderer
-                
-                with st.spinner("EDA 환경을 구성하는 중입니다..."):
-                    # Render pygwalker using the new component approach
-                    walker = StreamlitRenderer(df, spec="")
-                    walker.explorer()
+        with tabs[7]:
+            render_ml_pipeline(df)
 
         html_content, pwd, expiry, admin_pwd = generate_html_report(
             df,
