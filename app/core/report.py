@@ -298,6 +298,23 @@ def _progress_cell_style(pct):
     return f'background: color-mix(in srgb, var({var_name}) {opacity}%, var(--surface-1));', text_role
 
 
+# 핵심 요약 표(지사 x SP/SE/SG/전체): 그룹별 색 헤더 + 그룹 경계선 + 순위 하위 지사 음영.
+# report.py JS의 renderProgressSectionEl과 같은 마크업을 만든다.
+PROGRESS_GROUPS = ['SP', 'SE', 'SG', '전체']
+PROGRESS_GROUP_CLASS = {'SP': 'pg-SP', 'SE': 'pg-SE', 'SG': 'pg-SG', '전체': 'pg-ALL'}
+PROGRESS_GROUP_COLS = {
+    'SP': ['처리완료', '접수', '미접수', '계', '진척율'],
+    'SE': ['처리완료', '미처리', '계', '진척율'],
+    'SG': ['처리완료', '미처리', '계', '진척율'],
+    '전체': ['처리완료', '미처리', '계', '진척율', '순위'],
+}
+
+
+def progress_bottom_count(n):
+    """순위 하위로 강조할 지사 수 -- 8개 지사면 4개, 적으면 절반 (1개뿐이면 없음)."""
+    return min(4, n // 2)
+
+
 def render_progress_matrix(matrix):
     if matrix is None:
         return ""
@@ -305,48 +322,46 @@ def render_progress_matrix(matrix):
     # SP is tracked with an explicit 접수/미접수 split (no unlogged rows);
     # SE/SG only ever carry 처리완료 vs unlogged, so they get the simpler
     # 처리완료/미처리 pair. 전체 rolls back up to that simpler pair too.
-    group_header = "<th rowspan=\"2\">지사</th>"
-    group_header += '<th colspan="5" class="progress-group-th">SP</th>'
-    for t in ['SE', 'SG']:
-        group_header += f'<th colspan="4" class="progress-group-th">{_e(t)}</th>'
-    group_header += '<th colspan="5" class="progress-group-th">전체</th>'
-
-    sub_header = "<th>처리완료</th><th>접수</th><th>미접수</th><th>계</th><th>진척율</th>"
-    for _ in ['SE', 'SG']:
-        sub_header += "<th>처리완료</th><th>미처리</th><th>계</th><th>진척율</th>"
-    sub_header += "<th>처리완료</th><th>미처리</th><th>계</th><th>진척율</th><th>순위</th>"
+    group_header = '<th rowspan="2" class="pg-branch-th">지사</th>' + "".join(
+        f'<th colspan="{len(PROGRESS_GROUP_COLS[g])}" class="pg-g {PROGRESS_GROUP_CLASS[g]} grp-start">{_e(g)}</th>'
+        for g in PROGRESS_GROUPS
+    )
+    sub_header = "".join(
+        f'<th class="pg-sub {PROGRESS_GROUP_CLASS[g]}{" grp-start" if i == 0 else ""}">{_e(c)}</th>'
+        for g in PROGRESS_GROUPS for i, c in enumerate(PROGRESS_GROUP_COLS[g])
+    )
+    n = len(matrix['branch_rows'])
+    k = progress_bottom_count(n)
 
     def render_row(row, is_total=False):
-        cells = [f'<td class="progress-branch{" progress-total-label" if is_total else ""}">{_e(row["지사"])}</td>']
-
-        sp = row['SP']
-        style, text_role = _progress_cell_style(sp['진척율'])
-        cells.append(f'<td class="cell-num">{sp["처리완료"]:,}</td>')
-        cells.append(f'<td class="cell-num">{sp["접수"]:,}</td>')
-        cells.append(f'<td class="cell-num">{sp["미접수"]:,}</td>')
-        cells.append(f'<td class="cell-num">{sp["계"]:,}</td>')
-        cells.append(f'<td class="cell-num progress-cell {text_role}" style="{style}">{sp["진척율"]:.1f}%</td>')
-
-        for t in ['SE', 'SG', '전체']:
-            cell = row[t]
-            style, text_role = _progress_cell_style(cell['진척율'])
-            cells.append(f'<td class="cell-num">{cell["처리완료"]:,}</td>')
-            cells.append(f'<td class="cell-num">{cell["미처리"]:,}</td>')
-            cells.append(f'<td class="cell-num">{cell["계"]:,}</td>')
-            cells.append(
-                f'<td class="cell-num progress-cell {text_role}" style="{style}">{cell["진척율"]:.1f}%</td>'
-            )
-        if not is_total:
-            cells.append(f'<td class="cell-num progress-rank">{row["순위"]}</td>')
-        else:
+        bottom = (not is_total) and k > 0 and row['순위'] > n - k
+        cells = [f'<td class="progress-branch{" progress-total-label" if is_total else ""}">'
+                 f'{_e(row["지사"])}</td>']
+        for g in PROGRESS_GROUPS:
+            cell = row[g]
+            for i, c in enumerate(col for col in PROGRESS_GROUP_COLS[g] if col != '순위'):
+                cls = 'cell-num' + (' grp-start' if i == 0 else '')
+                if c == '진척율':
+                    style, text_role = _progress_cell_style(cell[c])
+                    cells.append(f'<td class="{cls} progress-cell {text_role}" style="{style}">{cell[c]:.1f}%</td>')
+                else:
+                    cells.append(f'<td class="{cls}">{cell[c]:,}</td>')
+        if is_total:
             cells.append('<td class="cell-num">-</td>')
-        row_attrs = ' class="progress-total-row"' if is_total else ''
-        return f'<tr{row_attrs}>{"".join(cells)}</tr>'
+        elif bottom:
+            cells.append(f'<td class="cell-num progress-rank pg-rank-bottom" title="순위 하위 {k}개">▼ {row["순위"]}</td>')
+        else:
+            cells.append(f'<td class="cell-num progress-rank">{row["순위"]}</td>')
+        row_cls = 'progress-total-row' if is_total else ('pg-bottom' if bottom else '')
+        row_attr = f' class="{row_cls}"' if row_cls else ''
+        return f'<tr{row_attr}>{"".join(cells)}</tr>'
 
     body_rows = [render_row(r) for r in matrix['branch_rows']]
     body_rows.append(render_row(matrix['total_row'], is_total=True))
 
     type_summary = " · ".join(f"{t} {matrix['type_totals'][t]:,}건" for t in PROGRESS_TYPES)
+    note = (f'<p class="pg-note"><span class="pg-note-swatch"></span>▼ 순위 하위 {k}개 지사 (연한 붉은 음영) · '
+            f'진척율 칸 색: 30% 미만 위험 · 55% 미만 주의 · 그 이상 양호</p>') if k else ""
 
     return f"""
     <p class="section-desc">활동대상구분 기준 이번 달 대상 건수 -- {type_summary}</p>
@@ -358,7 +373,8 @@ def render_progress_matrix(matrix):
             </thead>
             <tbody>{"".join(body_rows)}</tbody>
         </table>
-    </div>"""
+    </div>
+    {note}"""
 
 
 PROGRESS_SERIES_ROLE = {'SP': 'role-s3', 'SE': 'role-s2', 'SG': 'role-s1'}
@@ -1331,7 +1347,8 @@ body {
              color: var(--text-primary); background: color-mix(in srgb, var(--brand) 16%, var(--surface-1)); }
 .perf-copy { font-size: 11.5px; font-weight: 600; padding: 4px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); cursor: pointer; white-space: nowrap; }
 .perf-copy:disabled { opacity: .5; cursor: default; }
-.perf-scroll { max-height: 640px; overflow: auto; }
+.table-scroll.perf-scroll { max-height: none; overflow-x: auto; overflow-y: visible; }  /* 스크롤 없이 한 번에 (.table-scroll의 640px 제한 해제) */
+.perf-toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; }
 .perf-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .perf-table th { position: sticky; top: 0; z-index: 1; background: var(--brand-dark); color: #fff; font-weight: 700; padding: 8px 6px; text-align: center; white-space: nowrap; }
 .perf-table th.perf-th-alert { color: #ffb4b4; }
@@ -1510,6 +1527,28 @@ tbody tr:hover { background: var(--page-plane); }
 .progress-table th { white-space: nowrap; }
 .progress-table .cell-num { text-align: center; }
 .progress-group-th { text-align: center; background: var(--brand-dark); }
+/* 핵심 요약 표: 그룹별 색 헤더 (SP=s3, SE=s2, SG=s1 -- 차트 범례와 같은 색), 그룹 경계선, 하위 순위 음영 */
+.table-scroll.progress-table-scroll { max-height: none; }
+.progress-table { border-collapse: separate; border-spacing: 0; }
+.progress-table thead th { position: static; text-align: center; padding: 7px 6px; color: var(--text-primary); border-bottom: 1px solid var(--grid-line); }
+.progress-table th.pg-branch-th { background: var(--text-primary); color: var(--surface-1); font-size: 13px; font-weight: 800; min-width: 64px; }
+.progress-table th.pg-g { font-size: 14px; font-weight: 800; letter-spacing: 0.5px; border-top: 4px solid; padding: 8px 6px; }
+.progress-table th.pg-sub { font-size: 11.5px; font-weight: 700; color: var(--text-secondary); }
+.progress-table th.pg-g.pg-SP { background: color-mix(in srgb, var(--s3) 24%, var(--surface-1)); border-top-color: var(--s3); }
+.progress-table th.pg-g.pg-SE { background: color-mix(in srgb, var(--s2) 22%, var(--surface-1)); border-top-color: var(--s2); }
+.progress-table th.pg-g.pg-SG { background: color-mix(in srgb, var(--s1) 22%, var(--surface-1)); border-top-color: var(--s1); }
+.progress-table th.pg-g.pg-ALL { background: color-mix(in srgb, var(--text-primary) 12%, var(--surface-1)); border-top-color: var(--text-primary); }
+.progress-table th.pg-sub.pg-SP { background: color-mix(in srgb, var(--s3) 9%, var(--surface-1)); }
+.progress-table th.pg-sub.pg-SE { background: color-mix(in srgb, var(--s2) 8%, var(--surface-1)); }
+.progress-table th.pg-sub.pg-SG { background: color-mix(in srgb, var(--s1) 8%, var(--surface-1)); }
+.progress-table th.pg-sub.pg-ALL { background: color-mix(in srgb, var(--text-primary) 5%, var(--surface-1)); }
+.progress-table td { border-bottom: 1px solid var(--grid-line); padding: 7px 6px; }
+.progress-table .grp-start { border-left: 2px solid color-mix(in srgb, var(--text-primary) 35%, var(--surface-1)); }
+.progress-table td.progress-branch { font-size: 13px; }
+.progress-table tr.pg-bottom td:not(.progress-cell) { background: color-mix(in srgb, var(--critical) 7%, var(--surface-1)); }
+.progress-table td.pg-rank-bottom { color: var(--critical); }
+.pg-note { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-muted); margin: 8px 0 18px; }
+.pg-note-swatch { width: 12px; height: 12px; border-radius: 3px; background: color-mix(in srgb, var(--critical) 12%, var(--surface-1)); border: 1px solid color-mix(in srgb, var(--critical) 35%, var(--surface-1)); display: inline-block; }
 .progress-branch { font-weight: 600; white-space: nowrap; }
 .progress-cell { font-weight: 700; }
 .progress-text-light { color: #ffffff; }
@@ -3547,6 +3586,14 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         wrap.appendChild(mkEl('p', 'section-desc',
             '달성율 = 처리완료 ÷ 대상 · 소계 달성율 ' + PERF_WARN_PCT + '% 미만 빨간색 · 담당자 달성율 ' + PERF_LOW_PCT + '% 미만 노란 줄'
             + (spByOwner ? '' : ' · 8. 영업구역담당자 파일이 없어 영업사원 표는 영업구역별로 표시')));
+        const bar = mkEl('div', 'perf-toolbar');
+        [['view', '📄 HTML 새 창으로 보기 (인쇄용)'], ['save', '💾 HTML 파일로 저장']].forEach(([mode, label]) => {
+            const b = mkEl('button', 'ghost-btn small', label);
+            b.type = 'button';
+            b.dataset.perfHtml = mode;
+            bar.appendChild(b);
+        });
+        wrap.appendChild(bar);
         const grid = mkEl('div', 'perf-grid');
         grid.appendChild(perfTableCard('영업사원 실적현황 (SP)', ['지사', spByOwner ? '담당자' : '영업구역', '미접수', '접수', '처리완료', '합계', '달성율'],
             spData, r => spByOwner ? r.담당자 : r.구역,
@@ -3558,6 +3605,38 @@ document.addEventListener('DOMContentLoaded', initDashNav);
                 (r, isSub) => [[fmtInt(r.대상)], [fmtInt(r.처리완료)], rateCell(r.처리완료, r.대상, isSub)]));
         });
         wrap.appendChild(grid);
+    }
+    // 실적현황표 3개를 한 장짜리 HTML로 (스크롤 없이, A4 가로 인쇄용 스타일 포함)
+    function perfStandaloneHtml() {
+        const grid = document.querySelector('#perfReportWrap .perf-grid');
+        if (!grid) return null;
+        const clone = grid.cloneNode(true);
+        clone.querySelectorAll('.perf-copy').forEach(b => b.remove());
+        const css = Array.from(document.querySelectorAll('style')).map(st => st.textContent).join('\\n');
+        const escHtml = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const filter = (document.getElementById('navFilterSummary') || {}).textContent || '';
+        const stamp = new Date().toLocaleString('ko-KR');
+        const extra = 'body{background:#fff;padding:20px 24px;margin:0;}'
+            + '.perf-grid{grid-template-columns:repeat(3,minmax(0,1fr));}'
+            + '@media (max-width:1100px){.perf-grid{grid-template-columns:1fr;}}'
+            + '@media print{@page{size:A4 landscape;margin:8mm}body{padding:0}.perf-table{font-size:9.5px}.perf-table td,.perf-table th{padding:2px 4px}.perf-card{break-inside:avoid}}';
+        return '<!DOCTYPE html><html lang="ko" data-theme="light"><head><meta charset="UTF-8">'
+            + '<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>실적현황표</title>'
+            + '<style>' + css + '</style><style>' + extra + '</style></head><body>'
+            + '<h1 style="font-size:18px;margin:0 0 4px">유지고객 이탈방지 실적현황</h1>'
+            + '<p style="margin:0 0 14px;color:#52514e;font-size:12px">' + escHtml(stamp) + ' 기준 · ' + escHtml(filter) + '</p>'
+            + clone.outerHTML + '</body></html>';
+    }
+    function perfHtmlExport(mode) {
+        const html = perfStandaloneHtml();
+        if (!html) return;
+        const url = URL.createObjectURL(new Blob([html], { type: 'text/html;charset=utf-8' }));
+        if (mode === 'view' && window.open(url, '_blank')) { setTimeout(() => URL.revokeObjectURL(url), 60000); return; }
+        const d = new Date(), p = x => String(x).padStart(2, '0');
+        const a = document.createElement('a');
+        a.href = url; a.download = '실적현황표_' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '.html';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
     }
     function copyPerfTable(btn) {
         const text = btn.dataset.perfCopy;
@@ -3972,32 +4051,36 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         cellEl.setAttribute('style', bg);
         return cellEl;
     }
-    function progressRowEl(row, isTotal) {
+    // 핵심 요약 표 -- report.py render_progress_matrix와 같은 마크업 (그룹 색 헤더 / 그룹 경계선 / 하위 순위 음영)
+    const PG_GROUPS = ['SP', 'SE', 'SG', '전체'];
+    const PG_CLASS = { SP: 'pg-SP', SE: 'pg-SE', SG: 'pg-SG', '전체': 'pg-ALL' };
+    const PG_COLS = {
+        SP: ['처리완료', '접수', '미접수', '계', '진척율'],
+        SE: ['처리완료', '미처리', '계', '진척율'],
+        SG: ['처리완료', '미처리', '계', '진척율'],
+        '전체': ['처리완료', '미처리', '계', '진척율', '순위'],
+    };
+    const pgBottomCount = n => Math.min(4, Math.floor(n / 2));
+    function progressRowEl(row, isTotal, n, k) {
+        const bottom = !isTotal && k > 0 && row['순위'] > n - k;
         const tr = document.createElement('tr');
-        if (isTotal) tr.className = 'progress-total-row';
+        if (isTotal) tr.className = 'progress-total-row'; else if (bottom) tr.className = 'pg-bottom';
         tr.appendChild(mkEl('td', 'progress-branch' + (isTotal ? ' progress-total-label' : ''), row['지사']));
-
-        const sp = row.SP;
-        tr.appendChild(progressNumTd(sp.처리완료));
-        tr.appendChild(progressNumTd(sp.접수));
-        tr.appendChild(progressNumTd(sp.미접수));
-        tr.appendChild(progressNumTd(sp.계));
-        tr.appendChild(progressPctTd(sp));
-
-        ['SE', 'SG', '전체'].forEach(t => {
-            const cell = row[t];
-            tr.appendChild(progressNumTd(cell.처리완료));
-            tr.appendChild(progressNumTd(cell.미처리));
-            tr.appendChild(progressNumTd(cell.계));
-            tr.appendChild(progressPctTd(cell));
+        PG_GROUPS.forEach(g => {
+            const cell = row[g];
+            PG_COLS[g].filter(c => c !== '순위').forEach((c, i) => {
+                const td = c === '진척율' ? progressPctTd(cell) : progressNumTd(cell[c]);
+                if (i === 0) td.classList.add('grp-start');
+                tr.appendChild(td);
+            });
         });
-        tr.appendChild(mkEl('td', 'cell-num' + (isTotal ? '' : ' progress-rank'), isTotal ? '-' : String(row['순위'])));
+        if (isTotal) tr.appendChild(mkEl('td', 'cell-num', '-'));
+        else if (bottom) {
+            const td = mkEl('td', 'cell-num progress-rank pg-rank-bottom', '▼ ' + row['순위']);
+            td.title = '순위 하위 ' + k + '개';
+            tr.appendChild(td);
+        } else tr.appendChild(mkEl('td', 'cell-num progress-rank', String(row['순위'])));
         return tr;
-    }
-    function groupTh(text, colspan) {
-        const th = mkEl('th', 'progress-group-th', text);
-        th.colSpan = colspan;
-        return th;
     }
     function renderProgressSectionEl(containerEl, matrix) {
         containerEl.innerHTML = '';
@@ -4010,25 +4093,31 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         const table = document.createElement('table'); table.className = 'progress-table';
         const thead = document.createElement('thead');
         const groupTr = document.createElement('tr');
-        const branchTh = mkEl('th', '', '지사'); branchTh.rowSpan = 2;
+        const branchTh = mkEl('th', 'pg-branch-th', '지사'); branchTh.rowSpan = 2;
         groupTr.appendChild(branchTh);
-        groupTr.appendChild(groupTh('SP', 5));
-        groupTr.appendChild(groupTh('SE', 4));
-        groupTr.appendChild(groupTh('SG', 4));
-        groupTr.appendChild(groupTh('전체', 5));
         const subTr = document.createElement('tr');
-        ['처리완료', '접수', '미접수', '계', '진척율'].forEach(t => subTr.appendChild(mkEl('th', '', t)));
-        for (let i = 0; i < 2; i++) ['처리완료', '미처리', '계', '진척율'].forEach(t => subTr.appendChild(mkEl('th', '', t)));
-        ['처리완료', '미처리', '계', '진척율', '순위'].forEach(t => subTr.appendChild(mkEl('th', '', t)));
+        PG_GROUPS.forEach(g => {
+            const th = mkEl('th', 'pg-g ' + PG_CLASS[g] + ' grp-start', g);
+            th.colSpan = PG_COLS[g].length;
+            groupTr.appendChild(th);
+            PG_COLS[g].forEach((c, i) => subTr.appendChild(mkEl('th', 'pg-sub ' + PG_CLASS[g] + (i === 0 ? ' grp-start' : ''), c)));
+        });
         thead.appendChild(groupTr); thead.appendChild(subTr);
         table.appendChild(thead);
 
+        const n = matrix.branch_rows.length, k = pgBottomCount(n);
         const tbody = document.createElement('tbody');
-        matrix.branch_rows.forEach(r => tbody.appendChild(progressRowEl(r, false)));
-        tbody.appendChild(progressRowEl(matrix.total_row, true));
+        matrix.branch_rows.forEach(r => tbody.appendChild(progressRowEl(r, false, n, k)));
+        tbody.appendChild(progressRowEl(matrix.total_row, true, n, k));
         table.appendChild(tbody);
         scrollDiv.appendChild(table);
         containerEl.appendChild(scrollDiv);
+        if (k) {
+            const note = mkEl('p', 'pg-note');
+            note.appendChild(mkEl('span', 'pg-note-swatch'));
+            note.appendChild(document.createTextNode('▼ 순위 하위 ' + k + '개 지사 (연한 붉은 음영) · 진척율 칸 색: 30% 미만 위험 · 55% 미만 주의 · 그 이상 양호'));
+            containerEl.appendChild(note);
+        }
 
         const legend = mkEl('div', 'legend-grid progress-chart-legend');
         PROGRESS_TYPES.forEach(t => {
@@ -4465,6 +4554,8 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         if (perfWrap) perfWrap.addEventListener('click', (e) => {
             const btn = e.target.closest('[data-perf-copy]');
             if (btn) copyPerfTable(btn);
+            const htmlBtn = e.target.closest('[data-perf-html]');
+            if (htmlBtn) perfHtmlExport(htmlBtn.dataset.perfHtml);
         });
 
         wireFilterPillRow('hqFilterRow', 'hq');
