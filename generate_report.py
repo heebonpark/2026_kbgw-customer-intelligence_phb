@@ -28,7 +28,7 @@ def _load(base_dir, key):
     return load_data(path, is_csv=is_csv_path(path))
 
 
-def build_report(base_dir, matching_config=None, password=None, expiry_date=None):
+def build_report(base_dir, matching_config=None, password=None, expiry_date=None, eda_link=False):
     """Reads whatever source files are currently on disk (by their canonical
     stem -- see core/source_files.py) and builds the report. Shared by the
     CLI entry point below and the Streamlit admin '디스크의 최신 파일로
@@ -75,6 +75,7 @@ def build_report(base_dir, matching_config=None, password=None, expiry_date=None
         matching_config=matching_config,
         password=password,
         expiry_date=expiry_date,
+        eda_link=eda_link,
     )
     full_msg = msg + " (" + ", ".join(match_lines) + ")"
     return html_content, pwd, expiry, full_msg, merged_df, admin_pwd
@@ -93,7 +94,8 @@ def main():
     html_content, pwd, expiry, msg, merged_df, admin_pwd = build_report(
         base_dir, 
         password=args.password, 
-        expiry_date=args.expiry
+        expiry_date=args.expiry,
+        eda_link=True,  # this CLI writes Data_Intel_PRO_EDA.html right after, below
     )
 
     if html_content is None:

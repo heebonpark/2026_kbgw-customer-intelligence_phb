@@ -3927,7 +3927,8 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
 
 def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
                           cancelled_facility_df=None, raw_files=None, matching_config=None,
-                          password=None, admin_password=None, expiry_date=None, encrypt=True):
+                          password=None, admin_password=None, expiry_date=None, encrypt=True,
+                          eda_link=False):
     """Generates the password-protected HTML dashboard report.
 
     df: already-merged 총괄DB dataframe (server-rendered initial dashboard).
@@ -3955,6 +3956,10 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
         needed for anything hosted on the web. Blank passwords then become
         strong random ones (the fixed DEFAULT_ADMIN_PASSWORD is public in
         this repo, so it must never be a decryption key).
+    eda_link: show the '딥 다이브 EDA' button, which opens a sibling
+        Data_Intel_PRO_EDA.html. Only generate_report.py's CLI writes that
+        file (unencrypted, full data) -- the GUI and a deployed page never
+        have it, so the button would just be a dead link there.
     """
     if encrypt:
         from .secure_report import generate_strong_password
@@ -4007,6 +4012,10 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
             embedded_script = f'<script type="application/json" id="embeddedData">{embedded_json}</script>'
 
     generated_at = datetime.now().strftime('%Y-%m-%d %H:%M')
+    eda_button_html = """
+        <div class="eda-btn-wrap">
+            <a href="Data_Intel_PRO_EDA.html" target="_blank" class="eda-btn">🚀 딥 다이브 EDA 분석기 열기 (별도 창)</a>
+        </div>""" if eda_link else ""
 
     script = (
         APP_SCRIPT_TEMPLATE
@@ -4050,9 +4059,7 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
         {admin_panel_html}
         {filter_bar_html}
 
-        <div class="eda-btn-wrap">
-            <a href="Data_Intel_PRO_EDA.html" target="_blank" class="eda-btn">🚀 딥 다이브 EDA 분석기 열기 (별도 창)</a>
-        </div>
+        {eda_button_html}
 
         <details class="section-collapse">
         <summary class="section-title">🔄 재계약대상(SP)</summary>
