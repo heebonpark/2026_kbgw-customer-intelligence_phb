@@ -1325,6 +1325,24 @@ body {
 @container (max-width: 38px) { .zl4 { display: none; } }
 @container (max-width: 46px) { .zl5 { display: none; } }
 /* ---- 구역별 고급 시각화 ---- */
+.perf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; align-items: start; margin-bottom: 16px; }
+.perf-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.perf-band { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; font-weight: 700; font-size: 14.5px;
+             color: var(--text-primary); background: color-mix(in srgb, var(--brand) 16%, var(--surface-1)); }
+.perf-copy { font-size: 11.5px; font-weight: 600; padding: 4px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); cursor: pointer; white-space: nowrap; }
+.perf-copy:disabled { opacity: .5; cursor: default; }
+.perf-scroll { max-height: 640px; overflow: auto; }
+.perf-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.perf-table th { position: sticky; top: 0; z-index: 1; background: var(--brand-dark); color: #fff; font-weight: 700; padding: 8px 6px; text-align: center; white-space: nowrap; }
+.perf-table th.perf-th-alert { color: #ffb4b4; }
+.perf-table td { padding: 5px 8px; border-bottom: 1px solid var(--grid-line); border-left: 1px solid var(--grid-line); text-align: center; font-variant-numeric: tabular-nums; }
+.perf-table td.perf-branch { font-weight: 700; color: var(--text-primary); background: var(--surface-1); vertical-align: middle; }
+.perf-table td.perf-name { white-space: nowrap; }
+.perf-table td.perf-alert { color: var(--critical); }
+.perf-table tr.perf-low td:not(.perf-branch) { background: color-mix(in srgb, var(--warning) 38%, var(--surface-1)); }
+.perf-table tr.perf-sub td { background: color-mix(in srgb, var(--baseline) 30%, var(--surface-1)); font-weight: 700; }
+.perf-table tr.perf-total td { background: color-mix(in srgb, var(--brand) 12%, var(--surface-1)); font-weight: 800; border-top: 2px solid var(--baseline); }
+.perf-table td.perf-warn { color: var(--critical); }
 .dv-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 16px; }
 .dv-tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
 .dv-tile-lead { border-color: color-mix(in srgb, var(--brand) 45%, var(--border)); }
@@ -3340,6 +3358,125 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         });
         containerEl.appendChild(zoneFacilityListEl(zoneData));
     }
+    // ---- 구역별 실적현황 (보고서 양식: 영업사원 / 기술사원 / 출동사원) ----
+    // SP는 8. 영업구역담당자로 붙인 담당자별(없으면 영업구역별), SE는 기술구역정보별, SG는 구역정보별.
+    // 달성율 = 처리완료 / 대상. 소계 달성율 90% 미만은 빨간색, 담당자 달성율 30% 미만 줄은 노란 배경.
+    const PERF_WARN_PCT = 90, PERF_LOW_PCT = 30;
+    const pct0 = (done, total) => total ? Math.round(done / total * 100) + '%' : '-';
+    function perfGroups(zd) {
+        // zd.rows는 이미 지사 순서로 정렬됨 -- 지사별로 묶고 소계를 붙인다
+        const groups = [];
+        zd.rows.forEach(r => {
+            if (!groups.length || groups[groups.length - 1].지사 !== r.지사) groups.push({ 지사: r.지사, rows: [] });
+            groups[groups.length - 1].rows.push(r);
+        });
+        groups.forEach(g => {
+            g.sub = g.rows.reduce((a, r) => ({ 대상: a.대상 + r.대상, 처리완료: a.처리완료 + r.처리완료, 접수: a.접수 + r.접수, 미접수: a.미접수 + r.미접수 }),
+                { 대상: 0, 처리완료: 0, 접수: 0, 미접수: 0 });
+        });
+        return groups;
+    }
+    function perfTableCard(title, cols, zd, nameOf, cellsOf, lowRow) {
+        const card = mkEl('section', 'perf-card');
+        const band = mkEl('div', 'perf-band');
+        band.appendChild(mkEl('span', null, title));
+        const copyBtn = mkEl('button', 'perf-copy', '📋 엑셀용 복사');
+        copyBtn.type = 'button';
+        band.appendChild(copyBtn);
+        card.appendChild(band);
+        if (!zd || !zd.rows.length) {
+            card.appendChild(mkEl('div', 'empty-card', '집계할 데이터가 없습니다.'));
+            copyBtn.disabled = true;
+            return card;
+        }
+        const tsv = [cols.join('\\t')];
+        const wrap = mkEl('div', 'table-scroll perf-scroll');
+        const table = mkEl('table', 'perf-table');
+        const thead = document.createElement('thead');
+        const hr = document.createElement('tr');
+        cols.forEach(c => hr.appendChild(mkEl('th', c === '미접수' ? 'perf-th-alert' : null, c)));
+        thead.appendChild(hr);
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        const addCells = (tr, cells) => cells.forEach(([text, cls]) => tr.appendChild(mkEl('td', cls || 'cell-num', text)));
+        perfGroups(zd).forEach(g => {
+            g.rows.forEach((r, i) => {
+                const tr = document.createElement('tr');
+                if (lowRow && lowRow(r)) tr.className = 'perf-low';
+                if (i === 0) {
+                    const td = mkEl('td', 'perf-branch', g.지사);
+                    td.rowSpan = g.rows.length + 1;
+                    tr.appendChild(td);
+                }
+                tr.appendChild(mkEl('td', 'perf-name', nameOf(r)));
+                const cells = cellsOf(r);
+                addCells(tr, cells);
+                tbody.appendChild(tr);
+                tsv.push([g.지사, nameOf(r)].concat(cells.map(c => c[0])).join('\\t'));
+            });
+            const sub = document.createElement('tr');
+            sub.className = 'perf-sub';
+            sub.appendChild(mkEl('td', 'perf-name', '소계'));
+            const cells = cellsOf(g.sub, true);
+            addCells(sub, cells);
+            tbody.appendChild(sub);
+            tsv.push([g.지사, '소계'].concat(cells.map(c => c[0])).join('\\t'));
+        });
+        const totalRow = document.createElement('tr');
+        totalRow.className = 'perf-total';
+        const t0 = mkEl('td', 'perf-branch', '합계');
+        t0.colSpan = 2;
+        totalRow.appendChild(t0);
+        const totalCells = cellsOf(zd.total, true);
+        addCells(totalRow, totalCells);
+        tbody.appendChild(totalRow);
+        tsv.push(['합계', ''].concat(totalCells.map(c => c[0])).join('\\t'));
+        table.appendChild(tbody);
+        wrap.appendChild(table);
+        card.appendChild(wrap);
+        copyBtn.dataset.perfCopy = tsv.join('\\n');
+        return card;
+    }
+    function rateCell(done, total, isSub) {
+        const warn = isSub && total && done / total * 100 < PERF_WARN_PCT;
+        return [pct0(done, total), 'cell-num perf-rate' + (warn ? ' perf-warn' : '')];
+    }
+    const blankZero = n => n ? fmtInt(n) : '';
+    function renderPerfReport() {
+        const wrap = document.getElementById('perfReportWrap');
+        if (!wrap) return;
+        wrap.innerHTML = '';
+        const rows = applyGlobalFilter(latestMergedRows);
+        const byOwner = buildZoneActivityJS(rows, 'owner');
+        const byZone = buildZoneActivityJS(rows, 'zone');
+        if (!byZone) {
+            wrap.appendChild(mkEl('div', 'empty-card', '구역별로 집계할 데이터가 없습니다.'));
+            return;
+        }
+        const spData = byOwner && byOwner.SP && byOwner.SP.mode ? byOwner.SP : byZone.SP;
+        const spByOwner = !!(spData && spData.mode);
+        wrap.appendChild(mkEl('p', 'section-desc',
+            '달성율 = 처리완료 ÷ 대상 · 소계 달성율 ' + PERF_WARN_PCT + '% 미만 빨간색 · 담당자 달성율 ' + PERF_LOW_PCT + '% 미만 노란 줄'
+            + (spByOwner ? '' : ' · 8. 영업구역담당자 파일이 없어 영업사원 표는 영업구역별로 표시')));
+        const grid = mkEl('div', 'perf-grid');
+        grid.appendChild(perfTableCard('영업사원 실적현황 (SP)', ['지사', spByOwner ? '담당자' : '영업구역', '미접수', '접수', '처리완료', '합계', '달성율'],
+            spData, r => spByOwner ? r.담당자 : r.구역,
+            (r, isSub) => [[blankZero(r.미접수), 'cell-num perf-alert'], [blankZero(r.접수), 'cell-num perf-alert'],
+                [blankZero(r.처리완료)], [fmtInt(r.대상)], rateCell(r.처리완료, r.대상, isSub)],
+            r => r.대상 && r.처리완료 / r.대상 * 100 < PERF_LOW_PCT));
+        [['SE', '기술사원 실적현황 (SE · 구역별)'], ['SG', '출동사원 실적현황 (SG · 구역별)']].forEach(([t, title]) => {
+            grid.appendChild(perfTableCard(title, ['지사', '구역', '대상', '실적', '달성율'], byZone[t], r => r.구역,
+                (r, isSub) => [[fmtInt(r.대상)], [fmtInt(r.처리완료)], rateCell(r.처리완료, r.대상, isSub)]));
+        });
+        wrap.appendChild(grid);
+    }
+    function copyPerfTable(btn) {
+        const text = btn.dataset.perfCopy;
+        const done = () => { const t = btn.textContent; btn.textContent = '✅ 복사됨 -- 엑셀에 붙여넣기'; setTimeout(() => { btn.textContent = t; }, 1600); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+        else fallbackCopy(text, done);
+    }
+
     function rerenderZoneActivity() {
         const wrap = document.getElementById('zoneActivityWrap');
         if (!wrap) return;
@@ -3981,6 +4118,7 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
 
         const zoneActivityWrap = document.getElementById('zoneActivityWrap');
         if (zoneActivityWrap) rerenderZoneActivity();
+        renderPerfReport();
 
         const spRepSectionWrap = document.getElementById('spRepSectionWrap');
         if (spRepSectionWrap) renderSpRepSectionEl(spRepSectionWrap, buildSpRepPerformanceJS(filtered));
@@ -4213,6 +4351,12 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
             zoneActivityWrap.addEventListener('focusout', hideDvTip);
             rerenderZoneActivity(); // 서버 렌더 결과를 조회 기능이 붙은 화면으로 교체
         }
+        renderPerfReport();
+        const perfWrap = document.getElementById('perfReportWrap');
+        if (perfWrap) perfWrap.addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-perf-copy]');
+            if (btn) copyPerfTable(btn);
+        });
 
         wireFilterPillRow('hqFilterRow', 'hq');
         wireFilterPillRow('branchFilterRow', 'branch');
@@ -4441,6 +4585,11 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
         <div id="zoneActivityWrap">
             {zone_activity_html}
         </div>
+        </details>
+
+        <details class="section-collapse" open>
+        <summary class="section-title">구역별 실적현황 (영업·기술·출동사원)</summary>
+        <div id="perfReportWrap"></div>
         </details>
 
         <details class="subsection-collapse" open>

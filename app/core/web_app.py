@@ -263,6 +263,11 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
         <div id="zoneActivityWrap"></div>
         </details>
 
+        <details class="section-collapse" open>
+        <summary class="section-title">구역별 실적현황 (영업·기술·출동사원)</summary>
+        <div id="perfReportWrap"></div>
+        </details>
+
         <details class="subsection-collapse" open>
         <summary class="subsection-title">SP 부진자 추가분석 (담당자 기준)</summary>
         <div id="spRepSectionWrap"></div>
