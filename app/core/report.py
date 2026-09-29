@@ -2095,16 +2095,13 @@ document.addEventListener('DOMContentLoaded', initDashNav);
             const status = firstNonNull([out['계약상태_origin'], out['계약상태(중)_fac'], out['계약상태(대)_fac']]);
             out['계약상태'] = status;
 
-            // 상태값 역반영 + 실적 반영 (handlers.py process_and_merge와 같게):
-            // VOC 상태(처리완료/접수/미접수) -> 해지시설 '일반해지'는 처리완료 -> 순찰 매칭은 처리완료,
-            // 그리고 총괄DB 활동유무보다 더 진행된 경우에만 '활동유무'를 올린다 (되돌리지 않음).
+            // 상태값 역반영 (handlers.py process_and_merge와 같게): VOC 상태 -> 해지시설 '일반해지'는
+            // 처리완료 -> 순찰 매칭은 처리완료. 'sp 담당자 상태값' 열에만 두고 실적(활동유무)에는 더하지 않는다.
             let writeback = null;
             if (['처리완료', '접수', '미접수'].includes(out['최근VOC상태'])) writeback = out['최근VOC상태'];
             if (out['계약상태(중)_cancelfac'] === '일반해지') writeback = '처리완료';
             if ((out['순찰건수'] || 0) > 0) writeback = '처리완료';
             out['sp 담당자 상태값'] = writeback;
-            out['활동유무_총괄DB'] = out['활동유무'] === undefined ? null : out['활동유무'];
-            if (writeback && statusRank(writeback) > statusRank(out['활동유무'])) out['활동유무'] = writeback;
 
             // 8. 영업구역담당자 -- SP 건만 영업구역정보 = 구역번호 (handlers.py process_and_merge와 같게)
             if (spZoneCol) {
@@ -3703,12 +3700,9 @@ document.addEventListener('DOMContentLoaded', initDashNav);
             tiles.innerHTML = '';
             const overall = zoneOwnerSel ? buildZoneActivityJS(allRows, 'zone') : zoneData;
             if (overall) tiles.appendChild(zoneKpiTilesEl(overall));
-            // 실적 반영 근거: 총괄DB 활동유무 + VOC·순찰·해지 역반영으로 올라간 건수
-            const lifted = allRows.filter(r => r['활동유무'] !== r['활동유무_총괄DB'] && r['sp 담당자 상태값']);
-            const by = s => lifted.filter(r => r['활동유무'] === s).length;
             // 어떤 열의 어떤 값으로 셌는지 -- 실적이 이상하면 이 줄로 바로 확인
             const dist = new Map();
-            allRows.forEach(r => { const v = r['활동유무_총괄DB']; const k = (v === null || v === undefined || v === '') ? '빈칸' : String(v); dist.set(k, (dist.get(k) || 0) + 1); });
+            allRows.forEach(r => { const v = r['활동유무']; const k = (v === null || v === undefined || v === '') ? '빈칸' : String(v); dist.set(k, (dist.get(k) || 0) + 1); });
             const order = ['처리완료', '접수', '미접수'];
             const known = order.filter(k => dist.has(k)).map(k => k + ' ' + fmtInt(dist.get(k)));
             const others = Array.from(dist).filter(([k]) => !order.includes(k)).sort((a, b) => b[1] - a[1]);
@@ -3716,9 +3710,7 @@ document.addEventListener('DOMContentLoaded', initDashNav);
             tiles.appendChild(mkEl('p', 'section-desc status-diag',
                 '상태 기준 열: ' + (statusColUsed || '(찾지 못함)')
                 + (DATA.db && DATA.db.renamed && DATA.db.renamed[statusColUsed] ? ' (파일의 ' + DATA.db.renamed[statusColUsed] + ' 열)' : '') + ' -- ' + (known.length ? known.join(' · ') : '처리완료/접수/미접수 값 없음') + otherText));
-            tiles.appendChild(mkEl('p', 'section-desc', lifted.length
-                ? '실적 반영: 총괄DB 활동유무 + 역반영(2번 VOC · 3번 순찰 · 7번 해지)으로 ' + fmtInt(lifted.length) + '건 상향 (처리완료 ' + fmtInt(by('처리완료')) + ' · 접수 ' + fmtInt(by('접수')) + ')'
-                : '실적 반영: 총괄DB 활동유무 기준 (2번 VOC · 3번 순찰 · 7번 해지 파일로 상향된 건 없음)'));
+            tiles.appendChild(mkEl('p', 'section-desc', '실적 기준: 총괄DB 활동유무만 (2번 VOC · 3번 순찰 · 7번 해지 결과는 실적에 더하지 않고 상세 데이터의 sp 담당자 상태값 열에 표시)'));
         }
     }
 

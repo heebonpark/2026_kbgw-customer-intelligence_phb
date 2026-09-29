@@ -445,18 +445,7 @@ def process_and_merge(files_dict, matching_config):
         patrol_mask = merged_df['순찰건수'] > 0
         merged_df.loc[patrol_mask, 'sp 담당자 상태값'] = '처리완료'
 
-    # 4. 실적 반영: 모든 실적 집계(진척율·구역별·실적현황표)는 '활동유무'를 읽으므로,
-    #    총괄DB 원래 값과 위 역반영 값 중 더 진행된 쪽(미접수 < 접수 < 처리완료)을
-    #    '활동유무'로 쓴다 -- 되돌리지는 않는다. 원래 값은 '활동유무_총괄DB'에 남긴다.
-    #    report.py rebuildMerged()와 같은 규칙.
-    base = merged_df['활동유무'] if '활동유무' in merged_df.columns else pd.Series([None] * len(merged_df), index=merged_df.index)
-    merged_df['활동유무_총괄DB'] = base
-    merged_df['활동유무'] = [
-        wb if STATUS_RANK.get(wb, -1) > STATUS_RANK.get(cur, -1) else cur
-        for cur, wb in zip(base, merged_df['sp 담당자 상태값'])
-    ]
-    match_report['status_writeback'] = int(sum(
-        1 for cur, new in zip(merged_df['활동유무_총괄DB'], merged_df['활동유무']) if cur != new and not (pd.isna(cur) and pd.isna(new))
-    ))
+    # 실적(진척율·구역별·실적현황표)은 총괄DB '활동유무'만 센다 -- 위 역반영 값은
+    # 'sp 담당자 상태값' 열에만 남고 실적에는 더하지 않는다 (bba5fc6과 같은 동작).
 
     return merged_df, "성공적으로 병합되었습니다.", match_report
