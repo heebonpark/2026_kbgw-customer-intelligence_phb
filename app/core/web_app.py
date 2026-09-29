@@ -15,6 +15,13 @@ opens it only ever sees the files they pick themselves.
 Excel files with several sheets get a sheet picker; the sheet whose header
 row has the column that slot needs (SHEET_HINT_COLUMNS) is pre-selected.
 
+After the dashboard is built, the page can also produce the shareable report:
+it copies its own source, embeds the parsed data, turns the report's lock
+screen back on, and encrypts the whole thing in the browser (WebCrypto) into
+the exact unlock-page format secure_report.py writes -- then either downloads
+it or publishes it to GitHub Pages through the GitHub API with a token the
+user types in (never stored unless they tick "remember").
+
 Not covered here (desktop GUI only): 4. 해지 파이프라인 and 7. 해지시설
 내역 -- their sections are rendered server-side in Python only.
 """
@@ -29,6 +36,7 @@ from .matching_config import (
     FILE_DISPLAY_COLUMNS, default_config,
 )
 from .report import CSS, APP_SCRIPT_TEMPLATE, render_admin_panel_shell
+from .secure_report import UNLOCK_PAGE_TEMPLATE, PBKDF2_ITERATIONS
 
 SHEETJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
 
@@ -42,6 +50,16 @@ SHEET_HINT_COLUMNS = {
     'facility': ['계약번호'],
     'zone_owner': ['구역번호'],
 }
+
+# The report lock screen (same markup as report.py), switched back on in the
+# exported copy. __EXPIRY_TEXT__ is filled in the browser.
+LOCK_SCREEN_HTML = """<div id="lockScreen" class="lock-screen">
+    <h2>Data Intel PRO 보안 리포트</h2>
+    <p>만료일: __EXPIRY_TEXT__</p>
+    <input type="password" id="pwd" placeholder="비밀번호 입력" autocomplete="off">
+    <button onclick="checkPassword()">확인</button>
+    <div id="errorMsg" class="error"></div>
+</div>"""
 
 # (key, label, note) -- same numbering as the desktop GUI
 WEB_UPLOAD_SLOTS = [
@@ -86,10 +104,15 @@ def generate_web_app_html():
         "keyCandidates": FILE_KEY_CANDIDATES,
         "displayColumns": FILE_DISPLAY_COLUMNS,
         "sheetHints": SHEET_HINT_COLUMNS,
+        "dbKeyCandidates": DB_KEY_CANDIDATES,
+        "unlockTemplate": UNLOCK_PAGE_TEMPLATE,
+        "lockScreenHtml": LOCK_SCREEN_HTML,
+        "iterations": PBKDF2_ITERATIONS,
     }
     # The report script's lock screen is never shown here (no data is embedded),
     # so its password constants are just unguessable filler.
     filler = ''.join(random.choice(string.ascii_letters) for _ in range(24))
+    upload_config["filler"] = filler  # the export swaps these back to the real passwords
     app_script = (APP_SCRIPT_TEMPLATE.replace('__PASSWORD__', filler)
                   .replace('__ADMIN_PASSWORD__', filler).replace('__EXPIRY__', '9999-12-31'))
     embedded_json = json.dumps(embedded, ensure_ascii=False).replace('</', '<\\/')
@@ -113,8 +136,8 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
 <meta name="robots" content="noindex, nofollow">
 <title>Data Intel PRO 웹 대시보드</title>
 <style>__CSS__</style>
+<style id="webVisibleStyle">#content { display: block; }</style>
 <style>
-#content { display: block; }
 .web-upload { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 24px; }
 .web-upload h2 { font-size: 17px; margin: 0 0 4px; color: var(--text-primary); }
 .web-upload .web-privacy { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 16px; }
@@ -134,6 +157,17 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
 .web-run:disabled { opacity: .5; cursor: not-allowed; }
 .web-progress { font-size: 13px; color: var(--text-secondary); }
 .web-footnote { font-size: 11.5px; color: var(--text-muted); margin: 12px 0 0; }
+.web-share-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 10px 14px; }
+.web-field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
+.web-field input { font-size: 14px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--page-plane); color: var(--text-primary); }
+.web-field small { font-weight: 400; color: var(--text-muted); font-size: 11.5px; }
+.web-btn2 { font-size: 14px; font-weight: 700; padding: 10px 18px; border-radius: 10px; border: 1px solid var(--border); background: var(--page-plane); color: var(--text-primary); cursor: pointer; }
+.web-btn2:disabled { opacity: .5; cursor: progress; }
+.web-deploy { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+.web-deploy summary { cursor: pointer; font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.web-result { margin-top: 14px; }
+.web-result pre { white-space: pre-wrap; background: var(--page-plane); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; font-size: 13px; margin: 6px 0; }
+.web-remember { flex-direction: row; align-items: center; gap: 6px; font-weight: 400; }
 #webDashboard[hidden] { display: none; }
 </style>
 </head>
@@ -163,6 +197,41 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
             </div>
             <p class="web-footnote">엑셀에서 열어 둔 파일도 선택할 수 있습니다 -- 단, <b>마지막으로 저장된 내용</b>을 읽으므로 수정 중이면 먼저 저장하세요. 시트가 여러 개면 필요한 컬럼이 있는 시트를 자동으로 고르고, 목록에서 바꿀 수 있습니다.</p>
             <p class="web-footnote">4. 해지파이프라인 · 7. 해지시설내역 섹션은 데스크톱 GUI 리포트에서 제공합니다.</p>
+        </section>
+
+        <section class="web-upload" id="webShare" hidden>
+            <h2>🔒 공유용 리포트 만들기</h2>
+            <p class="web-privacy">위 대시보드를 <b>암호화된 HTML 파일</b>로 만듭니다 (GUI 리포트와 같은 방식 -- 비밀번호 없이는 내용을 볼 수 없음). 암호화도 이 브라우저 안에서 합니다.</p>
+            <div class="web-share-grid">
+                <label class="web-field">사용자 비밀번호 <small>받는 사람이 입력 · 비우면 12자리 랜덤</small>
+                    <input type="text" id="shareUserPwd" autocomplete="off" placeholder="예: Kbgw2026!oct"></label>
+                <label class="web-field">관리자 비밀번호 <small>매칭설정 패널까지 열림 · 비우면 12자리 랜덤</small>
+                    <input type="password" id="shareAdminPwd" autocomplete="new-password" placeholder="예: GUI와 같은 관리자 비밀번호"></label>
+                <label class="web-field">만료일 <small>이 날짜가 지나면 열리지 않음</small>
+                    <input type="date" id="shareExpiry"></label>
+            </div>
+            <div class="web-actions">
+                <button type="button" class="web-run" id="shareDownloadBtn">📥 암호화 HTML 다운로드</button>
+                <span class="web-progress" id="shareProgress"></span>
+            </div>
+            <details class="web-deploy">
+                <summary>🌐 GitHub Pages에 바로 배포 (공유 링크)</summary>
+                <p class="web-footnote">GitHub 토큰이 필요합니다 -- github.com → Settings → Developer settings → Personal access tokens → Tokens (classic) → <b>repo</b> 권한으로 생성. 토큰은 GitHub에만 전송되고, '기억'을 체크하지 않으면 저장되지 않습니다.</p>
+                <div class="web-share-grid">
+                    <label class="web-field">GitHub 토큰 <input type="password" id="ghToken" autocomplete="off" placeholder="ghp_..."></label>
+                    <label class="web-field">배포 저장소 이름 <input type="text" id="ghRepo" value="kbgw-report"></label>
+                    <label class="web-field web-remember"><input type="checkbox" id="ghRemember"> 이 브라우저에 토큰 기억</label>
+                </div>
+                <div class="web-actions">
+                    <button type="button" class="web-btn2" id="shareDeployBtn">🌐 암호화해서 배포</button>
+                </div>
+            </details>
+            <div class="web-result" id="shareResult" hidden>
+                <div class="web-field">공유 문구 (받는 사람에게 보내세요)</div>
+                <pre id="shareText"></pre>
+                <button type="button" class="web-btn2" id="shareCopyBtn">📋 공유 문구 복사</button>
+                <p class="web-footnote" id="shareAdminNote"></p>
+            </div>
         </section>
 
         <div id="webDashboard" hidden>
@@ -227,6 +296,7 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
 (function () {
     const CFG = JSON.parse(document.getElementById('uploadConfig').textContent);
     const picked = {};   // key -> { file, wb (parsed workbook), sheet }
+    let lastPayload = null;  // the tables behind the dashboard on screen -- what the export embeds
     const runBtn = document.getElementById('webRunBtn');
     const progress = document.getElementById('webProgress');
     const setStatus = (key, text, cls) => {
@@ -402,6 +472,8 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
             const adminWrap = document.getElementById('adminOnlyWrap');
             if (adminWrap) adminWrap.style.display = '';
             const res = window.DataIntelLoad(payload);
+            lastPayload = payload;
+            document.getElementById('webShare').hidden = false;
             const secs = ((performance.now() - t0) / 1000).toFixed(1);
             progress.textContent = '✅ 완료 -- 관리계약 ' + res.rows.toLocaleString('ko-KR') + '건 (' + secs + '초). 파일을 바꾸면 다시 만들 수 있습니다.';
             document.getElementById('reportMeta').textContent = '관리계약 ' + res.rows.toLocaleString('ko-KR') + '건 · 이 브라우저에서 계산됨';
@@ -411,6 +483,202 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
         } finally {
             runBtn.disabled = !picked.db;
         }
+    });
+
+    // ===== 공유용 암호화 리포트 (report.py + secure_report.py와 같은 결과를 브라우저에서) =====
+    const $ = id => document.getElementById(id);
+    const PWD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+    function strongPassword(len) {
+        const out = []; const buf = new Uint32Array(len * 2);
+        while (out.length < len) {
+            crypto.getRandomValues(buf);
+            for (const v of buf) { if (v < 4294967296 - (4294967296 % 56) && out.length < len) out.push(PWD_ALPHABET[v % 56]); }
+        }
+        return out.join('');
+    }
+    function daysFromToday(days) {  // local date (not UTC -- toISOString would be a day off after midnight KST)
+        const d = new Date(); d.setDate(d.getDate() + days);
+        const p = n => String(n).padStart(2, '0');
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+    }
+    $('shareExpiry').value = daysFromToday(30);
+    try { const t = localStorage.getItem('dataintel-gh-token'); if (t) { $('ghToken').value = t; $('ghRemember').checked = true; } } catch (e) {}
+
+    function prefilterFiles(payload) {
+        // report.py _prefilter_to_possible_matches: 총괄DB 키와 맞을 수 있는 행만 담아 파일 크기를 줄인다
+        const db = payload.db;
+        const keys = new Set();
+        CFG.dbKeyCandidates.forEach(c => { const i = db.columns.indexOf(c); if (i >= 0) db.rows.forEach(r => { if (r[i] != null) keys.add(String(r[i])); }); });
+        const files = {};
+        Object.keys(payload.files).forEach(k => {
+            const t = payload.files[k];
+            const idx = (CFG.keyCandidates[k] || []).map(c => t.columns.indexOf(c)).filter(i => i >= 0);
+            files[k] = { columns: t.columns, rows: idx.length ? t.rows.filter(r => idx.some(i => r[i] != null && keys.has(String(r[i])))) : [] };
+        });
+        return { db, files, zoneOwnerMap: payload.zoneOwnerMap };
+    }
+    async function pageSource() {
+        try {
+            const r = await fetch(location.href.split('#')[0], { cache: 'no-store' });
+            if (r.ok) return await r.text();
+        } catch (e) { /* file:// -- fall back to the live DOM */ }
+        return '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+    }
+    const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    async function buildReportHtml(userPwd, adminPwd, expiry) {
+        let src = await pageSource();
+        const must = (from, to) => {
+            if (!src.includes(from)) throw new Error('리포트 틀을 만들 수 없습니다 (페이지를 새로고침 후 다시 시도).');
+            src = src.split(from).join(to);
+        };
+        must('const CORRECT_PWD = "' + CFG.filler + '";', 'const CORRECT_PWD = ' + JSON.stringify(userPwd) + ';');
+        must('const ADMIN_PWD = "' + CFG.filler + '";', 'const ADMIN_PWD = ' + JSON.stringify(adminPwd) + ';');
+        must('new Date("9999-12-31T23:59:59")', 'new Date("' + expiry + 'T23:59:59")');
+        must('<style id="webVisibleStyle">#content { display: block; }</style>', '<style>#webUpload, #webShare { display: none !important; }</style>');
+        const bodyAt = src.indexOf('<body>');
+        src = src.slice(0, bodyAt + 6) + '\n' + CFG.lockScreenHtml.replace('__EXPIRY_TEXT__', esc(expiry)) + src.slice(bodyAt + 6);
+        const data = prefilterFiles(lastPayload);
+        const generated = new Date();
+        const meta = '생성일시 ' + generated.toLocaleString('ko-KR') + ' · 관리계약 ' + data.db.rows.length.toLocaleString('ko-KR') + '건 · 만료일 ' + expiry;
+        const boot = '<script type="application/json" id="webPreload">' + JSON.stringify(data).replace(/<\//g, '<\\/') + '<\/script>\n'
+            + '<script>document.addEventListener("DOMContentLoaded", function () {'
+            + ' var p = JSON.parse(document.getElementById("webPreload").textContent);'
+            + ' document.getElementById("webDashboard").hidden = false;'
+            + ' window.DataIntelLoad(p);'
+            + ' document.getElementById("reportMeta").textContent = ' + JSON.stringify(meta) + ';'
+            + '});<\/script>\n';
+        const endAt = src.lastIndexOf('</body>');
+        return src.slice(0, endAt) + boot + src.slice(endAt);
+    }
+    function b64(bytes) {
+        let s = '';
+        for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+        return btoa(s);
+    }
+    async function encryptReport(reportHtml, passwords, expiry) {
+        // secure_report.py encrypt_report와 같은 형식: 본문은 랜덤 키로 AES-256-GCM, 그 키를 비밀번호별 PBKDF2 키로 감쌈
+        const contentKey = crypto.getRandomValues(new Uint8Array(32));
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const ck = await crypto.subtle.importKey('raw', contentKey, 'AES-GCM', false, ['encrypt']);
+        const data = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, ck, new TextEncoder().encode(reportHtml)));
+        const slots = [];
+        for (const pwd of Array.from(new Set(passwords.filter(Boolean)))) {
+            const salt = crypto.getRandomValues(new Uint8Array(16));
+            const siv = crypto.getRandomValues(new Uint8Array(12));
+            const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);
+            const kek = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: CFG.iterations, hash: 'SHA-256' },
+                base, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
+            const wrapped = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: siv }, kek, contentKey));
+            slots.push({ salt: b64(salt), iv: b64(siv), key: b64(wrapped) });
+        }
+        const payload = JSON.stringify({ v: 1, iter: CFG.iterations, slots, iv: b64(iv), data: b64(data) });
+        return CFG.unlockTemplate.split('__TITLE__').join('Data Intel PRO 보안 리포트')
+            .replace('__EXPIRY__', '<p class="exp">만료일: ' + esc(expiry) + '</p>')
+            .replace('__PAYLOAD__', payload);
+    }
+    async function makeEncrypted() {
+        if (!lastPayload) throw new Error('먼저 대시보드를 만드세요.');
+        const expiry = $('shareExpiry').value;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(expiry)) throw new Error('만료일을 선택하세요.');
+        const userPwd = $('shareUserPwd').value.trim() || strongPassword(12);
+        const adminPwd = $('shareAdminPwd').value.trim() || strongPassword(12);
+        if (userPwd === adminPwd) throw new Error('사용자 비밀번호와 관리자 비밀번호는 달라야 합니다.');
+        $('shareProgress').textContent = '리포트 만드는 중...';
+        const reportHtml = await buildReportHtml(userPwd, adminPwd, expiry);
+        $('shareProgress').textContent = '암호화 중...';
+        const html = await encryptReport(reportHtml, [userPwd, adminPwd], expiry);
+        return { html, userPwd, adminPwd, expiry };
+    }
+    function showShare(r, url) {
+        const lines = ['[Data Intel PRO 리포트]'];
+        lines.push(url ? '링크: ' + url : '첨부 파일: Data_Intel_PRO_Report.html (브라우저로 열기)');
+        lines.push('비밀번호: ' + r.userPwd, '만료일: ' + r.expiry);
+        $('shareText').textContent = lines.join('\n');
+        $('shareAdminNote').textContent = '관리자 비밀번호(공유하지 마세요): ' + r.adminPwd;
+        $('shareResult').hidden = false;
+    }
+    $('shareCopyBtn').addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText($('shareText').textContent); $('shareCopyBtn').textContent = '✅ 복사됨'; }
+        catch (e) { $('shareCopyBtn').textContent = '직접 선택해서 복사하세요'; }
+        setTimeout(() => { $('shareCopyBtn').textContent = '📋 공유 문구 복사'; }, 1500);
+    });
+    $('shareDownloadBtn').addEventListener('click', async () => {
+        const btn = $('shareDownloadBtn'); btn.disabled = true;
+        try {
+            const r = await makeEncrypted();
+            const url = URL.createObjectURL(new Blob([r.html], { type: 'text/html;charset=utf-8' }));
+            const a = document.createElement('a'); a.href = url; a.download = 'Data_Intel_PRO_Report.html'; a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+            $('shareProgress').textContent = '✅ 다운로드 완료 -- 파일은 암호화되어 있어 메일·메신저로 보내도 됩니다.';
+            showShare(r, null);
+        } catch (e) { console.error(e); $('shareProgress').textContent = '⚠️ ' + (e.message || e); }
+        finally { btn.disabled = false; }
+    });
+
+    // ---- GitHub Pages 배포 (deploy_report.py와 같은 결과: 저장소에 index.html 단일 커밋) ----
+    async function gh(token, method, path, body) {
+        const r = await fetch('https://api.github.com' + path, {
+            method, headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+            body: body ? JSON.stringify(body) : undefined,
+        });
+        const text = await r.text();
+        let json = null; try { json = text ? JSON.parse(text) : null; } catch (e) {}
+        return { status: r.status, ok: r.ok, json };
+    }
+    function ghFail(step, res) {
+        const msg = res.json && res.json.message ? res.json.message : 'HTTP ' + res.status;
+        if (res.status === 401) return new Error('토큰이 올바르지 않거나 만료되었습니다.');
+        if (res.status === 403 || res.status === 404) return new Error(step + ' 권한이 없습니다 -- 토큰에 repo 권한이 있는지 확인하세요. (' + msg + ')');
+        return new Error(step + ' 실패: ' + msg);
+    }
+    async function deployToPages(token, repo, html) {
+        const say = t => { $('shareProgress').textContent = t; };
+        const me = await gh(token, 'GET', '/user');
+        if (!me.ok) throw ghFail('로그인', me);
+        const full = me.json.login + '/' + repo;
+        let info = await gh(token, 'GET', '/repos/' + full);
+        if (info.status === 404) {
+            say('배포 저장소 만드는 중: ' + full);
+            const made = await gh(token, 'POST', '/user/repos', { name: repo, private: false, auto_init: true, description: 'Data Intel PRO 암호화 리포트 배포용' });
+            if (!made.ok) throw ghFail('저장소 생성', made);
+        } else if (!info.ok) throw ghFail('저장소 확인', info);
+        say('리포트 올리는 중...');
+        const blob = await gh(token, 'POST', '/repos/' + full + '/git/blobs', { content: b64(new TextEncoder().encode(html)), encoding: 'base64' });
+        if (!blob.ok) throw ghFail('업로드', blob);
+        const nojekyll = await gh(token, 'POST', '/repos/' + full + '/git/blobs', { content: '', encoding: 'utf-8' });
+        if (!nojekyll.ok) throw ghFail('업로드', nojekyll);
+        const tree = await gh(token, 'POST', '/repos/' + full + '/git/trees', { tree: [
+            { path: 'index.html', mode: '100644', type: 'blob', sha: blob.json.sha },
+            { path: '.nojekyll', mode: '100644', type: 'blob', sha: nojekyll.json.sha }] });
+        if (!tree.ok) throw ghFail('업로드', tree);
+        // parents: [] -- 이전 리포트를 기록에 남기지 않는 단일 커밋 (deploy_report.py의 force push와 같음)
+        const commit = await gh(token, 'POST', '/repos/' + full + '/git/commits', { message: 'Deploy encrypted report', tree: tree.json.sha, parents: [] });
+        if (!commit.ok) throw ghFail('업로드', commit);
+        let ref = await gh(token, 'PATCH', '/repos/' + full + '/git/refs/heads/main', { sha: commit.json.sha, force: true });
+        if (!ref.ok) ref = await gh(token, 'POST', '/repos/' + full + '/git/refs', { ref: 'refs/heads/main', sha: commit.json.sha });
+        if (!ref.ok) throw ghFail('업로드', ref);
+        let pages = await gh(token, 'GET', '/repos/' + full + '/pages');
+        if (!pages.ok) {
+            say('GitHub Pages 켜는 중...');
+            pages = await gh(token, 'POST', '/repos/' + full + '/pages', { source: { branch: 'main', path: '/' } });
+            if (!pages.ok) throw ghFail('GitHub Pages 설정', pages);
+        }
+        return (pages.json && pages.json.html_url) || ('https://' + me.json.login.toLowerCase() + '.github.io/' + repo + '/');
+    }
+    $('shareDeployBtn').addEventListener('click', async () => {
+        const btn = $('shareDeployBtn'); btn.disabled = true; $('shareDownloadBtn').disabled = true;
+        try {
+            const token = $('ghToken').value.trim();
+            const repo = $('ghRepo').value.trim() || 'kbgw-report';
+            if (!token) throw new Error('GitHub 토큰을 입력하세요.');
+            if (!/^[A-Za-z0-9._-]+$/.test(repo)) throw new Error('저장소 이름은 영문·숫자·-·_ 만 쓸 수 있습니다.');
+            try { if ($('ghRemember').checked) localStorage.setItem('dataintel-gh-token', token); else localStorage.removeItem('dataintel-gh-token'); } catch (e) {}
+            const r = await makeEncrypted();
+            const url = await deployToPages(token, repo, r.html);
+            $('shareProgress').textContent = '✅ 배포 완료 -- 1~2분 뒤 링크가 열립니다: ' + url;
+            showShare(r, url);
+        } catch (e) { console.error(e); $('shareProgress').textContent = '⚠️ ' + (e.message || e); }
+        finally { btn.disabled = false; $('shareDownloadBtn').disabled = false; }
     });
 })();
 </script>
