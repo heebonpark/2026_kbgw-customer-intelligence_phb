@@ -195,6 +195,7 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
 .web-sheet, .web-map select, .web-map input { font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text-primary); max-width: 100%; }
 .web-slot.web-slot-wide { grid-column: 1 / -1; }
 .web-map { border-top: 1px dashed var(--baseline); padding-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.web-map[hidden], .web-paste[hidden] { display: none; }
 .web-map-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 12.5px; color: var(--text-secondary); }
 .web-map-row label { display: flex; align-items: center; gap: 6px; }
 .web-map-row input[type=number] { width: 64px; }
