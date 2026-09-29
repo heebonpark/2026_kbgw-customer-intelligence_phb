@@ -473,6 +473,9 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
 .web-slot-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
 .web-slot-note { font-weight: 400; color: var(--text-muted); font-size: 11.5px; }
 .web-slot input[type=file] { font-size: 12px; color: var(--text-secondary); max-width: 100%; }
+.web-slot-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.web-reload { border-color: color-mix(in srgb, var(--brand) 55%, var(--border)); font-weight: 700; }
+.web-paste { width: 100%; min-height: 64px; font-size: 12px; padding: 8px 10px; border: 1px dashed var(--brand); border-radius: 8px; background: var(--surface-1); color: var(--text-primary); resize: vertical; }
 .web-slot-status { font-size: 11.5px; color: var(--text-muted); }
 .web-sheet, .web-map select, .web-map input { font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text-primary); max-width: 100%; }
 .web-slot.web-slot-wide { grid-column: 1 / -1; }
@@ -533,45 +536,88 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
             <div class="web-slots">
         <div class="web-slot web-slot-required" data-key="db">
             <span class="web-slot-title">1. 총괄관리DB <span class="web-slot-note">(필수)</span></span>
-            <input type="file" accept=".xlsx,.xls,.csv" data-key="db">
+            <div class="web-slot-actions">
+                <button type="button" class="web-mini web-pick" data-pick-for="db">📂 파일 선택</button>
+                <button type="button" class="web-mini web-reload" data-reload-for="db" hidden>🔄 다시 불러오기</button>
+                <button type="button" class="web-mini" data-paste-for="db">📋 엑셀에서 붙여넣기</button>
+            </div>
+            <input type="file" accept=".xlsx,.xls,.csv" data-key="db" hidden>
+            <textarea class="web-paste" data-paste-area="db" hidden
+                placeholder="엑셀에서 시트를 전체 선택(Ctrl+A) → 복사(Ctrl+C) 후, 여기를 누르고 붙여넣기(Ctrl+V) -- 저장 안 한 내용도 그대로 들어옵니다"></textarea>
             <div class="web-map" data-map-for="db" hidden></div>
             <span class="web-slot-status" data-status-for="db">파일을 선택하세요</span>
         </div>
         <div class="web-slot" data-key="voc">
             <span class="web-slot-title">2. 월/일일 SP관리활동 (VOC) <span class="web-slot-note">(선택)</span></span>
-            <input type="file" accept=".xlsx,.xls,.csv" data-key="voc">
+            <div class="web-slot-actions">
+                <button type="button" class="web-mini web-pick" data-pick-for="voc">📂 파일 선택</button>
+                <button type="button" class="web-mini web-reload" data-reload-for="voc" hidden>🔄 다시 불러오기</button>
+                <button type="button" class="web-mini" data-paste-for="voc">📋 엑셀에서 붙여넣기</button>
+            </div>
+            <input type="file" accept=".xlsx,.xls,.csv" data-key="voc" hidden>
+            <textarea class="web-paste" data-paste-area="voc" hidden
+                placeholder="엑셀에서 시트를 전체 선택(Ctrl+A) → 복사(Ctrl+C) 후, 여기를 누르고 붙여넣기(Ctrl+V) -- 저장 안 한 내용도 그대로 들어옵니다"></textarea>
             <div class="web-map" data-map-for="voc" hidden></div>
             <span class="web-slot-status" data-status-for="voc">파일을 선택하세요</span>
         </div>
         <div class="web-slot" data-key="patrol">
             <span class="web-slot-title">3. 월/일일 SE,SG 정기점검 <span class="web-slot-note">(선택)</span></span>
-            <input type="file" accept=".xlsx,.xls,.csv" data-key="patrol">
+            <div class="web-slot-actions">
+                <button type="button" class="web-mini web-pick" data-pick-for="patrol">📂 파일 선택</button>
+                <button type="button" class="web-mini web-reload" data-reload-for="patrol" hidden>🔄 다시 불러오기</button>
+                <button type="button" class="web-mini" data-paste-for="patrol">📋 엑셀에서 붙여넣기</button>
+            </div>
+            <input type="file" accept=".xlsx,.xls,.csv" data-key="patrol" hidden>
+            <textarea class="web-paste" data-paste-area="patrol" hidden
+                placeholder="엑셀에서 시트를 전체 선택(Ctrl+A) → 복사(Ctrl+C) 후, 여기를 누르고 붙여넣기(Ctrl+V) -- 저장 안 한 내용도 그대로 들어옵니다"></textarea>
             <div class="web-map" data-map-for="patrol" hidden></div>
             <span class="web-slot-status" data-status-for="patrol">파일을 선택하세요</span>
         </div>
         <div class="web-slot" data-key="original">
             <span class="web-slot-title">5. 2026년 관리고객원본 <span class="web-slot-note">(선택)</span></span>
-            <input type="file" accept=".xlsx,.xls,.csv" data-key="original">
+            <div class="web-slot-actions">
+                <button type="button" class="web-mini web-pick" data-pick-for="original">📂 파일 선택</button>
+                <button type="button" class="web-mini web-reload" data-reload-for="original" hidden>🔄 다시 불러오기</button>
+                <button type="button" class="web-mini" data-paste-for="original">📋 엑셀에서 붙여넣기</button>
+            </div>
+            <input type="file" accept=".xlsx,.xls,.csv" data-key="original" hidden>
+            <textarea class="web-paste" data-paste-area="original" hidden
+                placeholder="엑셀에서 시트를 전체 선택(Ctrl+A) → 복사(Ctrl+C) 후, 여기를 누르고 붙여넣기(Ctrl+V) -- 저장 안 한 내용도 그대로 들어옵니다"></textarea>
             <div class="web-map" data-map-for="original" hidden></div>
             <span class="web-slot-status" data-status-for="original">파일을 선택하세요</span>
         </div>
         <div class="web-slot" data-key="facility">
             <span class="web-slot-title">6. 시설현황 <span class="web-slot-note">(선택)</span></span>
-            <input type="file" accept=".xlsx,.xls,.csv" data-key="facility">
+            <div class="web-slot-actions">
+                <button type="button" class="web-mini web-pick" data-pick-for="facility">📂 파일 선택</button>
+                <button type="button" class="web-mini web-reload" data-reload-for="facility" hidden>🔄 다시 불러오기</button>
+                <button type="button" class="web-mini" data-paste-for="facility">📋 엑셀에서 붙여넣기</button>
+            </div>
+            <input type="file" accept=".xlsx,.xls,.csv" data-key="facility" hidden>
+            <textarea class="web-paste" data-paste-area="facility" hidden
+                placeholder="엑셀에서 시트를 전체 선택(Ctrl+A) → 복사(Ctrl+C) 후, 여기를 누르고 붙여넣기(Ctrl+V) -- 저장 안 한 내용도 그대로 들어옵니다"></textarea>
             <div class="web-map" data-map-for="facility" hidden></div>
             <span class="web-slot-status" data-status-for="facility">파일을 선택하세요</span>
         </div>
         <div class="web-slot" data-key="zone_owner">
             <span class="web-slot-title">8. 영업구역담당자 <span class="web-slot-note">(선택 · SP 구역번호→담당자명)</span></span>
-            <input type="file" accept=".xlsx,.xls,.csv" data-key="zone_owner">
+            <div class="web-slot-actions">
+                <button type="button" class="web-mini web-pick" data-pick-for="zone_owner">📂 파일 선택</button>
+                <button type="button" class="web-mini web-reload" data-reload-for="zone_owner" hidden>🔄 다시 불러오기</button>
+                <button type="button" class="web-mini" data-paste-for="zone_owner">📋 엑셀에서 붙여넣기</button>
+            </div>
+            <input type="file" accept=".xlsx,.xls,.csv" data-key="zone_owner" hidden>
+            <textarea class="web-paste" data-paste-area="zone_owner" hidden
+                placeholder="엑셀에서 시트를 전체 선택(Ctrl+A) → 복사(Ctrl+C) 후, 여기를 누르고 붙여넣기(Ctrl+V) -- 저장 안 한 내용도 그대로 들어옵니다"></textarea>
             <div class="web-map" data-map-for="zone_owner" hidden></div>
             <span class="web-slot-status" data-status-for="zone_owner">파일을 선택하세요</span>
         </div></div>
             <div class="web-actions">
                 <button type="button" class="web-run" id="webRunBtn" disabled>📊 대시보드 만들기</button>
+                <button type="button" class="web-btn2" id="webReloadAll" hidden title="엑셀에서 저장(Ctrl+S)한 최신 내용으로 모든 파일을 다시 읽고 대시보드를 새로 만듭니다">🔄 모두 다시 불러오고 대시보드 갱신</button>
                 <span class="web-progress" id="webProgress">1. 총괄관리DB는 필수입니다.</span>
             </div>
-            <p class="web-footnote">엑셀에서 열어 둔 파일도 선택할 수 있습니다 -- 단, <b>마지막으로 저장된 내용</b>을 읽으므로 수정 중이면 먼저 저장하세요. 파일을 고르면 <b>시트 · 헤더 행 · 컬럼(열 위치)</b>을 자동으로 맞추고 미리보기를 보여줍니다 -- 다르면 드롭다운에서 바꾸세요. 설정은 이 브라우저에 기억되어 다음에 같은 양식이면 자동 적용됩니다.</p>
+            <p class="web-footnote">엑셀에서 열어 둔 파일도 선택할 수 있습니다 -- 단, <b>마지막으로 저장된 내용</b>을 읽으므로 수정 중이면 먼저 저장하세요. 한 번 고른 파일은 <b>🔄 다시 불러오기</b>로 다시 고르지 않고 최신 저장본을 읽습니다 (Chrome·Edge). 저장 안 한 내용까지 쓰려면 <b>📋 엑셀에서 붙여넣기</b>를 쓰세요. 파일을 고르면 <b>시트 · 헤더 행 · 컬럼(열 위치)</b>을 자동으로 맞추고 미리보기를 보여줍니다 -- 다르면 드롭다운에서 바꾸세요. 설정은 이 브라우저에 기억되어 다음에 같은 양식이면 자동 적용됩니다.</p>
             <p class="web-footnote">4. 해지파이프라인 · 7. 해지시설내역 섹션은 데스크톱 GUI 리포트에서 제공합니다.</p>
         </section>
 
@@ -697,12 +743,12 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
 </div>
 
 <script type="application/json" id="embeddedData">{"db": {"columns": [], "rows": []}, "files": {"original": {"columns": [], "rows": []}, "facility": {"columns": [], "rows": []}, "patrol": {"columns": [], "rows": []}, "voc": {"columns": [], "rows": []}, "cancel": {"columns": [], "rows": []}, "cancelled_facility": {"columns": [], "rows": []}}, "matchingConfig": {"original": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "facility": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "patrol": [{"db_col": "서비스번호", "file_col": "고객번호", "enabled": true}], "voc": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "cancel": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "cancelled_facility": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}]}, "fileLabels": {"original": "2026년 관리고객원본", "facility": "시설현황", "patrol": "순찰 정기점검 내역", "voc": "VOC정보조회", "cancel": "해지 파이프라인", "cancelled_facility": "해지시설 내역"}, "dbKeyCandidates": ["계약번호", "서비스번호"], "fileKeyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "hqOrder": ["강북/강원", "강남/서부", "대구/경북", "부산/경남", "충남/충북", "전남/전북"], "branchOrder": ["중앙", "강북", "서대문", "고양", "의정부", "남양주", "강릉", "원주"], "zoneOwnerMap": {}}</script>
-<script type="application/json" id="uploadConfig">{"matchable": ["original", "facility", "patrol", "voc", "cancel", "cancelled_facility"], "keyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "sheetHints": {"db": ["활동대상구분", "담당채널"], "voc": ["VOC유형대", "계약번호"], "patrol": ["고객번호"], "original": ["계약번호"], "facility": ["계약번호"], "zone_owner": ["구역번호"]}, "fieldSpecs": {"db": [{"name": "활동대상구분", "aliases": ["활동대상구분", "담당채널"], "required": true}, {"name": "지사", "aliases": ["지사", "관리지사명", "관리지사"], "required": true}, {"name": "계약번호", "aliases": ["계약번호"]}, {"name": "서비스번호", "aliases": ["서비스번호"]}, {"name": "상호", "aliases": ["상호", "상호명", "고객명"]}, {"name": "설치주소", "aliases": ["설치주소", "주소"]}, {"name": "영업구역정보", "aliases": ["영업구역정보", "영업구역번호", "영업구역"]}, {"name": "기술구역정보", "aliases": ["기술구역정보", "기술구역번호", "기술구역"]}, {"name": "구역정보", "aliases": ["구역정보", "구역"]}, {"name": "활동유무", "aliases": ["활동유무", "활동유무(o,x)"], "prefix": "활동유무", "required": true}, {"name": "SP담당", "aliases": ["SP담당"]}], "zone_owner": [{"name": "구역번호", "aliases": ["구역번호", "영업구역번호"], "required": true}, {"name": "담당자명", "aliases": ["담당자명", "담당자", "사원명", "(신규)사원명"], "required": true}]}, "dbKeyCandidates": ["계약번호", "서비스번호"], "unlockTemplate": "\u003c!DOCTYPE html>\n\u003chtml lang=\"ko\">\n\u003chead>\n\u003cmeta charset=\"UTF-8\">\n\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n\u003cmeta name=\"robots\" content=\"noindex, nofollow\">\n\u003ctitle>__TITLE__\u003c/title>\n\u003cstyle>\n:root { --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; --brand: #2563eb; --error: #d03b3b; }\n@media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --muted: #94a3b8; --border: #334155; } }\n* { box-sizing: border-box; }\nbody { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--text);\n       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; padding: 16px; }\n.card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; text-align: center; }\nh1 { font-size: 20px; margin: 0 0 6px; }\n.exp, .hint { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }\ninput { width: 100%; font-size: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }\nbutton { width: 100%; margin-top: 12px; font-size: 15px; font-weight: 700; padding: 12px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; }\nbutton:disabled { opacity: .6; cursor: progress; }\n.err { min-height: 18px; margin-top: 10px; font-size: 13px; color: var(--error); }\n\u003c/style>\n\u003c/head>\n\u003cbody>\n\u003cform class=\"card\" id=\"unlockForm\" autocomplete=\"off\">\n    \u003ch1>🔒 __TITLE__\u003c/h1>\n    __EXPIRY__\n    \u003cp class=\"hint\">공유받은 비밀번호를 입력하세요. 데이터는 암호화되어 있습니다.\u003c/p>\n    \u003cinput type=\"password\" id=\"unlockPwd\" placeholder=\"비밀번호\" autofocus>\n    \u003cbutton type=\"submit\" id=\"unlockBtn\">열기\u003c/button>\n    \u003cdiv class=\"err\" id=\"unlockErr\">\u003c/div>\n\u003c/form>\n\u003cscript type=\"application/json\" id=\"encPayload\">__PAYLOAD__\u003c/script>\n\u003cscript>\n(function () {\n    const payload = JSON.parse(document.getElementById('encPayload').textContent);\n    const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));\n    const form = document.getElementById('unlockForm');\n    const btn = document.getElementById('unlockBtn');\n    const err = document.getElementById('unlockErr');\n\n    async function unwrapContentKey(pwd) {\n        const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);\n        for (const slot of payload.slots) {\n            const kek = await crypto.subtle.deriveKey(\n                { name: 'PBKDF2', salt: b64(slot.salt), iterations: payload.iter, hash: 'SHA-256' },\n                base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);\n            try {\n                return await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(slot.iv) }, kek, b64(slot.key));\n            } catch (e) { /* not this slot -- try the next password slot */ }\n        }\n        return null;\n    }\n\n    form.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        const pwd = document.getElementById('unlockPwd').value;\n        if (!pwd) return;\n        if (!window.crypto || !crypto.subtle) {\n            err.textContent = '이 브라우저에서는 열 수 없습니다 (https 주소 또는 최신 브라우저가 필요합니다).';\n            return;\n        }\n        btn.disabled = true; btn.textContent = '여는 중...'; err.textContent = '';\n        try {\n            const rawKey = await unwrapContentKey(pwd);\n            if (!rawKey) throw new Error('bad password');\n            const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);\n            const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(payload.iv) }, key, b64(payload.data));\n            const reportHtml = new TextDecoder().decode(plain);\n            document.open();\n            document.write(reportHtml);\n            document.close();\n            // Hand the same password to the report's own lock screen: it still\n            // enforces the expiry date and decides user vs admin view.\n            const unlock = () => {\n                const input = document.getElementById('pwd');\n                if (input && typeof window.checkPassword === 'function') { input.value = pwd; window.checkPassword(); }\n            };\n            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', unlock); else unlock();\n        } catch (ex) {\n            btn.disabled = false; btn.textContent = '열기';\n            err.textContent = '비밀번호가 올바르지 않습니다.';\n        }\n    });\n})();\n\u003c/script>\n\u003c/body>\n\u003c/html>", "lockScreenHtml": "\u003cdiv id=\"lockScreen\" class=\"lock-screen\">\n    \u003ch2>Data Intel PRO 보안 리포트\u003c/h2>\n    \u003cp>만료일: __EXPIRY_TEXT__\u003c/p>\n    \u003cinput type=\"password\" id=\"pwd\" placeholder=\"비밀번호 입력\" autocomplete=\"off\">\n    \u003cbutton onclick=\"checkPassword()\">확인\u003c/button>\n    \u003cdiv id=\"errorMsg\" class=\"error\">\u003c/div>\n\u003c/div>", "iterations": 310000, "filler": "yJTLbJkEqBFUqdycwtXAHwWk"}</script>
+<script type="application/json" id="uploadConfig">{"matchable": ["original", "facility", "patrol", "voc", "cancel", "cancelled_facility"], "keyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "sheetHints": {"db": ["활동대상구분", "담당채널"], "voc": ["VOC유형대", "계약번호"], "patrol": ["고객번호"], "original": ["계약번호"], "facility": ["계약번호"], "zone_owner": ["구역번호"]}, "fieldSpecs": {"db": [{"name": "활동대상구분", "aliases": ["활동대상구분", "담당채널"], "required": true}, {"name": "지사", "aliases": ["지사", "관리지사명", "관리지사"], "required": true}, {"name": "계약번호", "aliases": ["계약번호"]}, {"name": "서비스번호", "aliases": ["서비스번호"]}, {"name": "상호", "aliases": ["상호", "상호명", "고객명"]}, {"name": "설치주소", "aliases": ["설치주소", "주소"]}, {"name": "영업구역정보", "aliases": ["영업구역정보", "영업구역번호", "영업구역"]}, {"name": "기술구역정보", "aliases": ["기술구역정보", "기술구역번호", "기술구역"]}, {"name": "구역정보", "aliases": ["구역정보", "구역"]}, {"name": "활동유무", "aliases": ["활동유무", "활동유무(o,x)"], "prefix": "활동유무", "required": true}, {"name": "SP담당", "aliases": ["SP담당"]}], "zone_owner": [{"name": "구역번호", "aliases": ["구역번호", "영업구역번호"], "required": true}, {"name": "담당자명", "aliases": ["담당자명", "담당자", "사원명", "(신규)사원명"], "required": true}]}, "dbKeyCandidates": ["계약번호", "서비스번호"], "unlockTemplate": "\u003c!DOCTYPE html>\n\u003chtml lang=\"ko\">\n\u003chead>\n\u003cmeta charset=\"UTF-8\">\n\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n\u003cmeta name=\"robots\" content=\"noindex, nofollow\">\n\u003ctitle>__TITLE__\u003c/title>\n\u003cstyle>\n:root { --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; --brand: #2563eb; --error: #d03b3b; }\n@media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --muted: #94a3b8; --border: #334155; } }\n* { box-sizing: border-box; }\nbody { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--text);\n       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; padding: 16px; }\n.card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; text-align: center; }\nh1 { font-size: 20px; margin: 0 0 6px; }\n.exp, .hint { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }\ninput { width: 100%; font-size: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }\nbutton { width: 100%; margin-top: 12px; font-size: 15px; font-weight: 700; padding: 12px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; }\nbutton:disabled { opacity: .6; cursor: progress; }\n.err { min-height: 18px; margin-top: 10px; font-size: 13px; color: var(--error); }\n\u003c/style>\n\u003c/head>\n\u003cbody>\n\u003cform class=\"card\" id=\"unlockForm\" autocomplete=\"off\">\n    \u003ch1>🔒 __TITLE__\u003c/h1>\n    __EXPIRY__\n    \u003cp class=\"hint\">공유받은 비밀번호를 입력하세요. 데이터는 암호화되어 있습니다.\u003c/p>\n    \u003cinput type=\"password\" id=\"unlockPwd\" placeholder=\"비밀번호\" autofocus>\n    \u003cbutton type=\"submit\" id=\"unlockBtn\">열기\u003c/button>\n    \u003cdiv class=\"err\" id=\"unlockErr\">\u003c/div>\n\u003c/form>\n\u003cscript type=\"application/json\" id=\"encPayload\">__PAYLOAD__\u003c/script>\n\u003cscript>\n(function () {\n    const payload = JSON.parse(document.getElementById('encPayload').textContent);\n    const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));\n    const form = document.getElementById('unlockForm');\n    const btn = document.getElementById('unlockBtn');\n    const err = document.getElementById('unlockErr');\n\n    async function unwrapContentKey(pwd) {\n        const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);\n        for (const slot of payload.slots) {\n            const kek = await crypto.subtle.deriveKey(\n                { name: 'PBKDF2', salt: b64(slot.salt), iterations: payload.iter, hash: 'SHA-256' },\n                base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);\n            try {\n                return await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(slot.iv) }, kek, b64(slot.key));\n            } catch (e) { /* not this slot -- try the next password slot */ }\n        }\n        return null;\n    }\n\n    form.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        const pwd = document.getElementById('unlockPwd').value;\n        if (!pwd) return;\n        if (!window.crypto || !crypto.subtle) {\n            err.textContent = '이 브라우저에서는 열 수 없습니다 (https 주소 또는 최신 브라우저가 필요합니다).';\n            return;\n        }\n        btn.disabled = true; btn.textContent = '여는 중...'; err.textContent = '';\n        try {\n            const rawKey = await unwrapContentKey(pwd);\n            if (!rawKey) throw new Error('bad password');\n            const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);\n            const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(payload.iv) }, key, b64(payload.data));\n            const reportHtml = new TextDecoder().decode(plain);\n            document.open();\n            document.write(reportHtml);\n            document.close();\n            // Hand the same password to the report's own lock screen: it still\n            // enforces the expiry date and decides user vs admin view.\n            const unlock = () => {\n                const input = document.getElementById('pwd');\n                if (input && typeof window.checkPassword === 'function') { input.value = pwd; window.checkPassword(); }\n            };\n            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', unlock); else unlock();\n        } catch (ex) {\n            btn.disabled = false; btn.textContent = '열기';\n            err.textContent = '비밀번호가 올바르지 않습니다.';\n        }\n    });\n})();\n\u003c/script>\n\u003c/body>\n\u003c/html>", "lockScreenHtml": "\u003cdiv id=\"lockScreen\" class=\"lock-screen\">\n    \u003ch2>Data Intel PRO 보안 리포트\u003c/h2>\n    \u003cp>만료일: __EXPIRY_TEXT__\u003c/p>\n    \u003cinput type=\"password\" id=\"pwd\" placeholder=\"비밀번호 입력\" autocomplete=\"off\">\n    \u003cbutton onclick=\"checkPassword()\">확인\u003c/button>\n    \u003cdiv id=\"errorMsg\" class=\"error\">\u003c/div>\n\u003c/div>", "iterations": 310000, "filler": "naIkBnLJlpTUoYIRrJjlhPIr"}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // ===== Lock screen =====
-const CORRECT_PWD = "yJTLbJkEqBFUqdycwtXAHwWk";
-const ADMIN_PWD = "yJTLbJkEqBFUqdycwtXAHwWk";
+const CORRECT_PWD = "naIkBnLJlpTUoYIRrJjlhPIr";
+const ADMIN_PWD = "naIkBnLJlpTUoYIRrJjlhPIr";
 const EXPIRY_DATE = new Date("9999-12-31T23:59:59");
 let isAdminUnlocked = false;
 
@@ -3658,40 +3704,180 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         }
     }
 
-    document.querySelectorAll('.web-slot input[type=file]').forEach(input => {
-        input.addEventListener('change', async () => {
-            const key = input.dataset.key;
-            const token = pickToken[key] = {};
-            delete picked[key];
-            renderMapBox(key);
-            const file = input.files && input.files[0];
-            if (!file) { setStatus(key, '파일을 선택하세요'); refreshRun(); return; }
-            setStatus(key, file.name + ' -- 여는 중...', 'ok');
-            runBtn.disabled = true;
-            await new Promise(r => setTimeout(r, 0));
-            try {
-                const wb = await readWorkbook(file);
-                if (pickToken[key] !== token) return;
-                const saved = loadSaved(key);
-                const sheets = wb.SheetNames.map(name => ({ name, rows: sheetRowCount(wb.Sheets[name]) }));
-                // 지난번 시트(같은 이름, 데이터 있음) -> 필요한 컬럼 + 데이터 있는 시트 -> 데이터 있는 첫 시트
-                const hasHint = sh => sheetHasColumn(wb.Sheets[sh.name], CFG.sheetHints[key] || []);
-                const savedSheet = saved ? sheets.find(sh => sh.name === saved.sheet && sh.rows > 0) : null;
-                const hinted = sheets.find(sh => sh.rows > 0 && hasHint(sh)) || sheets.find(hasHint);
-                const chosen = (savedSheet || hinted || sheets.find(sh => sh.rows > 0) || sheets[0]).name;
-                picked[key] = { file, wb };
-                applySheet(key, chosen, savedSheet ? saved.headerRow : null, savedSheet ? saved : null);
-                renderMapBox(key);
-                setStatus(key, file.name + ' · 시트 ' + chosen + ' · 헤더 ' + picked[key].headerRow + '행'
-                    + (savedSheet ? ' (지난 설정 적용)' : sheets.length > 1 && hinted ? ' (자동 선택)' : ''), 'ok');
-            } catch (e) {
-                console.error(e);
-                if (pickToken[key] !== token) return;
-                setStatus(key, '파일을 열 수 없습니다: ' + (e && e.message ? e.message : e), 'err');
-            }
-            refreshRun();
+    // ---- 파일 받기: 📂 선택 / 🔄 다시 불러오기(기억한 파일의 최신 저장본) / 📋 엑셀에서 붙여넣기 ----
+    const handles = {};  // key -> FileSystemFileHandle (Chrome/Edge). IndexedDB에 보관해 새로고침 후에도 유지.
+    const canHandle = typeof window.showOpenFilePicker === 'function';
+    function idb() {
+        return new Promise((res, rej) => {
+            const rq = indexedDB.open('dataintel-web', 1);
+            rq.onupgradeneeded = () => rq.result.createObjectStore('handles');
+            rq.onsuccess = () => res(rq.result);
+            rq.onerror = () => rej(rq.error);
         });
+    }
+    async function idbSet(key, value) {
+        try {
+            const db = await idb();
+            await new Promise((res, rej) => {
+                const tx = db.transaction('handles', 'readwrite');
+                if (value) tx.objectStore('handles').put(value, key); else tx.objectStore('handles').delete(key);
+                tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+            });
+        } catch (e) { /* 저장 못 해도 이번 창에서는 동작 */ }
+    }
+    async function idbAll() {
+        try {
+            const db = await idb();
+            return await new Promise((res, rej) => {
+                const out = {};
+                const rq = db.transaction('handles').objectStore('handles').openCursor();
+                rq.onsuccess = () => { const c = rq.result; if (c) { out[c.key] = c.value; c.continue(); } else res(out); };
+                rq.onerror = () => rej(rq.error);
+            });
+        } catch (e) { return {}; }
+    }
+    function showReload(key) {
+        const btn = document.querySelector('[data-reload-for="' + key + '"]');
+        if (btn) {
+            btn.hidden = !handles[key];
+            if (handles[key]) btn.textContent = '🔄 다시 불러오기 (' + handles[key].name + ')';
+        }
+        document.getElementById('webReloadAll').hidden = !Object.keys(handles).length;
+    }
+
+    // 어느 경로로 들어오든 같은 처리: 시트 고르기 -> 헤더 행/컬럼 자동 맞춤 -> 설정 칸 표시
+    async function takeWorkbook(key, name, getWb) {
+        const token = pickToken[key] = {};
+        delete picked[key];
+        renderMapBox(key);
+        setStatus(key, name + ' -- 여는 중...', 'ok');
+        runBtn.disabled = true;
+        await new Promise(r => setTimeout(r, 0));
+        let ok = false;
+        try {
+            const wb = await getWb();
+            if (pickToken[key] !== token) return false;
+            const saved = loadSaved(key);
+            const sheets = wb.SheetNames.map(n => ({ name: n, rows: sheetRowCount(wb.Sheets[n]) }));
+            // 지난번 시트(같은 이름, 데이터 있음) -> 필요한 컬럼 + 데이터 있는 시트 -> 데이터 있는 첫 시트
+            const hasHint = sh => sheetHasColumn(wb.Sheets[sh.name], CFG.sheetHints[key] || []);
+            const savedSheet = saved ? sheets.find(sh => sh.name === saved.sheet && sh.rows > 0) : null;
+            const hinted = sheets.find(sh => sh.rows > 0 && hasHint(sh)) || sheets.find(hasHint);
+            const chosen = (savedSheet || hinted || sheets.find(sh => sh.rows > 0) || sheets[0]).name;
+            picked[key] = { name, wb };
+            // 컬럼 지정은 헤더 이름으로 기억하므로 붙여넣기(시트 이름이 다름)에도 적용, 헤더 행은 같은 시트일 때만
+            applySheet(key, chosen, savedSheet ? saved.headerRow : null, saved);
+            renderMapBox(key);
+            setStatus(key, name + ' · 시트 ' + chosen + ' · 헤더 ' + picked[key].headerRow + '행'
+                + (savedSheet ? ' (지난 설정 적용)' : sheets.length > 1 && hinted ? ' (자동 선택)' : ''), 'ok');
+            ok = true;
+        } catch (e) {
+            console.error(e);
+            if (pickToken[key] !== token) return false;
+            setStatus(key, name + ' 을(를) 열 수 없습니다: ' + (e && e.message ? e.message : e), 'err');
+        }
+        refreshRun();
+        return ok;
+    }
+    async function readHandle(key) {
+        const h = handles[key];
+        if (!h) return false;
+        try {
+            if (h.queryPermission && (await h.queryPermission({ mode: 'read' })) !== 'granted'
+                && (await h.requestPermission({ mode: 'read' })) !== 'granted') {
+                setStatus(key, '파일 읽기를 허용해야 다시 불러올 수 있습니다', 'err');
+                return false;
+            }
+            const file = await h.getFile();  // 엑셀에서 마지막으로 저장된 내용
+            return await takeWorkbook(key, file.name, () => readWorkbook(file));
+        } catch (e) {
+            console.error(e);
+            setStatus(key, '다시 불러오지 못했습니다 (파일이 옮겨졌거나 삭제됨?) -- 📂 파일 선택으로 다시 고르세요', 'err');
+            return false;
+        }
+    }
+
+    document.querySelectorAll('[data-pick-for]').forEach(btn => btn.addEventListener('click', async () => {
+        const key = btn.dataset.pickFor;
+        const input = document.querySelector('.web-slot input[data-key="' + key + '"]');
+        if (!canHandle) { input.click(); return; }  // Safari/Firefox: 일반 파일 선택
+        let h;
+        try {
+            [h] = await window.showOpenFilePicker({ types: [{ description: '엑셀/CSV',
+                accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'], 'application/vnd.ms-excel': ['.xls'], 'text/csv': ['.csv'] } }] });
+        } catch (e) {
+            if (!e || e.name !== 'AbortError') input.click();
+            return;
+        }
+        handles[key] = h;
+        idbSet(key, h);
+        showReload(key);
+        await readHandle(key);
+    }));
+    document.querySelectorAll('.web-slot input[type=file]').forEach(input => input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        if (file) takeWorkbook(input.dataset.key, file.name, () => readWorkbook(file));
+    }));
+    document.querySelectorAll('[data-reload-for]').forEach(btn => btn.addEventListener('click', () => readHandle(btn.dataset.reloadFor)));
+    document.getElementById('webReloadAll').addEventListener('click', async () => {
+        const btn = document.getElementById('webReloadAll');
+        btn.disabled = true;
+        try {
+            for (const key of Object.keys(handles)) await readHandle(key);
+            if (picked.db && !missingRequired('db').length) runBtn.click();
+        } finally { btn.disabled = false; }
     });
+
+    // 📋 엑셀에서 복사한 셀(탭 구분 텍스트) -> 시트 하나짜리 통합문서
+    function parseTsv(text) {
+        // 엑셀 복사 형식: 탭/줄바꿈 구분, 줄바꿈·탭·따옴표가 든 셀만 "..."로 감싸고 " 는 "" 로
+        const rows = [];
+        let row = [], cell = '', quoted = false;
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (quoted) {
+                if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else quoted = false; } else cell += ch;
+                continue;
+            }
+            if (ch === '"' && cell === '') { quoted = true; continue; }
+            if (ch === '\t') { row.push(cell); cell = ''; continue; }
+            if (ch === '\n' || ch === '\r') {
+                if (ch === '\r' && text[i + 1] === '\n') i++;
+                row.push(cell); rows.push(row); row = []; cell = '';
+                continue;
+            }
+            cell += ch;
+        }
+        if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+        return rows;
+    }
+    function pastedValue(v) {
+        // 화면에 보이는 값이 들어오므로 숫자만 숫자로 (앞자리 0이 있는 코드는 글자 그대로)
+        if (v === '') return null;
+        const t = v.trim();
+        if (/^-?(0|[1-9]\d*)(\.\d+)?$/.test(t)) return Number(t);
+        if (/^-?[1-9]\d{0,2}(,\d{3})+(\.\d+)?$/.test(t)) return Number(t.replace(/,/g, ''));
+        return v;
+    }
+    document.querySelectorAll('[data-paste-for]').forEach(btn => btn.addEventListener('click', () => {
+        const ta = document.querySelector('[data-paste-area="' + btn.dataset.pasteFor + '"]');
+        ta.hidden = !ta.hidden;
+        if (!ta.hidden) { ta.value = ''; ta.focus(); }
+    }));
+    document.querySelectorAll('[data-paste-area]').forEach(ta => ta.addEventListener('paste', (e) => {
+        const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+        e.preventDefault();
+        const key = ta.dataset.pasteArea;
+        ta.hidden = true;
+        if (!text.trim()) { setStatus(key, '붙여넣은 내용이 없습니다 -- 엑셀에서 복사(Ctrl+C) 후 다시 시도하세요', 'err'); return; }
+        takeWorkbook(key, '엑셀 붙여넣기', async () => {
+            const ws = XLSX.utils.aoa_to_sheet(parseTsv(text).map(r => r.map(pastedValue)));
+            return { SheetNames: ['붙여넣기'], Sheets: { '붙여넣기': ws } };
+        });
+    }));
+
+    // 지난번에 고른 파일 기억 복원 -> 🔄 버튼이 바로 보인다
+    if (canHandle) idbAll().then(all => Object.keys(all).forEach(k => { handles[k] = all[k]; showReload(k); }));
 
     // ---- file -> {columns, rows} (mirrors handlers.py load_data) ----
     function decodeCsv(buf) {
@@ -3793,7 +3979,7 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
             const payload = { db: null, files: {}, zoneOwnerMap: {} };
             for (const key of Object.keys(picked)) {
                 const p = picked[key];
-                progress.textContent = p.file.name + ' 읽는 중...';
+                progress.textContent = p.name + ' 읽는 중...';
                 await new Promise(r => setTimeout(r, 0));  // let the status paint before a long parse
                 const table = readTable(p);
                 saveSettings(key);
@@ -3807,7 +3993,7 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
                     const wanted = Array.from(new Set(CFG.keyCandidates[key].concat(CFG.displayColumns[key])));
                     payload.files[key] = pickColumns(table, wanted);
                 }
-                setStatus(key, p.file.name + ' · 시트 ' + p.sheet + ' · 헤더 ' + p.headerRow + '행 · ' + table.rows.length.toLocaleString('ko-KR') + '행', 'ok');
+                setStatus(key, p.name + ' · 시트 ' + p.sheet + ' · 헤더 ' + p.headerRow + '행 · ' + table.rows.length.toLocaleString('ko-KR') + '행', 'ok');
             }
             if (!payload.db.rows.length) throw new Error('총괄DB 시트 "' + picked.db.sheet + '"에 데이터 행이 없습니다.');
             progress.textContent = '병합·집계 중...';

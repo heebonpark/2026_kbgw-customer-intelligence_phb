@@ -12,6 +12,11 @@ numbers for identical files.
 The page itself carries no customer data, so it needs no password; whoever
 opens it only ever sees the files they pick themselves.
 
+Files come in three ways: 📂 pick (Chrome/Edge keep the file handle in
+IndexedDB, so 🔄 re-reads the latest saved version -- e.g. a workbook left open
+in Excel -- without picking again, even after a reload), or 📋 paste what was
+copied in Excel (Ctrl+A, Ctrl+C), which includes unsaved edits.
+
 Each picked file gets load settings: sheet (pre-selected by SHEET_HINT_COLUMNS),
 header row (auto-detected, or typed), and for 1번/8번 a column mapping
 (FIELD_SPECS -- matched by name, or chosen by column letter such as F열),
@@ -104,7 +109,14 @@ def _upload_slots_html():
         cards.append(f"""
         <div class="web-slot{required}" data-key="{key}">
             <span class="web-slot-title">{label} <span class="web-slot-note">({note})</span></span>
-            <input type="file" accept=".xlsx,.xls,.csv" data-key="{key}">
+            <div class="web-slot-actions">
+                <button type="button" class="web-mini web-pick" data-pick-for="{key}">📂 파일 선택</button>
+                <button type="button" class="web-mini web-reload" data-reload-for="{key}" hidden>🔄 다시 불러오기</button>
+                <button type="button" class="web-mini" data-paste-for="{key}">📋 엑셀에서 붙여넣기</button>
+            </div>
+            <input type="file" accept=".xlsx,.xls,.csv" data-key="{key}" hidden>
+            <textarea class="web-paste" data-paste-area="{key}" hidden
+                placeholder="엑셀에서 시트를 전체 선택(Ctrl+A) → 복사(Ctrl+C) 후, 여기를 누르고 붙여넣기(Ctrl+V) -- 저장 안 한 내용도 그대로 들어옵니다"></textarea>
             <div class="web-map" data-map-for="{key}" hidden></div>
             <span class="web-slot-status" data-status-for="{key}">파일을 선택하세요</span>
         </div>""")
@@ -176,6 +188,9 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
 .web-slot-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
 .web-slot-note { font-weight: 400; color: var(--text-muted); font-size: 11.5px; }
 .web-slot input[type=file] { font-size: 12px; color: var(--text-secondary); max-width: 100%; }
+.web-slot-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.web-reload { border-color: color-mix(in srgb, var(--brand) 55%, var(--border)); font-weight: 700; }
+.web-paste { width: 100%; min-height: 64px; font-size: 12px; padding: 8px 10px; border: 1px dashed var(--brand); border-radius: 8px; background: var(--surface-1); color: var(--text-primary); resize: vertical; }
 .web-slot-status { font-size: 11.5px; color: var(--text-muted); }
 .web-sheet, .web-map select, .web-map input { font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text-primary); max-width: 100%; }
 .web-slot.web-slot-wide { grid-column: 1 / -1; }
@@ -236,9 +251,10 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
             <div class="web-slots">__SLOTS__</div>
             <div class="web-actions">
                 <button type="button" class="web-run" id="webRunBtn" disabled>📊 대시보드 만들기</button>
+                <button type="button" class="web-btn2" id="webReloadAll" hidden title="엑셀에서 저장(Ctrl+S)한 최신 내용으로 모든 파일을 다시 읽고 대시보드를 새로 만듭니다">🔄 모두 다시 불러오고 대시보드 갱신</button>
                 <span class="web-progress" id="webProgress">1. 총괄관리DB는 필수입니다.</span>
             </div>
-            <p class="web-footnote">엑셀에서 열어 둔 파일도 선택할 수 있습니다 -- 단, <b>마지막으로 저장된 내용</b>을 읽으므로 수정 중이면 먼저 저장하세요. 파일을 고르면 <b>시트 · 헤더 행 · 컬럼(열 위치)</b>을 자동으로 맞추고 미리보기를 보여줍니다 -- 다르면 드롭다운에서 바꾸세요. 설정은 이 브라우저에 기억되어 다음에 같은 양식이면 자동 적용됩니다.</p>
+            <p class="web-footnote">엑셀에서 열어 둔 파일도 선택할 수 있습니다 -- 단, <b>마지막으로 저장된 내용</b>을 읽으므로 수정 중이면 먼저 저장하세요. 한 번 고른 파일은 <b>🔄 다시 불러오기</b>로 다시 고르지 않고 최신 저장본을 읽습니다 (Chrome·Edge). 저장 안 한 내용까지 쓰려면 <b>📋 엑셀에서 붙여넣기</b>를 쓰세요. 파일을 고르면 <b>시트 · 헤더 행 · 컬럼(열 위치)</b>을 자동으로 맞추고 미리보기를 보여줍니다 -- 다르면 드롭다운에서 바꾸세요. 설정은 이 브라우저에 기억되어 다음에 같은 양식이면 자동 적용됩니다.</p>
             <p class="web-footnote">4. 해지파이프라인 · 7. 해지시설내역 섹션은 데스크톱 GUI 리포트에서 제공합니다.</p>
         </section>
 
@@ -528,40 +544,180 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
         }
     }
 
-    document.querySelectorAll('.web-slot input[type=file]').forEach(input => {
-        input.addEventListener('change', async () => {
-            const key = input.dataset.key;
-            const token = pickToken[key] = {};
-            delete picked[key];
-            renderMapBox(key);
-            const file = input.files && input.files[0];
-            if (!file) { setStatus(key, '파일을 선택하세요'); refreshRun(); return; }
-            setStatus(key, file.name + ' -- 여는 중...', 'ok');
-            runBtn.disabled = true;
-            await new Promise(r => setTimeout(r, 0));
-            try {
-                const wb = await readWorkbook(file);
-                if (pickToken[key] !== token) return;
-                const saved = loadSaved(key);
-                const sheets = wb.SheetNames.map(name => ({ name, rows: sheetRowCount(wb.Sheets[name]) }));
-                // 지난번 시트(같은 이름, 데이터 있음) -> 필요한 컬럼 + 데이터 있는 시트 -> 데이터 있는 첫 시트
-                const hasHint = sh => sheetHasColumn(wb.Sheets[sh.name], CFG.sheetHints[key] || []);
-                const savedSheet = saved ? sheets.find(sh => sh.name === saved.sheet && sh.rows > 0) : null;
-                const hinted = sheets.find(sh => sh.rows > 0 && hasHint(sh)) || sheets.find(hasHint);
-                const chosen = (savedSheet || hinted || sheets.find(sh => sh.rows > 0) || sheets[0]).name;
-                picked[key] = { file, wb };
-                applySheet(key, chosen, savedSheet ? saved.headerRow : null, savedSheet ? saved : null);
-                renderMapBox(key);
-                setStatus(key, file.name + ' · 시트 ' + chosen + ' · 헤더 ' + picked[key].headerRow + '행'
-                    + (savedSheet ? ' (지난 설정 적용)' : sheets.length > 1 && hinted ? ' (자동 선택)' : ''), 'ok');
-            } catch (e) {
-                console.error(e);
-                if (pickToken[key] !== token) return;
-                setStatus(key, '파일을 열 수 없습니다: ' + (e && e.message ? e.message : e), 'err');
-            }
-            refreshRun();
+    // ---- 파일 받기: 📂 선택 / 🔄 다시 불러오기(기억한 파일의 최신 저장본) / 📋 엑셀에서 붙여넣기 ----
+    const handles = {};  // key -> FileSystemFileHandle (Chrome/Edge). IndexedDB에 보관해 새로고침 후에도 유지.
+    const canHandle = typeof window.showOpenFilePicker === 'function';
+    function idb() {
+        return new Promise((res, rej) => {
+            const rq = indexedDB.open('dataintel-web', 1);
+            rq.onupgradeneeded = () => rq.result.createObjectStore('handles');
+            rq.onsuccess = () => res(rq.result);
+            rq.onerror = () => rej(rq.error);
         });
+    }
+    async function idbSet(key, value) {
+        try {
+            const db = await idb();
+            await new Promise((res, rej) => {
+                const tx = db.transaction('handles', 'readwrite');
+                if (value) tx.objectStore('handles').put(value, key); else tx.objectStore('handles').delete(key);
+                tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+            });
+        } catch (e) { /* 저장 못 해도 이번 창에서는 동작 */ }
+    }
+    async function idbAll() {
+        try {
+            const db = await idb();
+            return await new Promise((res, rej) => {
+                const out = {};
+                const rq = db.transaction('handles').objectStore('handles').openCursor();
+                rq.onsuccess = () => { const c = rq.result; if (c) { out[c.key] = c.value; c.continue(); } else res(out); };
+                rq.onerror = () => rej(rq.error);
+            });
+        } catch (e) { return {}; }
+    }
+    function showReload(key) {
+        const btn = document.querySelector('[data-reload-for="' + key + '"]');
+        if (btn) {
+            btn.hidden = !handles[key];
+            if (handles[key]) btn.textContent = '🔄 다시 불러오기 (' + handles[key].name + ')';
+        }
+        document.getElementById('webReloadAll').hidden = !Object.keys(handles).length;
+    }
+
+    // 어느 경로로 들어오든 같은 처리: 시트 고르기 -> 헤더 행/컬럼 자동 맞춤 -> 설정 칸 표시
+    async function takeWorkbook(key, name, getWb) {
+        const token = pickToken[key] = {};
+        delete picked[key];
+        renderMapBox(key);
+        setStatus(key, name + ' -- 여는 중...', 'ok');
+        runBtn.disabled = true;
+        await new Promise(r => setTimeout(r, 0));
+        let ok = false;
+        try {
+            const wb = await getWb();
+            if (pickToken[key] !== token) return false;
+            const saved = loadSaved(key);
+            const sheets = wb.SheetNames.map(n => ({ name: n, rows: sheetRowCount(wb.Sheets[n]) }));
+            // 지난번 시트(같은 이름, 데이터 있음) -> 필요한 컬럼 + 데이터 있는 시트 -> 데이터 있는 첫 시트
+            const hasHint = sh => sheetHasColumn(wb.Sheets[sh.name], CFG.sheetHints[key] || []);
+            const savedSheet = saved ? sheets.find(sh => sh.name === saved.sheet && sh.rows > 0) : null;
+            const hinted = sheets.find(sh => sh.rows > 0 && hasHint(sh)) || sheets.find(hasHint);
+            const chosen = (savedSheet || hinted || sheets.find(sh => sh.rows > 0) || sheets[0]).name;
+            picked[key] = { name, wb };
+            // 컬럼 지정은 헤더 이름으로 기억하므로 붙여넣기(시트 이름이 다름)에도 적용, 헤더 행은 같은 시트일 때만
+            applySheet(key, chosen, savedSheet ? saved.headerRow : null, saved);
+            renderMapBox(key);
+            setStatus(key, name + ' · 시트 ' + chosen + ' · 헤더 ' + picked[key].headerRow + '행'
+                + (savedSheet ? ' (지난 설정 적용)' : sheets.length > 1 && hinted ? ' (자동 선택)' : ''), 'ok');
+            ok = true;
+        } catch (e) {
+            console.error(e);
+            if (pickToken[key] !== token) return false;
+            setStatus(key, name + ' 을(를) 열 수 없습니다: ' + (e && e.message ? e.message : e), 'err');
+        }
+        refreshRun();
+        return ok;
+    }
+    async function readHandle(key) {
+        const h = handles[key];
+        if (!h) return false;
+        try {
+            if (h.queryPermission && (await h.queryPermission({ mode: 'read' })) !== 'granted'
+                && (await h.requestPermission({ mode: 'read' })) !== 'granted') {
+                setStatus(key, '파일 읽기를 허용해야 다시 불러올 수 있습니다', 'err');
+                return false;
+            }
+            const file = await h.getFile();  // 엑셀에서 마지막으로 저장된 내용
+            return await takeWorkbook(key, file.name, () => readWorkbook(file));
+        } catch (e) {
+            console.error(e);
+            setStatus(key, '다시 불러오지 못했습니다 (파일이 옮겨졌거나 삭제됨?) -- 📂 파일 선택으로 다시 고르세요', 'err');
+            return false;
+        }
+    }
+
+    document.querySelectorAll('[data-pick-for]').forEach(btn => btn.addEventListener('click', async () => {
+        const key = btn.dataset.pickFor;
+        const input = document.querySelector('.web-slot input[data-key="' + key + '"]');
+        if (!canHandle) { input.click(); return; }  // Safari/Firefox: 일반 파일 선택
+        let h;
+        try {
+            [h] = await window.showOpenFilePicker({ types: [{ description: '엑셀/CSV',
+                accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'], 'application/vnd.ms-excel': ['.xls'], 'text/csv': ['.csv'] } }] });
+        } catch (e) {
+            if (!e || e.name !== 'AbortError') input.click();
+            return;
+        }
+        handles[key] = h;
+        idbSet(key, h);
+        showReload(key);
+        await readHandle(key);
+    }));
+    document.querySelectorAll('.web-slot input[type=file]').forEach(input => input.addEventListener('change', () => {
+        const file = input.files && input.files[0];
+        if (file) takeWorkbook(input.dataset.key, file.name, () => readWorkbook(file));
+    }));
+    document.querySelectorAll('[data-reload-for]').forEach(btn => btn.addEventListener('click', () => readHandle(btn.dataset.reloadFor)));
+    document.getElementById('webReloadAll').addEventListener('click', async () => {
+        const btn = document.getElementById('webReloadAll');
+        btn.disabled = true;
+        try {
+            for (const key of Object.keys(handles)) await readHandle(key);
+            if (picked.db && !missingRequired('db').length) runBtn.click();
+        } finally { btn.disabled = false; }
     });
+
+    // 📋 엑셀에서 복사한 셀(탭 구분 텍스트) -> 시트 하나짜리 통합문서
+    function parseTsv(text) {
+        // 엑셀 복사 형식: 탭/줄바꿈 구분, 줄바꿈·탭·따옴표가 든 셀만 "..."로 감싸고 " 는 "" 로
+        const rows = [];
+        let row = [], cell = '', quoted = false;
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (quoted) {
+                if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else quoted = false; } else cell += ch;
+                continue;
+            }
+            if (ch === '"' && cell === '') { quoted = true; continue; }
+            if (ch === '\t') { row.push(cell); cell = ''; continue; }
+            if (ch === '\n' || ch === '\r') {
+                if (ch === '\r' && text[i + 1] === '\n') i++;
+                row.push(cell); rows.push(row); row = []; cell = '';
+                continue;
+            }
+            cell += ch;
+        }
+        if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+        return rows;
+    }
+    function pastedValue(v) {
+        // 화면에 보이는 값이 들어오므로 숫자만 숫자로 (앞자리 0이 있는 코드는 글자 그대로)
+        if (v === '') return null;
+        const t = v.trim();
+        if (/^-?(0|[1-9]\d*)(\.\d+)?$/.test(t)) return Number(t);
+        if (/^-?[1-9]\d{0,2}(,\d{3})+(\.\d+)?$/.test(t)) return Number(t.replace(/,/g, ''));
+        return v;
+    }
+    document.querySelectorAll('[data-paste-for]').forEach(btn => btn.addEventListener('click', () => {
+        const ta = document.querySelector('[data-paste-area="' + btn.dataset.pasteFor + '"]');
+        ta.hidden = !ta.hidden;
+        if (!ta.hidden) { ta.value = ''; ta.focus(); }
+    }));
+    document.querySelectorAll('[data-paste-area]').forEach(ta => ta.addEventListener('paste', (e) => {
+        const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
+        e.preventDefault();
+        const key = ta.dataset.pasteArea;
+        ta.hidden = true;
+        if (!text.trim()) { setStatus(key, '붙여넣은 내용이 없습니다 -- 엑셀에서 복사(Ctrl+C) 후 다시 시도하세요', 'err'); return; }
+        takeWorkbook(key, '엑셀 붙여넣기', async () => {
+            const ws = XLSX.utils.aoa_to_sheet(parseTsv(text).map(r => r.map(pastedValue)));
+            return { SheetNames: ['붙여넣기'], Sheets: { '붙여넣기': ws } };
+        });
+    }));
+
+    // 지난번에 고른 파일 기억 복원 -> 🔄 버튼이 바로 보인다
+    if (canHandle) idbAll().then(all => Object.keys(all).forEach(k => { handles[k] = all[k]; showReload(k); }));
 
     // ---- file -> {columns, rows} (mirrors handlers.py load_data) ----
     function decodeCsv(buf) {
@@ -663,7 +819,7 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
             const payload = { db: null, files: {}, zoneOwnerMap: {} };
             for (const key of Object.keys(picked)) {
                 const p = picked[key];
-                progress.textContent = p.file.name + ' 읽는 중...';
+                progress.textContent = p.name + ' 읽는 중...';
                 await new Promise(r => setTimeout(r, 0));  // let the status paint before a long parse
                 const table = readTable(p);
                 saveSettings(key);
@@ -677,7 +833,7 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
                     const wanted = Array.from(new Set(CFG.keyCandidates[key].concat(CFG.displayColumns[key])));
                     payload.files[key] = pickColumns(table, wanted);
                 }
-                setStatus(key, p.file.name + ' · 시트 ' + p.sheet + ' · 헤더 ' + p.headerRow + '행 · ' + table.rows.length.toLocaleString('ko-KR') + '행', 'ok');
+                setStatus(key, p.name + ' · 시트 ' + p.sheet + ' · 헤더 ' + p.headerRow + '행 · ' + table.rows.length.toLocaleString('ko-KR') + '행', 'ok');
             }
             if (!payload.db.rows.length) throw new Error('총괄DB 시트 "' + picked.db.sheet + '"에 데이터 행이 없습니다.');
             progress.textContent = '병합·집계 중...';
