@@ -28,7 +28,8 @@ def _load(base_dir, key):
     return load_data(path, is_csv=is_csv_path(path))
 
 
-def build_report(base_dir, matching_config=None, password=None, expiry_date=None, eda_link=False):
+def build_report(base_dir, matching_config=None, password=None, expiry_date=None, eda_link=False,
+                 admin_password=None):
     """Reads whatever source files are currently on disk (by their canonical
     stem -- see core/source_files.py) and builds the report. Shared by the
     CLI entry point below and the Streamlit admin '디스크의 최신 파일로
@@ -75,6 +76,7 @@ def build_report(base_dir, matching_config=None, password=None, expiry_date=None
         matching_config=matching_config,
         password=password,
         expiry_date=expiry_date,
+        admin_password=admin_password,
         eda_link=eda_link,
     )
     full_msg = msg + " (" + ", ".join(match_lines) + ")"
@@ -85,6 +87,8 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="Data Intel PRO Report Generator")
     parser.add_argument("--password", type=str, help="사용자 조회용 비밀번호 (지정하지 않으면 랜덤 생성)", default=None)
+    parser.add_argument("--admin-password", type=str, default=None,
+                        help="관리자 비밀번호 (지정하지 않으면 이 PC에 저장된 값, 없으면 랜덤)")
     parser.add_argument("--expiry", type=str, help="리포트 만료일 (YYYY-MM-DD, 지정하지 않으면 월말)", default=None)
     args = parser.parse_args()
 
@@ -95,6 +99,7 @@ def main():
         base_dir, 
         password=args.password, 
         expiry_date=args.expiry,
+        admin_password=args.admin_password,
         eda_link=True,  # this CLI writes Data_Intel_PRO_EDA.html right after, below
     )
 

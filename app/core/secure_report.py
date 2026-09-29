@@ -33,6 +33,10 @@ from cryptography.hazmat.primitives.hashes import SHA256
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 PBKDF2_ITERATIONS = 310_000
+
+# The fixed admin password lives only on each PC (never in this public repo --
+# anyone who reads it from the source could decrypt every published report).
+SETTINGS_PATH = os.path.join(os.path.expanduser("~/.dataintelligence_pro"), "report_settings.json")
 # Ambiguous characters (0/O, 1/l/I) left out so a password read aloud or
 # retyped from a message doesn't fail on a look-alike.
 PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789"
@@ -42,6 +46,29 @@ def generate_strong_password(length=12):
     """12 chars from a 56-symbol alphabet is ~70 bits -- out of reach for an
     offline guessing attack even against a publicly hosted file."""
     return ''.join(secrets.choice(PASSWORD_ALPHABET) for _ in range(length))
+
+
+def load_admin_password():
+    """The admin password saved on this PC, or None if none is set."""
+    try:
+        with open(SETTINGS_PATH, encoding='utf-8') as f:
+            value = json.load(f).get('admin_password')
+        return value or None
+    except (FileNotFoundError, ValueError, OSError):
+        return None
+
+
+def save_admin_password(password):
+    """Saves (or, with a blank value, clears) this PC's fixed admin password."""
+    os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
+    try:
+        with open(SETTINGS_PATH, encoding='utf-8') as f:
+            settings = json.load(f)
+    except (FileNotFoundError, ValueError, OSError):
+        settings = {}
+    settings['admin_password'] = password or None
+    with open(SETTINGS_PATH, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, ensure_ascii=False, indent=2)
 
 
 def _b64(data):

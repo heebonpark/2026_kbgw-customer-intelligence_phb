@@ -4305,11 +4305,12 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
         have it, so the button would just be a dead link there.
     """
     if encrypt:
-        from .secure_report import generate_strong_password
+        from .secure_report import generate_strong_password, load_admin_password
         if password is None:
             password = generate_strong_password()
         if admin_password is None:
-            admin_password = generate_strong_password()
+            # this PC's fixed admin password (GUI setting), else a random one
+            admin_password = load_admin_password() or generate_strong_password()
     if password is None:
         import random
         password = str(random.randint(1000, 9999))
