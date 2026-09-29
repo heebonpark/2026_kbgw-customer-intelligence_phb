@@ -47,6 +47,7 @@ def build_report(base_dir, matching_config=None, password=None, expiry_date=None
         'patrol': _load(base_dir, 'patrol'),
         'original': _load(base_dir, 'original'),
         'facility': _load(base_dir, 'facility'),
+        'zone_owner': _load(base_dir, 'zone_owner'),
     }
     # 해지 파이프라인 / 해지시설내역: 총괄DB와 매칭하지 않는 독립 데이터.
     cancel_df = _load(base_dir, 'cancel')

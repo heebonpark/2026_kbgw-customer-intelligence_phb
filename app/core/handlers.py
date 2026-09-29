@@ -27,6 +27,46 @@ HQ_ALIASES = {
 
 OPEN_VOC_STATES = {'미접수', '접수', '처리중', '결재요청'}
 
+# 8. 영업구역담당자 -- SP 전용 구역번호 -> 담당자명 표. 총괄DB의 SP 구역
+# 컬럼(영업구역정보)과 이 파일의 구역번호를 맞춰 '영업구역담당자'를 채운다.
+SP_ZONE_COL_CANDIDATES = ['영업구역정보', '영업구역번호', '영업구역']
+ZONE_OWNER_KEY_COL = '구역번호'
+ZONE_OWNER_NAME_COL = '담당자명'
+ZONE_OWNER_OUTPUT_COL = '영업구역담당자'
+# 파일에 구역번호는 있는데 담당자명이 비어 있는 구역 (파일에 아예 없는 구역은
+# 집계 단계에서 '미매칭'으로 표시되어 둘이 구분된다).
+NO_OWNER_LABEL = '담당자없음'
+
+
+def _zone_key(v):
+    """Normalizes a zone code so '405', 405 and 405.0 (Excel hands numeric
+    codes back as floats) all compare equal. Mirrors zoneKey() in report.py."""
+    if v is None or (isinstance(v, float) and pd.isna(v)):
+        return None
+    s = str(v).replace('\xa0', ' ').strip()
+    if s.endswith('.0'):
+        s = s[:-2]
+    return s or None
+
+
+def build_zone_owner_map(zone_owner_df):
+    """{구역번호: 담당자명}. A zone listed under several names keeps all of
+    them joined with '/' (in file order) rather than silently picking one; a
+    zone listed with no name at all maps to NO_OWNER_LABEL."""
+    if zone_owner_df is None or ZONE_OWNER_KEY_COL not in zone_owner_df.columns \
+            or ZONE_OWNER_NAME_COL not in zone_owner_df.columns:
+        return {}
+    owners = {}
+    for zone, name in zip(zone_owner_df[ZONE_OWNER_KEY_COL], zone_owner_df[ZONE_OWNER_NAME_COL]):
+        key = _zone_key(zone)
+        name = None if name is None or (isinstance(name, float) and pd.isna(name)) else str(name).strip()
+        if not key:
+            continue
+        names = owners.setdefault(key, [])
+        if name and name not in names:
+            names.append(name)
+    return {k: '/'.join(v) or NO_OWNER_LABEL for k, v in owners.items()}
+
 
 def normalize_hq(val):
     """Trim + alias-canonicalize, falling back to '미상' for display (used by
@@ -258,6 +298,13 @@ def process_and_merge(files_dict, matching_config):
     merged_df = db_df.copy()
     match_report = {}
 
+    # 활동유무 헤더가 '활동유무(o,x)'처럼 붙어 나오는 내보내기도 있다 -- 집계는
+    # 전부 '활동유무'를 읽으므로 이름을 맞춰 둔다 (report.py rebuildMerged와 같게).
+    if '활동유무' not in merged_df.columns:
+        alias = next((c for c in merged_df.columns if str(c).startswith('활동유무')), None)
+        if alias:
+            merged_df['활동유무'] = merged_df[alias]
+
     for key, suffix in [('original', 'origin'), ('facility', 'fac'), ('cancel', 'cancel'), ('cancelled_facility', 'cancelfac')]:
         file_df = files_dict.get(key)
         conditions = enabled_conditions(matching_config, key) if file_df is not None else []
@@ -318,6 +365,19 @@ def process_and_merge(files_dict, matching_config):
     merged_df['계약상태'] = _first_non_null(
         col('계약상태_origin').astype(object), col('계약상태(중)_fac').astype(object), col('계약상태(대)_fac').astype(object),
     )
+
+    # 8. 영업구역담당자: SP 건만, 영업구역정보 = 구역번호로 담당자명을 붙인다.
+    zone_owner_map = build_zone_owner_map(files_dict.get('zone_owner'))
+    sp_zone_col = _first_matching_col(merged_df, SP_ZONE_COL_CANDIDATES)
+    if zone_owner_map and sp_zone_col and '활동대상구분' in merged_df.columns:
+        is_sp = merged_df['활동대상구분'] == 'SP'
+        merged_df[ZONE_OWNER_OUTPUT_COL] = [
+            zone_owner_map.get(_zone_key(z)) if sp else None
+            for z, sp in zip(merged_df[sp_zone_col], is_sp)
+        ]
+        match_report['zone_owner'] = [{'db_col': sp_zone_col, 'file_col': ZONE_OWNER_KEY_COL}]
+    else:
+        match_report['zone_owner'] = []
 
     # --- 상태값 역반영 (총괄DB 업데이트) 로직 ---
     if 'sp 담당자 상태값' not in merged_df.columns:

@@ -27,9 +27,10 @@ SOURCE_FILES = {
     'facility': {'stem': '시설현황', 'label': '시설현황', 'is_csv_default': True, 'required': False},
     'cancel': {'stem': '해지파이프라인', 'label': '해지 파이프라인 (독립 섹션)', 'is_csv_default': False, 'required': False},
     'cancelled_facility': {'stem': '해지시설내역', 'label': '해지시설내역 (고액 미등록 알림용, 확장)', 'is_csv_default': False, 'required': False},
+    'zone_owner': {'stem': '영업구역담당자', 'label': '영업구역담당자 (SP 구역번호→담당자명)', 'is_csv_default': False, 'required': False},
 }
 
-SOURCE_ORDER = ['db', 'voc', 'patrol', 'original', 'facility', 'cancel', 'cancelled_facility']
+SOURCE_ORDER = ['db', 'voc', 'patrol', 'original', 'facility', 'cancel', 'cancelled_facility', 'zone_owner']
 
 BACKUP_DIRNAME = 'backups'
 

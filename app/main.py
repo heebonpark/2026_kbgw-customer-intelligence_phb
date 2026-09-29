@@ -248,6 +248,10 @@ def render_dashboard():
             "7. 해지시설 내역 (Excel/CSV) - 고액 미등록 알림용 [확장]", type=['xlsx', 'xls', 'csv'],
         )
 
+        zone_owner_file = st.file_uploader(
+            "8. 영업구역담당자 (Excel/CSV) - SP 영업구역정보=구역번호 → 담당자명", type=['xlsx', 'xls', 'csv'],
+        )
+
         process_btn = st.button("데이터 병합 및 처리")
 
     with col2:
@@ -277,6 +281,7 @@ def render_dashboard():
                 'facility': load_data(facility_file, facility_file.name.endswith('.csv')) if facility_file else None,
                 'cancel': cancel_df,
                 'cancelled_facility': cancelled_facility_df,
+                'zone_owner': load_data(zone_owner_file, zone_owner_file.name.endswith('.csv')) if zone_owner_file else None,
             }
             
             for k, df_ in files_dict.items():

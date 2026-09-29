@@ -18,6 +18,7 @@ import pandas as pd
 from .handlers import (
     HQ_ORDER, BRANCH_ORDER, normalize_hq, normalize_branch,
     to_numeric_amount, _first_matching_col,
+    SP_ZONE_COL_CANDIDATES, ZONE_OWNER_OUTPUT_COL, _zone_key,
 )
 
 UNKNOWN_LABEL = "미상"
@@ -297,18 +298,31 @@ def build_progress_type_charts(matrix):
 # 활동대상구분별로 구역 기준 컬럼이 다르다 -- SP는 영업구역정보(F열), SE는
 # 기술구역정보(G열), SG는 구역정보(H열). 앞에 있는 이름이 우선.
 ZONE_COL_CANDIDATES = {
-    'SP': ['영업구역정보', '영업구역번호', '영업구역'],
+    'SP': SP_ZONE_COL_CANDIDATES,
     'SE': ['기술구역정보', '기술구역번호', '기술구역'],
     'SG': ['구역정보', '구역'],
 }
 ZONE_LABELS = {'SP': '영업구역', 'SE': '기술구역', 'SG': '구역'}
 
+# SP는 8. 영업구역담당자 파일이 매칭되면 담당자 기준으로도 묶을 수 있다.
+# 모드별 (묶는 키, 제목, 표 머리글) -- report.py JS의 ZONE_SP_MODES와 같게 유지.
+ZONE_SP_MODES = {
+    'zone_owner': (['지사', '구역', '담당자'], '영업구역·담당자별', '지사_영업구역_담당자'),
+    'owner': (['지사', '담당자'], '담당자별', '지사_담당자'),
+    'zone': (['지사', '구역'], '영업구역별', '지사_영업구역'),
+}
+ZONE_SP_MODE_ORDER = ['zone_owner', 'owner', 'zone']
+UNMATCHED_OWNER_LABEL = '미매칭'
 
-def build_zone_activity(df):
-    """SP/SE/SG 각각을 해당 구역 컬럼별로 묶어 활동유무 건수를 센다.
-    처리율은 처리완료만 분자로 친다 (접수는 미처리). 구역 값이 비어 있는
-    건은 '미상'으로 모아 합계가 대상 건수와 항상 맞게 한다. 처리율이 낮은
-    구역이 먼저 오도록 정렬 (같으면 대상 건수가 많은 순)."""
+
+def build_zone_activity(df, sp_mode='zone_owner'):
+    """SP/SE/SG 각각을 지사 x 해당 구역 컬럼별로 묶어 활동유무 건수를 센다
+    ('지사_구역' 라벨). SP는 영업구역담당자 컬럼이 있으면 sp_mode에 따라
+    '지사_구역_담당자' / '지사_담당자' / '지사_구역'으로 묶는다 (구역번호가
+    담당자 파일에 없으면 '미매칭'). 처리율은 처리완료만 분자로 친다 (접수는
+    미처리). 지사/구역 값이 비어 있는 건은 '미상'으로 모아 합계가 대상
+    건수와 항상 맞게 한다. 지사는 조직 순서(BRANCH_ORDER), 그 안에서
+    구역/담당자 오름차순."""
     if df is None or '활동대상구분' not in df.columns:
         return None
     status = df['활동유무'] if '활동유무' in df.columns else pd.Series(index=df.index, dtype=object)
@@ -323,17 +337,38 @@ def build_zone_activity(df):
             "미처리": total - done, "처리율": (done / total * 100) if total else 0.0,
         }
 
+    branch_rank = {b: i for i, b in enumerate(BRANCH_ORDER)}
+    has_owner = ZONE_OWNER_OUTPUT_COL in df.columns
     result = {}
     for t in PROGRESS_TYPES:
         zone_col = _first_matching_col(df, ZONE_COL_CANDIDATES[t])
         mask = df['활동대상구분'] == t
         if not zone_col or not mask.any():
             continue
-        zones = df.loc[mask, zone_col].fillna(UNKNOWN_LABEL).astype(str).str.strip().replace('', UNKNOWN_LABEL)
+
+        def _clean(col, missing=UNKNOWN_LABEL):
+            if col not in df.columns:
+                return pd.Series(missing, index=df.index[mask])
+            return df.loc[mask, col].fillna(missing).astype(str).str.strip().replace('', missing)
+
+        # 구역번호가 숫자로 읽힌 경우 405.0 -> 405 (브라우저 쪽 표시와 맞춤)
+        parts = {'지사': _clean('지사'), '구역': _clean(zone_col).map(lambda z: _zone_key(z) or UNKNOWN_LABEL)}
+        mode = None
+        keys = ['지사', '구역']
+        if t == 'SP' and has_owner:
+            mode = sp_mode if sp_mode in ZONE_SP_MODES else 'zone_owner'
+            keys = ZONE_SP_MODES[mode][0]
+            parts['담당자'] = _clean(ZONE_OWNER_OUTPUT_COL, UNMATCHED_OWNER_LABEL)
+
         sub_status = status[mask]
-        rows = [dict(구역=z, **_counts(sub_status[zones == z])) for z in zones.unique()]
-        rows.sort(key=lambda r: (r['처리율'], -r['대상'], r['구역']))
-        result[t] = {"zone_col": zone_col, "rows": rows, "total": _counts(sub_status)}
+        rows = []
+        for group_key, idx in sub_status.groupby([parts[k] for k in keys]).groups.items():
+            row = dict(zip(keys, group_key))
+            row['라벨'] = '_'.join(group_key)
+            row.update(_counts(sub_status.loc[idx]))
+            rows.append(row)
+        rows.sort(key=lambda r: (branch_rank.get(r['지사'], len(BRANCH_ORDER)),) + tuple(r[k] for k in keys))
+        result[t] = {"zone_col": zone_col, "mode": mode, "rows": rows, "total": _counts(sub_status)}
     return result or None
 
 

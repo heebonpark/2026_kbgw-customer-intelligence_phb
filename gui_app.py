@@ -49,6 +49,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
 from core.handlers import process_and_merge, load_data
 from core.report import generate_html_report
 from core.matching_config import load_matching_config
+from deploy_report import deploy, DeployError
 
 APP_DIR = os.path.expanduser("~/.dataintelligence_pro")
 NOTES_FILE = os.path.join(APP_DIR, "file_notes.json")
@@ -101,10 +102,12 @@ class DataIntelGUI:
             'original': tk.StringVar(),
             'facility': tk.StringVar(),
             'cancelled_facility': tk.StringVar(),
+            'zone_owner': tk.StringVar(),
         }
         saved_notes = load_file_notes()
         self.file_notes = {key: tk.StringVar(value=saved_notes.get(key, '')) for key in self.file_paths}
 
+        self.last_report = None  # (path, user password, expiry) of the latest generated report
         self.report_password = tk.StringVar()
         self.report_expiry = tk.StringVar()
 
@@ -129,7 +132,7 @@ class DataIntelGUI:
                  bg=BG, fg=TEXT_MUTED, font=("Helvetica", 10)).pack(anchor="w", pady=(0, 6))
 
         # Scrollable file-card list -- keeps the window a fixed height even
-        # with 7 file slots x 3 lines (path + browse + 설명) each.
+        # with 8 file slots x 3 lines (path + browse + 설명) each.
         list_container = tk.Frame(body, bg=BG)
         list_container.pack(fill=tk.BOTH, expand=True)
 
@@ -159,6 +162,7 @@ class DataIntelGUI:
             ("5. 2026년 관리고객원본", "선택", 'original'),
             ("6. 시설현황", "선택, csv", 'facility'),
             ("7. 해지시설 내역", "선택, 고액 미등록 알림용", 'cancelled_facility'),
+            ("8. 영업구역담당자", "선택, SP 구역번호→담당자명", 'zone_owner'),
         ]
 
         for label_text, tag_text, key in fields:
@@ -194,6 +198,9 @@ class DataIntelGUI:
         self.run_btn = ttk.Button(action_row, text="🚀 데이터 병합 및 리포트 생성 실행",
                                    style="Action.TButton", command=self.run_process)
         self.run_btn.pack(side=tk.RIGHT)
+        self.deploy_btn = ttk.Button(action_row, text="🌐 GitHub Pages 배포", style="Ghost.TButton",
+                                     command=self.deploy_report, state=tk.DISABLED)
+        self.deploy_btn.pack(side=tk.RIGHT, padx=(0, 8))
 
         tk.Label(body, text="실행 로그", bg=BG, fg=TEXT_MUTED, font=("Helvetica", 10)).pack(anchor="w")
         log_frame = tk.Frame(body, bg=CARD_BG, highlightbackground=BORDER, highlightthickness=1)
@@ -329,6 +336,8 @@ class DataIntelGUI:
             self.log("=========================================")
 
             messagebox.showinfo("성공", f"리포트 생성 완료!\n만료일: {expiry}\n사용자용 암호: {pwd}\n관리자용 암호: {admin_pwd}")
+            self.last_report = (output_path, pwd, expiry)
+            self.deploy_btn.config(state=tk.NORMAL)
             webbrowser.open(f"file://{output_path}")
 
         except Exception as e:
@@ -337,6 +346,41 @@ class DataIntelGUI:
             messagebox.showerror("오류", f"실행 중 오류가 발생했습니다: {str(e)}")
         finally:
             self.run_btn.config(state=tk.NORMAL)
+
+    def deploy_report(self):
+        """Publishes the latest (encrypted) report to GitHub Pages and copies a
+        ready-to-send share message (link + password + expiry) to the clipboard."""
+        if not self.last_report:
+            return
+        path, pwd, expiry = self.last_report
+        self.deploy_btn.config(state=tk.DISABLED)
+        try:
+            self.log("GitHub Pages 배포를 시작합니다...")
+            try:
+                url = deploy(path, log=self.log)
+            except DeployError as e:
+                if '비공개 저장소' not in str(e):
+                    raise
+                if not messagebox.askyesno(
+                        "공개 저장소로 배포",
+                        "무료 계정은 비공개 저장소에서 GitHub Pages를 쓸 수 없습니다.\n"
+                        "리포트는 암호화되어 있어 비밀번호 없이는 내용을 볼 수 없습니다.\n\n공개 저장소로 배포할까요?"):
+                    self.log("배포 취소됨")
+                    return
+                url = deploy(path, public=True, log=self.log)
+            share = f"[Data Intel PRO 리포트]\n링크: {url}\n비밀번호: {pwd}\n만료일: {expiry}"
+            self.root.clipboard_clear()
+            self.root.clipboard_append(share)
+            self.log("=========================================")
+            self.log(share)
+            self.log("(공유 문구가 클립보드에 복사되었습니다 -- 처음 배포 시 1~2분 뒤 열립니다)")
+            self.log("=========================================")
+            messagebox.showinfo("배포 완료", share + "\n\n공유 문구가 클립보드에 복사되었습니다.")
+        except DeployError as e:
+            self.log(f"배포 실패: {e}")
+            messagebox.showerror("배포 실패", str(e))
+        finally:
+            self.deploy_btn.config(state=tk.NORMAL)
 
 
 def _show_on_screen(root, width, height):
