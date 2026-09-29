@@ -27,6 +27,9 @@ HQ_ALIASES = {
 
 OPEN_VOC_STATES = {'미접수', '접수', '처리중', '결재요청'}
 
+# 활동유무 진행 단계 -- 실적 반영 시 더 진행된 상태를 인정 (report.py STATUS_RANK_JS와 같게)
+STATUS_RANK = {'미접수': 0, '접수': 1, '처리완료': 2}
+
 # 8. 영업구역담당자 -- SP 전용 구역번호 -> 담당자명 표. 총괄DB의 SP 구역
 # 컬럼(영업구역정보)과 이 파일의 구역번호를 맞춰 '영업구역담당자'를 채운다.
 SP_ZONE_COL_CANDIDATES = ['영업구역정보', '영업구역번호', '영업구역']
@@ -304,6 +307,9 @@ def process_and_merge(files_dict, matching_config):
         alias = next((c for c in merged_df.columns if str(c).startswith('활동유무')), None)
         if alias:
             merged_df['활동유무'] = merged_df[alias]
+    if '활동유무' in merged_df.columns:
+        # '처리완료 '처럼 공백이 붙은 값도 같은 상태로 센다
+        merged_df['활동유무'] = _strip_invisible_whitespace(merged_df['활동유무'].astype(object))
 
     for key, suffix in [('original', 'origin'), ('facility', 'fac'), ('cancel', 'cancel'), ('cancelled_facility', 'cancelfac')]:
         file_df = files_dict.get(key)
@@ -397,5 +403,19 @@ def process_and_merge(files_dict, matching_config):
     if '순찰건수' in merged_df.columns:
         patrol_mask = merged_df['순찰건수'] > 0
         merged_df.loc[patrol_mask, 'sp 담당자 상태값'] = '처리완료'
+
+    # 4. 실적 반영: 모든 실적 집계(진척율·구역별·실적현황표)는 '활동유무'를 읽으므로,
+    #    총괄DB 원래 값과 위 역반영 값 중 더 진행된 쪽(미접수 < 접수 < 처리완료)을
+    #    '활동유무'로 쓴다 -- 되돌리지는 않는다. 원래 값은 '활동유무_총괄DB'에 남긴다.
+    #    report.py rebuildMerged()와 같은 규칙.
+    base = merged_df['활동유무'] if '활동유무' in merged_df.columns else pd.Series([None] * len(merged_df), index=merged_df.index)
+    merged_df['활동유무_총괄DB'] = base
+    merged_df['활동유무'] = [
+        wb if STATUS_RANK.get(wb, -1) > STATUS_RANK.get(cur, -1) else cur
+        for cur, wb in zip(base, merged_df['sp 담당자 상태값'])
+    ]
+    match_report['status_writeback'] = int(sum(
+        1 for cur, new in zip(merged_df['활동유무_총괄DB'], merged_df['활동유무']) if cur != new and not (pd.isna(cur) and pd.isna(new))
+    ))
 
     return merged_df, "성공적으로 병합되었습니다.", match_report

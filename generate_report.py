@@ -50,9 +50,11 @@ def build_report(base_dir, matching_config=None, password=None, expiry_date=None
         'facility': _load(base_dir, 'facility'),
         'zone_owner': _load(base_dir, 'zone_owner'),
     }
-    # 해지 파이프라인 / 해지시설내역: 총괄DB와 매칭하지 않는 독립 데이터.
+    # 해지 파이프라인: 총괄DB와 매칭하지 않는 독립 데이터.
+    # 해지시설내역: 독립 섹션(고액 미등록 알림)이면서, '일반해지'는 활동유무에 처리완료로 역반영된다.
     cancel_df = _load(base_dir, 'cancel')
     cancelled_facility_df = _load(base_dir, 'cancelled_facility')
+    files_dict['cancelled_facility'] = cancelled_facility_df
 
     if matching_config is None:
         matching_config = load_matching_config()

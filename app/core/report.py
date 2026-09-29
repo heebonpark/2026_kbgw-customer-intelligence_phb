@@ -1544,7 +1544,7 @@ tbody tr:hover { background: var(--page-plane); }
 .progress-table th.pg-sub.pg-ALL { background: color-mix(in srgb, var(--text-primary) 5%, var(--surface-1)); }
 .progress-table td { border-bottom: 1px solid var(--grid-line); padding: 7px 6px; }
 .progress-table .grp-start { border-left: 2px solid color-mix(in srgb, var(--text-primary) 35%, var(--surface-1)); }
-.progress-table td.progress-branch { font-size: 13px; }
+.progress-table td.progress-branch { font-size: 13px; text-align: center; }
 .progress-table tr.pg-bottom td:not(.progress-cell) { background: color-mix(in srgb, var(--critical) 7%, var(--surface-1)); }
 .progress-table td.pg-rank-bottom { color: var(--critical); }
 .pg-note { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-muted); margin: 8px 0 18px; }
@@ -2014,18 +2014,25 @@ document.addEventListener('DOMContentLoaded', initDashNav);
     let zoneOwnerMap = DATA.zoneOwnerMap || {};
     const SP_ZONE_COL_CANDIDATES = ['영업구역정보', '영업구역번호', '영업구역'];
 
+    const STATUS_RANK_JS = { 미접수: 0, 접수: 1, 처리완료: 2 };  // handlers.py STATUS_RANK
+    const statusRank = v => (v in STATUS_RANK_JS ? STATUS_RANK_JS[v] : -1);
+
     function rebuildMerged(config) {
         let rows = dbRowsBase.map(r => Object.assign({}, r));
         const dbColSet = new Set(dbRowsBase.length ? Object.keys(dbRowsBase[0]) : []);
         // '활동유무(o,x)' 같은 헤더도 '활동유무'로 읽는다 (handlers.py process_and_merge와 같게)
         const activityAlias = dbColSet.has('활동유무') ? null : Array.from(dbColSet).find(c => c.startsWith('활동유무'));
         if (activityAlias) rows.forEach(r => { r['활동유무'] = r[activityAlias]; });
+        rows.forEach(r => { if (typeof r['활동유무'] === 'string') r['활동유무'] = r['활동유무'].replace(/\u00a0/g, ' ').trim(); });
         const spZoneCol = Object.keys(zoneOwnerMap).length ? SP_ZONE_COL_CANDIDATES.find(c => dbColSet.has(c)) : null;
 
         const originRes = applyMatching(rows, fileRowsByKey.original, config.original, DATA.displayColumns.original, 'origin', false);
         rows = originRes.rows;
         const facRes = applyMatching(rows, fileRowsByKey.facility, config.facility, DATA.displayColumns.facility, 'fac', false);
         rows = facRes.rows;
+        // 7. 해지시설내역 -- '일반해지'면 처리완료로 역반영 (handlers.py와 같게)
+        const cancelFacRes = applyMatching(rows, fileRowsByKey.cancelled_facility, config.cancelled_facility, DATA.displayColumns.cancelled_facility || [], 'cancelfac', false);
+        rows = cancelFacRes.rows;
         const patrolRes = applyMatching(rows, fileRowsByKey.patrol, config.patrol, DATA.displayColumns.patrol, 'patrol', true, ['도착시간', '출발시간']);
         rows = patrolRes.rows;
         const vocRes = applyMatching(rows, fileRowsByKey.voc, config.voc, DATA.displayColumns.voc, 'voc', true, ['접수일시']);
@@ -2065,6 +2072,17 @@ document.addEventListener('DOMContentLoaded', initDashNav);
             const status = firstNonNull([out['계약상태_origin'], out['계약상태(중)_fac'], out['계약상태(대)_fac']]);
             out['계약상태'] = status;
 
+            // 상태값 역반영 + 실적 반영 (handlers.py process_and_merge와 같게):
+            // VOC 상태(처리완료/접수/미접수) -> 해지시설 '일반해지'는 처리완료 -> 순찰 매칭은 처리완료,
+            // 그리고 총괄DB 활동유무보다 더 진행된 경우에만 '활동유무'를 올린다 (되돌리지 않음).
+            let writeback = null;
+            if (['처리완료', '접수', '미접수'].includes(out['최근VOC상태'])) writeback = out['최근VOC상태'];
+            if (out['계약상태(중)_cancelfac'] === '일반해지') writeback = '처리완료';
+            if ((out['순찰건수'] || 0) > 0) writeback = '처리완료';
+            out['sp 담당자 상태값'] = writeback;
+            out['활동유무_총괄DB'] = out['활동유무'] === undefined ? null : out['활동유무'];
+            if (writeback && statusRank(writeback) > statusRank(out['활동유무'])) out['활동유무'] = writeback;
+
             // 8. 영업구역담당자 -- SP 건만 영업구역정보 = 구역번호 (handlers.py process_and_merge와 같게)
             if (spZoneCol) {
                 out['영업구역담당자'] = out['활동대상구분'] === 'SP' ? (zoneOwnerMap[zoneKey(out[spZoneCol])] || null) : null;
@@ -2084,7 +2102,7 @@ document.addEventListener('DOMContentLoaded', initDashNav);
             return bra - brb;
         });
 
-        return { rows, used: { original: originRes.used, facility: facRes.used, patrol: patrolRes.used, voc: vocRes.used } };
+        return { rows, used: { original: originRes.used, facility: facRes.used, cancelled_facility: cancelFacRes.used, patrol: patrolRes.used, voc: vocRes.used } };
     }
 
     // ---- analytics (mirrors analytics.py) ----
@@ -3662,6 +3680,12 @@ document.addEventListener('DOMContentLoaded', initDashNav);
             tiles.innerHTML = '';
             const overall = zoneOwnerSel ? buildZoneActivityJS(allRows, 'zone') : zoneData;
             if (overall) tiles.appendChild(zoneKpiTilesEl(overall));
+            // 실적 반영 근거: 총괄DB 활동유무 + VOC·순찰·해지 역반영으로 올라간 건수
+            const lifted = allRows.filter(r => r['활동유무'] !== r['활동유무_총괄DB'] && r['sp 담당자 상태값']);
+            const by = s => lifted.filter(r => r['활동유무'] === s).length;
+            tiles.appendChild(mkEl('p', 'section-desc', lifted.length
+                ? '실적 반영: 총괄DB 활동유무 + 역반영(2번 VOC · 3번 순찰 · 7번 해지)으로 ' + fmtInt(lifted.length) + '건 상향 (처리완료 ' + fmtInt(by('처리완료')) + ' · 접수 ' + fmtInt(by('접수')) + ')'
+                : '실적 반영: 총괄DB 활동유무 기준 (2번 VOC · 3번 순찰 · 7번 해지 파일로 상향된 건 없음)'));
         }
     }
 
