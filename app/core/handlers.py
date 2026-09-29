@@ -40,11 +40,23 @@ def _normalize_status(v):
     return squeezed if squeezed in STATUS_RANK else t
 
 
+def _status_hits(series):
+    return int(series.map(_normalize_status).isin(STATUS_RANK.keys()).sum())
+
+
 def detect_status_col(df):
-    """처리완료/접수/미접수가 실제로 들어 있는 열을 값으로 찾는다. 총괄DB마다 이 값이
-    '활동유무'에 있기도 하고 '상태'에 있기도 해서(이때 '활동유무(o,x)'에는 방문상담/재계약),
-    이름만 보고 고르면 실적이 0건이 된다. 상태값이 가장 많은 열, 같으면 이름이 활동유무 쪽.
+    """실적(처리완료/접수/미접수)을 읽을 열.
+    1) '활동유무' 열에 상태값이 있으면 무조건 그 열 -- 원래(bba5fc6) 동작 그대로.
+       상태값이 더 많은 다른 열(예: 처리상태)이 있어도 바꾸지 않는다.
+    2) 없으면 이름이 '활동유무'로 시작하는 열(예: 활동유무(o,x))에 상태값이 있으면 그 열.
+    3) 그래도 없으면(예: 상태 열에 상태값, 활동유무(o,x)에는 방문상담/재계약 -- 원래 코드는
+       여기서 KeyError) 상태값이 가장 많은 글자 열.
     report.py detectStatusCol()과 같은 규칙."""
+    if '활동유무' in df.columns and _status_hits(df['활동유무']) > 0:
+        return '활동유무'
+    for col in df.columns:
+        if str(col).startswith('활동유무') and _status_hits(df[col]) > 0:
+            return col
     best, best_hits = None, 0
     for col in df.columns:
         # 글자 열만 (pandas 2는 object, pandas 3은 str 타입)

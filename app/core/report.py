@@ -2023,11 +2023,14 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         const squeezed = t.replace(/\\s+/g, '');
         return squeezed in STATUS_RANK_JS ? squeezed : t;
     }
-    function detectStatusCol(rows, cols) {  // handlers.py detect_status_col
+    function detectStatusCol(rows, cols) {  // handlers.py detect_status_col: 활동유무 우선 -> 활동유무* -> 상태값 가장 많은 열
+        const hitsOf = c => rows.reduce((n, r) => n + (typeof r[c] === 'string' && normalizeStatus(r[c]) in STATUS_RANK_JS ? 1 : 0), 0);
+        if (cols.includes('활동유무') && hitsOf('활동유무') > 0) return '활동유무';
+        const named = cols.find(c => c.startsWith('활동유무') && hitsOf(c) > 0);
+        if (named) return named;
         let best = null, bestHits = 0;
         cols.forEach(c => {
-            let hits = 0;
-            rows.forEach(r => { if (typeof r[c] === 'string' && normalizeStatus(r[c]) in STATUS_RANK_JS) hits++; });
+            const hits = hitsOf(c);
             const prefer = c.startsWith('활동유무');
             if (hits > bestHits || (hits === bestHits && hits > 0 && prefer && !(best || '').startsWith('활동유무'))) { best = c; bestHits = hits; }
         });

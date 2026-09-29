@@ -442,11 +442,14 @@ __DASH_SECTIONS__
         const cells = headerCells(ws, p.headerRow);
         p.map = autoMap(key, cells, saved);
         if (key === 'db') {
-            // 활동유무: 지정된 열에 상태값이 더 적으면, 상태값이 가장 많은 열로 (예: 상태 열)
-            let best = -1, bestHits = 0;
-            cells.forEach(c => { const h = statusHits(ws, p.headerRow, c.idx); if (h > bestHits) { best = c.idx; bestHits = h; } });
+            // 활동유무: 이름으로 잡은 열에 상태값이 하나도 없을 때만, 상태값이 가장 많은 열로 (예: 상태 열).
+            // 활동유무 열에 상태값이 있으면 그대로 둔다 -- 엔진 detectStatusCol과 같은 규칙.
             const cur = p.map['활동유무'];
-            if (best >= 0 && (cur === undefined || cur < 0 || statusHits(ws, p.headerRow, cur) < bestHits)) p.map['활동유무'] = best;
+            if (cur === undefined || cur < 0 || statusHits(ws, p.headerRow, cur) === 0) {
+                let best = -1, bestHits = 0;
+                cells.forEach(c => { const h = statusHits(ws, p.headerRow, c.idx); if (h > bestHits) { best = c.idx; bestHits = h; } });
+                if (best >= 0) p.map['활동유무'] = best;
+            }
         }
     }
     function renderMapBox(key) {
