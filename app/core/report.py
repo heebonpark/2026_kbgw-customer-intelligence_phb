@@ -1343,6 +1343,26 @@ body {
 .perf-table tr.perf-sub td { background: color-mix(in srgb, var(--baseline) 30%, var(--surface-1)); font-weight: 700; }
 .perf-table tr.perf-total td { background: color-mix(in srgb, var(--brand) 12%, var(--surface-1)); font-weight: 800; border-top: 2px solid var(--baseline); }
 .perf-table td.perf-warn { color: var(--critical); }
+
+/* ---- 섹션 메뉴 (상단 고정) ---- */
+.dash-nav { position: sticky; top: var(--stick-top, 64px); z-index: 19; background: color-mix(in srgb, var(--surface-1) 94%, transparent);
+            backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border-bottom: 1px solid var(--border); }
+.dash-nav[hidden] { display: none; }
+.dash-nav-inner { max-width: 1360px; margin: 0 auto; padding: 6px 32px; display: flex; align-items: center; gap: 12px; }
+.dash-nav-links { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
+.dash-nav-links::-webkit-scrollbar { display: none; }
+.dash-nav-links a { flex: none; padding: 7px 12px; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--text-secondary); text-decoration: none; white-space: nowrap; }
+.dash-nav-links a:hover { background: var(--page-plane); color: var(--text-primary); }
+.dash-nav-links a.active { background: color-mix(in srgb, var(--brand) 14%, var(--surface-1)); color: var(--brand); }
+.dash-nav-filter { flex: none; font-size: 12px; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dash-sec, .dash-anchor { scroll-margin-top: calc(var(--stick-top, 64px) + 58px); }
+.sec-hint { font-size: 12px; font-weight: 400; color: var(--text-muted); margin-left: 2px; }
+.dash-admin { margin-top: 40px; }
+#overviewTiles:empty { display: none; }
+@media (max-width: 640px) {
+    .dash-nav-inner { padding: 6px 12px; }
+    .dash-nav-filter, .sec-hint { display: none; }
+}
 .dv-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 16px; }
 .dv-tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
 .dv-tile-lead { border-color: color-mix(in srgb, var(--brand) 45%, var(--border)); }
@@ -1767,6 +1787,37 @@ function wireNudgeFilter() {
     applyNudgeFilter('');
 }
 document.addEventListener('DOMContentLoaded', wireNudgeFilter);
+
+// ===== 섹션 메뉴: 상단 고정 높이 맞춤 / 클릭 이동(접힌 섹션은 펼침) / 현재 섹션 강조 =====
+function initDashNav() {
+    const nav = document.getElementById('dashNav');
+    if (!nav) return;
+    const topbar = document.querySelector('.topbar');
+    const setTop = () => document.documentElement.style.setProperty('--stick-top', (topbar ? topbar.offsetHeight : 0) + 'px');
+    setTop();
+    if (topbar && window.ResizeObserver) new ResizeObserver(setTop).observe(topbar);
+    const links = Array.from(nav.querySelectorAll('a[data-sec]'));
+    nav.addEventListener('click', (e) => {
+        const a = e.target.closest('a[data-sec]');
+        if (!a) return;
+        e.preventDefault();
+        const sec = document.getElementById(a.dataset.sec);
+        if (!sec) return;
+        if (sec.tagName === 'DETAILS') sec.open = true;
+        setTop();
+        sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        links.forEach(l => l.classList.toggle('active', l === a));
+    });
+    links.forEach(l => { if (!document.getElementById(l.dataset.sec)) l.hidden = true; });
+    if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver(entries => {
+            entries.forEach(en => { if (en.isIntersecting) links.forEach(l => l.classList.toggle('active', l.dataset.sec === en.target.id)); });
+        }, { rootMargin: '-40% 0px -55% 0px' });
+        links.forEach(l => { const s = document.getElementById(l.dataset.sec); if (s) io.observe(s); });
+    }
+}
+document.addEventListener('DOMContentLoaded', initDashNav);
+
 
 // ===== Client-side matching + dashboard engine =====
 // Mirrors app/core/handlers.py (apply_matching/process_and_merge) and
@@ -3384,7 +3435,6 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
             zoneFocus = null; // 필터/보기 기준이 바뀌어 그 구역이 사라졌으면 해제
         }
         containerEl.appendChild(zoneStatusPillsEl());
-        containerEl.appendChild(zoneKpiTilesEl(zoneData));
         const dvGrid = mkEl('div', 'chart-grid dv-grid-2');
         dvGrid.appendChild(zoneFocusTop10El(zoneData));
         dvGrid.appendChild(ownerScatterEl(ownerData && ownerData.SP ? ownerData.SP : zoneData.SP));
@@ -3528,6 +3578,12 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         if (zoneData && zoneData.SP) zoneData.SP.ownerOptions = options;
         const ownerData = buildZoneActivityJS(allRows, 'owner');  // 산점도는 비교용으로 전체 유지
         renderZoneActivityEl(wrap, zoneData, ownerData);
+        const tiles = document.getElementById('overviewTiles');
+        if (tiles) {
+            tiles.innerHTML = '';
+            const overall = zoneOwnerSel ? buildZoneActivityJS(allRows, 'zone') : zoneData;
+            if (overall) tiles.appendChild(zoneKpiTilesEl(overall));
+        }
     }
 
     // ---- SP 부진자 추가분석 (SP담당 컬럼 기준) -- mirrors analytics.py build_sp_rep_performance ----
@@ -4014,14 +4070,15 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         );
     }
     function updateFilterSummary(totalCount, filteredCount) {
-        const el = document.getElementById('globalFilterSummary');
-        if (!el) return;
+        const el = document.getElementById('globalFilterSummary') || document.createElement('span');
         const parts = [];
         if (globalFilter.hq) parts.push('본부: ' + globalFilter.hq);
         if (globalFilter.branch) parts.push('지사: ' + globalFilter.branch);
         if (globalFilter.activity) parts.push('구분: ' + globalFilter.activity);
         if (globalFilter.owner) parts.push('담당자: ' + globalFilter.owner);
         el.textContent = (parts.length ? parts.join(' · ') + ' · ' : '') + filteredCount.toLocaleString('ko-KR') + ' / ' + totalCount.toLocaleString('ko-KR') + '건';
+        const navEl = document.getElementById('navFilterSummary');
+        if (navEl) navEl.textContent = (parts.length ? '🔍 ' + parts.join(' · ') + ' · ' : '전체 · ') + filteredCount.toLocaleString('ko-KR') + '건';
     }
 
     // ---- toast + change log (admin action feedback) ----
@@ -4337,6 +4394,7 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
     document.addEventListener('DOMContentLoaded', () => {
         renderAdminPanel();
         recomputeMerge(); // silent -- reproduces the server-rendered numbers so filters work immediately
+        if (latestMergedRows.length) updateFilterSummary(latestMergedRows.length, latestMergedRows.length);
         renderChangeLog();
 
         const btnTheme = document.getElementById('btnTheme');
@@ -4463,6 +4521,105 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
 """
 
 
+# ---------------------------------------------------------------------------
+# Page layout -- shared by the GUI report and the web version (web_app.py) so
+# both always show the same sections in the same order. Ordered by the job:
+# headline -> where the gaps are (구역·담당자) -> report tables -> who to act on
+# -> contract background -> raw data; admin settings last (rarely used).
+# ---------------------------------------------------------------------------
+
+DASH_NAV_ITEMS = [
+    ('secOverview', '📊 핵심 요약'),
+    ('secZone', '🗺️ 구역·담당자'),
+    ('secPerf', '📋 실적현황표'),
+    ('secAction', '🎯 조치 대상'),
+    ('secContract', '📑 계약·고객'),
+    ('secDetail', '🔎 상세 데이터'),
+]
+
+
+def render_dashboard_nav(extra_items=(), hidden=False):
+    """Sticky one-line section menu under the top bar (active section is
+    highlighted; the current filter + row count sits on the right)."""
+    links = "".join(
+        f'<a href="#{sid}" data-sec="{sid}">{_e(label)}</a>'
+        for sid, label in list(DASH_NAV_ITEMS) + list(extra_items)
+    )
+    return (f'<nav class="dash-nav" id="dashNav"{" hidden" if hidden else ""} aria-label="섹션 이동">'
+            f'<div class="dash-nav-inner"><div class="dash-nav-links">{links}</div>'
+            f'<span class="dash-nav-filter" id="navFilterSummary"></span></div></nav>')
+
+
+def render_dashboard_sections(p):
+    """p: server-rendered HTML per slot (all optional -- the web version passes
+    none and lets the browser fill every container)."""
+    g = lambda k: p.get(k) or ""
+    cancel_block = (f'<div id="secCancel" class="dash-anchor">{g("cancel")}{g("nudge")}</div>'
+                    if g("cancel") or g("nudge") else "")
+    return f"""
+        {g("filter_bar")}
+
+        <details class="section-collapse dash-sec" id="secOverview" open>
+        <summary class="section-title">📊 핵심 요약 <span class="sec-hint">활동 처리율 · 지사별 진척율 (보고서 상단 표)</span></summary>
+        <div id="overviewTiles"></div>
+        <div id="progressInsightWrap">{g("branch_insights")}</div>
+        <div class="table-section" id="progressSection">{g("progress_table")}{g("progress_chart")}</div>
+        <details class="subsection-collapse">
+        <summary class="subsection-title">유형별 지사 순위 (SP / SE / SG)</summary>
+        <div id="progressTypeWrap">{g("progress_type")}</div>
+        </details>
+        </details>
+
+        <details class="section-collapse dash-sec" id="secZone" open>
+        <summary class="section-title">🗺️ 구역·담당자별 활동 <span class="sec-hint">상태·담당자 선택 → 집중관리 구역 → 구역별 현황 → 시설 조회</span></summary>
+        <div id="zoneActivityWrap">{g("zone_activity")}</div>
+        </details>
+
+        <details class="section-collapse dash-sec" id="secPerf" open>
+        <summary class="section-title">📋 실적현황표 <span class="sec-hint">영업사원 · 기술사원 · 출동사원 (엑셀용 복사)</span></summary>
+        <div id="perfReportWrap"></div>
+        </details>
+
+        <details class="section-collapse dash-sec" id="secAction" open>
+        <summary class="section-title">🎯 조치 대상 <span class="sec-hint">부진 담당자 · 미접수/접수 발송 리스트</span></summary>
+        <details class="subsection-collapse" open>
+        <summary class="subsection-title">SP 부진자 추가분석 (담당자 기준)</summary>
+        <div id="spRepSectionWrap">{g("sp_rep")}</div>
+        </details>
+        <details class="subsection-collapse" open>
+        <summary class="subsection-title">SP 미접수/접수 발송용 리스트 (담당자별)</summary>
+        <div id="spPendingSectionWrap">{g("sp_pending")}</div>
+        </details>
+        </details>
+
+        <details class="section-collapse dash-sec" id="secContract" open>
+        <summary class="section-title">📑 계약·고객 현황 <span class="sec-hint">계약 · 금액 · VOC · 재계약 · 분포</span></summary>
+        {g("eda_button")}
+        <div class="stat-grid" id="statGrid">{g("stat")}</div>
+        <div class="chart-grid" id="chartGrid">{g("chart_grid")}</div>
+        <div id="top10Section"></div>
+        <div id="treeSummarySection"></div>
+        <details class="subsection-collapse">
+        <summary class="subsection-title">🔄 재계약대상(SP)</summary>
+        <div id="recontractSectionWrap">{g("recontract")}</div>
+        </details>
+        <details class="subsection-collapse">
+        <summary class="subsection-title">데이터 분포/이상치 분석 (EDA, 월정산금액 기준)</summary>
+        <div id="edaSectionWrap">{g("eda")}</div>
+        </details>
+        </details>
+
+        <details class="section-collapse dash-sec" id="secDetail" open>
+        <summary class="section-title">🔎 상세 데이터 <span class="sec-hint">관리고객 전체 목록 · 필터/검색 · CSV</span></summary>
+        <button id="btnExportCSV" class="export-btn" title="현재 조건으로 필터링된 모든 데이터를 엑셀(CSV)로 다운로드합니다.">📥 필터링된 데이터 엑셀(CSV) 다운로드</button>
+        <div class="table-section" id="tableSection">{g("table")}</div>
+        </details>
+
+        {cancel_block}
+
+        <div class="dash-admin">{g("admin_panel")}</div>"""
+
+
 def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
                           cancelled_facility_df=None, raw_files=None, matching_config=None,
                           password=None, admin_password=None, expiry_date=None, encrypt=True,
@@ -4550,11 +4707,22 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
             embedded_json = json.dumps(embedded, ensure_ascii=False).replace('</script>', '<\\/script>')
             embedded_script = f'<script type="application/json" id="embeddedData">{embedded_json}</script>'
 
-    generated_at = datetime.now().strftime('%Y-%m-%d %H:%M')
     eda_button_html = """
         <div class="eda-btn-wrap">
             <a href="Data_Intel_PRO_EDA.html" target="_blank" class="eda-btn">🚀 딥 다이브 EDA 분석기 열기 (별도 창)</a>
         </div>""" if eda_link else ""
+    dash_nav_html = render_dashboard_nav(
+        extra_items=[('secCancel', '⚠️ 해지')] if (cancel_section_html or nudge_section_html) else [])
+    dash_sections_html = render_dashboard_sections({
+        "filter_bar": filter_bar_html, "admin_panel": admin_panel_html,
+        "branch_insights": branch_insights_html, "progress_table": progress_table_html,
+        "progress_chart": progress_chart_html, "progress_type": progress_type_dashboard_html,
+        "zone_activity": zone_activity_html, "sp_rep": sp_rep_section_html,
+        "sp_pending": sp_pending_section_html, "stat": stat_html, "chart_grid": chart_grid_html,
+        "recontract": recontract_section_html, "eda": eda_section_html, "table": table_html,
+        "cancel": cancel_section_html, "nudge": nudge_section_html, "eda_button": eda_button_html,
+    })
+    generated_at = datetime.now().strftime('%Y-%m-%d %H:%M')
 
     script = (
         APP_SCRIPT_TEMPLATE
@@ -4594,86 +4762,9 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
         </div>
         <button class="theme-toggle" onclick="toggleTheme()">🌓 테마 전환</button>
     </div>
+    {dash_nav_html}
     <div class="container">
-        {admin_panel_html}
-        {filter_bar_html}
-
-        {eda_button_html}
-
-        <details class="section-collapse">
-        <summary class="section-title">🔄 재계약대상(SP)</summary>
-        <div id="recontractSectionWrap">
-            {recontract_section_html}
-        </div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">총괄DB 기준 대시보드</summary>
-        <div class="stat-grid" id="statGrid">{stat_html}</div>
-        <div class="chart-grid" id="chartGrid">{chart_grid_html}</div>
-
-        <div id="top10Section"></div>
-
-        <div id="treeSummarySection"></div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">지사별 활동 진척율 (SP/SE/SG)</summary>
-        <div id="progressInsightWrap">
-            {branch_insights_html}
-        </div>
-        <div id="progressTypeWrap">
-            {progress_type_dashboard_html}
-        </div>
-        <div class="table-section" id="progressSection">
-            {progress_table_html}
-            {progress_chart_html}
-        </div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">구역별 활동 현황 (SP 영업구역 · SE 기술구역 · SG 구역)</summary>
-        <div id="zoneActivityWrap">
-            {zone_activity_html}
-        </div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">구역별 실적현황 (영업·기술·출동사원)</summary>
-        <div id="perfReportWrap"></div>
-        </details>
-
-        <details class="subsection-collapse" open>
-        <summary class="subsection-title">SP 부진자 추가분석 (담당자 기준)</summary>
-        <div id="spRepSectionWrap">
-            {sp_rep_section_html}
-        </div>
-        </details>
-
-        <details class="subsection-collapse" open>
-        <summary class="subsection-title">SP 미접수/접수 발송용 리스트 (담당자별)</summary>
-        <div id="spPendingSectionWrap">
-            {sp_pending_section_html}
-        </div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">데이터 분포/이상치 분석 (EDA, 월정산금액 기준)</summary>
-        <div id="edaSectionWrap">
-            {eda_section_html}
-        </div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">관리고객 상세 (필터/검색 가능)</summary>
-        <button id="btnExportCSV" class="export-btn" title="현재 조건으로 필터링된 모든 데이터를 엑셀(CSV)로 다운로드합니다.">📥 필터링된 데이터 엑셀(CSV) 다운로드</button>
-        <div class="table-section" id="tableSection">
-            {table_html}
-        </div>
-        </details>
-
-        {cancel_section_html}
-        {nudge_section_html}
+{dash_sections_html}
     </div>
 </div>
 

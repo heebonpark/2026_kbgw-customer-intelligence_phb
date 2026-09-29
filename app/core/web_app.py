@@ -42,7 +42,9 @@ from .matching_config import (
     MATCHABLE_FILES, FILE_LABELS, DB_KEY_CANDIDATES, FILE_KEY_CANDIDATES,
     FILE_DISPLAY_COLUMNS, default_config,
 )
-from .report import CSS, APP_SCRIPT_TEMPLATE, render_admin_panel_shell
+from .report import (
+    CSS, APP_SCRIPT_TEMPLATE, render_admin_panel_shell, render_dashboard_nav, render_dashboard_sections,
+)
 from .secure_report import UNLOCK_PAGE_TEMPLATE, PBKDF2_ITERATIONS
 
 SHEETJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
@@ -161,7 +163,11 @@ def generate_web_app_html():
     return (WEB_PAGE_TEMPLATE
             .replace('__CSS__', CSS)
             .replace('__SLOTS__', _upload_slots_html())
-            .replace('__ADMIN_PANEL__', render_admin_panel_shell())
+            .replace('__DASH_NAV__', render_dashboard_nav(hidden=True))
+            .replace('__DASH_SECTIONS__', render_dashboard_sections({
+                "filter_bar": '<div id="globalFilterBarWrap"></div>',
+                "admin_panel": render_admin_panel_shell(),
+            }))
             .replace('__EMBEDDED__', embedded_json)
             .replace('__UPLOAD_CONFIG__', upload_json)
             .replace('__SHEETJS__', SHEETJS_URL)
@@ -180,6 +186,17 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
 <style>
 .web-upload { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 24px; }
 .web-upload h2 { font-size: 17px; margin: 0 0 4px; color: var(--text-primary); }
+.web-upload[open] > .web-upload-sum { margin-bottom: 10px; }
+.web-upload-sum { display: flex; align-items: center; gap: 12px; cursor: pointer; list-style: none; flex-wrap: wrap; }
+.web-upload-sum::-webkit-details-marker { display: none; }
+.web-upload-title { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+.web-upload-files { font-size: 12.5px; color: var(--text-secondary); flex: 1; min-width: 0; }
+.web-upload-toggle { font-size: 12px; font-weight: 600; color: var(--brand); border: 1px solid color-mix(in srgb, var(--brand) 40%, var(--border)); border-radius: 6px; padding: 3px 9px; }
+.web-upload[open] > .web-upload-sum .web-upload-toggle { display: none; }
+.web-upload:not([open]) { padding: 12px 20px; margin-bottom: 12px; }
+.web-share[hidden] { display: none; }
+.web-quickbar { display: flex; justify-content: flex-end; margin: -4px 0 12px; }
+.web-quickbar[hidden] { display: none; }
 .web-upload .web-privacy { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 16px; }
 .web-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 10px; }
 .web-slot { display: flex; flex-direction: column; gap: 6px; border: 1px dashed var(--baseline); border-radius: 10px; padding: 12px 14px; background: var(--page-plane); }
@@ -245,9 +262,12 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
         </div>
         <button class="theme-toggle" onclick="toggleTheme()">🌓 테마 전환</button>
     </div>
+    __DASH_NAV__
     <div class="container">
-        <section class="web-upload" id="webUpload">
-            <h2>📂 원본 파일 선택</h2>
+        <details class="web-upload" id="webUpload" open>
+            <summary class="web-upload-sum"><span class="web-upload-title">📂 원본 파일</span>
+                <span class="web-upload-files" id="webUploadSummary">파일을 선택하세요</span>
+                <span class="web-upload-toggle">파일·설정 변경</span></summary>
             <p class="web-privacy">🔒 파일은 서버로 전송되지 않습니다 -- 이 브라우저 안에서만 읽고 계산하며, 창을 닫으면 사라집니다.</p>
             <div class="web-slots">__SLOTS__</div>
             <div class="web-actions">
@@ -257,10 +277,15 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
             </div>
             <p class="web-footnote">엑셀에서 열어 둔 파일도 선택할 수 있습니다 -- 단, <b>마지막으로 저장된 내용</b>을 읽으므로 수정 중이면 먼저 저장하세요. 한 번 고른 파일은 <b>🔄 다시 불러오기</b>로 다시 고르지 않고 최신 저장본을 읽습니다 (Chrome·Edge). 저장 안 한 내용까지 쓰려면 <b>📋 엑셀에서 붙여넣기</b>를 쓰세요. 파일을 고르면 <b>시트 · 헤더 행 · 컬럼(열 위치)</b>을 자동으로 맞추고 미리보기를 보여줍니다 -- 다르면 드롭다운에서 바꾸세요. 설정은 이 브라우저에 기억되어 다음에 같은 양식이면 자동 적용됩니다.</p>
             <p class="web-footnote">4. 해지파이프라인 · 7. 해지시설내역 섹션은 데스크톱 GUI 리포트에서 제공합니다.</p>
-        </section>
+        </details>
+        <div class="web-quickbar" id="webQuickbar" hidden>
+            <button type="button" class="web-btn2" id="webQuickReload" hidden>🔄 모두 다시 불러오고 갱신</button>
+        </div>
 
-        <section class="web-upload" id="webShare" hidden>
-            <h2>🔒 공유용 리포트 만들기</h2>
+        <details class="web-upload web-share" id="webShare" hidden>
+            <summary class="web-upload-sum"><span class="web-upload-title">🔒 공유용 리포트 만들기</span>
+                <span class="web-upload-files">암호화 HTML 다운로드 · GitHub Pages 배포</span>
+                <span class="web-upload-toggle">열기</span></summary>
             <p class="web-privacy">위 대시보드를 <b>암호화된 HTML 파일</b>로 만듭니다 (GUI 리포트와 같은 방식 -- 비밀번호 없이는 내용을 볼 수 없음). 암호화도 이 브라우저 안에서 합니다.</p>
             <div class="web-share-grid">
                 <label class="web-field">사용자 비밀번호 <small>받는 사람이 입력 · 비우면 12자리 랜덤</small>
@@ -292,62 +317,10 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
                 <button type="button" class="web-btn2" id="shareCopyBtn">📋 공유 문구 복사</button>
                 <p class="web-footnote" id="shareAdminNote"></p>
             </div>
-        </section>
+        </details>
 
         <div id="webDashboard" hidden>
-        __ADMIN_PANEL__
-        <div id="globalFilterBarWrap"></div>
-
-        <details class="section-collapse">
-        <summary class="section-title">🔄 재계약대상(SP)</summary>
-        <div id="recontractSectionWrap"></div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">총괄DB 기준 대시보드</summary>
-        <div class="stat-grid" id="statGrid"></div>
-        <div class="chart-grid" id="chartGrid"></div>
-        <div id="top10Section"></div>
-        <div id="treeSummarySection"></div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">지사별 활동 진척율 (SP/SE/SG)</summary>
-        <div id="progressInsightWrap"></div>
-        <div id="progressTypeWrap"></div>
-        <div class="table-section" id="progressSection"></div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">구역별 활동 현황 (SP 영업구역 · SE 기술구역 · SG 구역)</summary>
-        <div id="zoneActivityWrap"></div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">구역별 실적현황 (영업·기술·출동사원)</summary>
-        <div id="perfReportWrap"></div>
-        </details>
-
-        <details class="subsection-collapse" open>
-        <summary class="subsection-title">SP 부진자 추가분석 (담당자 기준)</summary>
-        <div id="spRepSectionWrap"></div>
-        </details>
-
-        <details class="subsection-collapse" open>
-        <summary class="subsection-title">SP 미접수/접수 발송용 리스트 (담당자별)</summary>
-        <div id="spPendingSectionWrap"></div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">데이터 분포/이상치 분석 (EDA, 월정산금액 기준)</summary>
-        <div id="edaSectionWrap"></div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">관리고객 상세 (필터/검색 가능)</summary>
-        <button id="btnExportCSV" class="export-btn" title="현재 조건으로 필터링된 모든 데이터를 엑셀(CSV)로 다운로드합니다.">📥 필터링된 데이터 엑셀(CSV) 다운로드</button>
-        <div class="table-section" id="tableSection"></div>
-        </details>
+__DASH_SECTIONS__
         </div>
     </div>
 </div>
@@ -584,6 +557,8 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
             if (handles[key]) btn.textContent = '🔄 다시 불러오기 (' + handles[key].name + ')';
         }
         document.getElementById('webReloadAll').hidden = !Object.keys(handles).length;
+        const quick = document.getElementById('webQuickReload');
+        if (quick) quick.hidden = !Object.keys(handles).length;
     }
 
     // 어느 경로로 들어오든 같은 처리: 시트 고르기 -> 헤더 행/컬럼 자동 맞춤 -> 설정 칸 표시
@@ -660,6 +635,7 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
         if (file) takeWorkbook(input.dataset.key, file.name, () => readWorkbook(file));
     }));
     document.querySelectorAll('[data-reload-for]').forEach(btn => btn.addEventListener('click', () => readHandle(btn.dataset.reloadFor)));
+    document.getElementById('webQuickReload').addEventListener('click', () => document.getElementById('webReloadAll').click());
     document.getElementById('webReloadAll').addEventListener('click', async () => {
         const btn = document.getElementById('webReloadAll');
         btn.disabled = true;
@@ -818,6 +794,7 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
         const t0 = performance.now();
         try {
             const payload = { db: null, files: {}, zoneOwnerMap: {} };
+            const loadedNames = [];
             for (const key of Object.keys(picked)) {
                 const p = picked[key];
                 progress.textContent = p.name + ' 읽는 중...';
@@ -834,6 +811,7 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
                     const wanted = Array.from(new Set(CFG.keyCandidates[key].concat(CFG.displayColumns[key])));
                     payload.files[key] = pickColumns(table, wanted);
                 }
+                loadedNames.push(p.name + ' (' + table.rows.length.toLocaleString('ko-KR') + '행)');
                 setStatus(key, p.name + ' · 시트 ' + p.sheet + ' · 헤더 ' + p.headerRow + '행 · ' + table.rows.length.toLocaleString('ko-KR') + '행', 'ok');
             }
             if (!payload.db.rows.length) throw new Error('총괄DB 시트 "' + picked.db.sheet + '"에 데이터 행이 없습니다.');
@@ -845,6 +823,13 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
             const res = window.DataIntelLoad(payload);
             lastPayload = payload;
             document.getElementById('webShare').hidden = false;
+            // 대시보드가 바로 보이게 업로드 칸은 한 줄로 접고 섹션 메뉴를 켠다
+            document.getElementById('webUploadSummary').textContent = loadedNames.join(' · ');
+            document.getElementById('webUpload').open = false;
+            document.getElementById('webQuickbar').hidden = false;
+            document.getElementById('webQuickReload').hidden = document.getElementById('webReloadAll').hidden;
+            const nav = document.getElementById('dashNav');
+            if (nav) { nav.hidden = false; window.dispatchEvent(new Event('resize')); }
             const secs = ((performance.now() - t0) / 1000).toFixed(1);
             progress.textContent = '✅ 완료 -- 관리계약 ' + res.rows.toLocaleString('ko-KR') + '건 (' + secs + '초). 파일을 바꾸면 다시 만들 수 있습니다.';
             document.getElementById('reportMeta').textContent = '관리계약 ' + res.rows.toLocaleString('ko-KR') + '건 · 이 브라우저에서 계산됨';
@@ -915,6 +900,7 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
             + '<script>document.addEventListener("DOMContentLoaded", function () {'
             + ' var p = JSON.parse(document.getElementById("webPreload").textContent);'
             + ' document.getElementById("webDashboard").hidden = false;'
+            + ' var nav = document.getElementById("dashNav"); if (nav) nav.hidden = false;'
             + ' window.DataIntelLoad(p);'
             + ' document.getElementById("reportMeta").textContent = ' + JSON.stringify(meta) + ';'
             + '});<\/script>\n';
