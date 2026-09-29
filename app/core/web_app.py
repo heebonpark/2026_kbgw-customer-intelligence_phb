@@ -256,7 +256,9 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
                 if (pickToken[key] !== token) return;
                 sel.innerHTML = '';
                 const sheets = wb.SheetNames.map(name => ({ name, rows: sheetRowCount(wb.Sheets[name]) }));
-                const hinted = sheets.find(sh => sheetHasColumn(wb.Sheets[sh.name], CFG.sheetHints[key] || []));
+                // 필요한 컬럼이 있고 데이터 행도 있는 시트를 우선 (헤더만 있는 빈 시트는 뒤로)
+                const hasHint = sh => sheetHasColumn(wb.Sheets[sh.name], CFG.sheetHints[key] || []);
+                const hinted = sheets.find(sh => sh.rows > 0 && hasHint(sh)) || sheets.find(hasHint);
                 const nonEmpty = sheets.find(sh => sh.rows > 0);
                 const chosen = (hinted || nonEmpty || sheets[0]).name;
                 picked[key] = { file, wb, sheet: chosen };
