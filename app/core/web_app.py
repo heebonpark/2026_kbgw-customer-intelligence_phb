@@ -12,8 +12,10 @@ numbers for identical files.
 The page itself carries no customer data, so it needs no password; whoever
 opens it only ever sees the files they pick themselves.
 
-Excel files with several sheets get a sheet picker; the sheet whose header
-row has the column that slot needs (SHEET_HINT_COLUMNS) is pre-selected.
+Each picked file gets load settings: sheet (pre-selected by SHEET_HINT_COLUMNS),
+header row (auto-detected, or typed), and for 1번/8번 a column mapping
+(FIELD_SPECS -- matched by name, or chosen by column letter such as F열),
+with a 3-row preview. The settings are remembered per slot in the browser.
 
 After the dashboard is built, the page can also produce the shareable report:
 it copies its own source, embeds the parsed data, turns the report's lock
@@ -61,6 +63,29 @@ LOCK_SCREEN_HTML = """<div id="lockScreen" class="lock-screen">
     <div id="errorMsg" class="error"></div>
 </div>"""
 
+# Columns the engine reads by exact name. When a file's header uses another
+# name, or the user points at a column by letter, the loader renames that
+# column to `name` before handing the table to the engine.
+FIELD_SPECS = {
+    'db': [
+        {'name': '활동대상구분', 'aliases': ['활동대상구분', '담당채널'], 'required': True},
+        {'name': '지사', 'aliases': ['지사', '관리지사명', '관리지사'], 'required': True},
+        {'name': '계약번호', 'aliases': ['계약번호']},
+        {'name': '서비스번호', 'aliases': ['서비스번호']},
+        {'name': '상호', 'aliases': ['상호', '상호명', '고객명']},
+        {'name': '설치주소', 'aliases': ['설치주소', '주소']},
+        {'name': '영업구역정보', 'aliases': ['영업구역정보', '영업구역번호', '영업구역']},
+        {'name': '기술구역정보', 'aliases': ['기술구역정보', '기술구역번호', '기술구역']},
+        {'name': '구역정보', 'aliases': ['구역정보', '구역']},
+        {'name': '활동유무', 'aliases': ['활동유무', '활동유무(o,x)'], 'prefix': '활동유무', 'required': True},
+        {'name': 'SP담당', 'aliases': ['SP담당']},
+    ],
+    'zone_owner': [
+        {'name': '구역번호', 'aliases': ['구역번호', '영업구역번호'], 'required': True},
+        {'name': '담당자명', 'aliases': ['담당자명', '담당자', '사원명', '(신규)사원명'], 'required': True},
+    ],
+}
+
 # (key, label, note) -- same numbering as the desktop GUI
 WEB_UPLOAD_SLOTS = [
     ('db', '1. 총괄관리DB', '필수'),
@@ -80,7 +105,7 @@ def _upload_slots_html():
         <div class="web-slot{required}" data-key="{key}">
             <span class="web-slot-title">{label} <span class="web-slot-note">({note})</span></span>
             <input type="file" accept=".xlsx,.xls,.csv" data-key="{key}">
-            <select class="web-sheet" data-sheet-for="{key}" hidden title="시트 선택"></select>
+            <div class="web-map" data-map-for="{key}" hidden></div>
             <span class="web-slot-status" data-status-for="{key}">파일을 선택하세요</span>
         </div>""")
     return "".join(cards)
@@ -104,6 +129,7 @@ def generate_web_app_html():
         "keyCandidates": FILE_KEY_CANDIDATES,
         "displayColumns": FILE_DISPLAY_COLUMNS,
         "sheetHints": SHEET_HINT_COLUMNS,
+        "fieldSpecs": FIELD_SPECS,
         "dbKeyCandidates": DB_KEY_CANDIDATES,
         "unlockTemplate": UNLOCK_PAGE_TEMPLATE,
         "lockScreenHtml": LOCK_SCREEN_HTML,
@@ -115,8 +141,10 @@ def generate_web_app_html():
     upload_config["filler"] = filler  # the export swaps these back to the real passwords
     app_script = (APP_SCRIPT_TEMPLATE.replace('__PASSWORD__', filler)
                   .replace('__ADMIN_PASSWORD__', filler).replace('__EXPIRY__', '9999-12-31'))
-    embedded_json = json.dumps(embedded, ensure_ascii=False).replace('</', '<\\/')
-    upload_json = json.dumps(upload_config, ensure_ascii=False).replace('</', '<\\/')
+    # '<' -> \u003c: no tag-like text (the unlock page template has <script>) can
+    # ever reach the HTML parser from inside these JSON blocks
+    embedded_json = json.dumps(embedded, ensure_ascii=False).replace('<', '\\u003c')
+    upload_json = json.dumps(upload_config, ensure_ascii=False).replace('<', '\\u003c')
 
     return (WEB_PAGE_TEMPLATE
             .replace('__CSS__', CSS)
@@ -149,7 +177,22 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
 .web-slot-note { font-weight: 400; color: var(--text-muted); font-size: 11.5px; }
 .web-slot input[type=file] { font-size: 12px; color: var(--text-secondary); max-width: 100%; }
 .web-slot-status { font-size: 11.5px; color: var(--text-muted); }
-.web-sheet { font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text-primary); max-width: 100%; }
+.web-sheet, .web-map select, .web-map input { font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text-primary); max-width: 100%; }
+.web-slot.web-slot-wide { grid-column: 1 / -1; }
+.web-map { border-top: 1px dashed var(--baseline); padding-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.web-map-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; font-size: 12.5px; color: var(--text-secondary); }
+.web-map-row label { display: flex; align-items: center; gap: 6px; }
+.web-map-row input[type=number] { width: 64px; }
+.web-map-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px 12px; }
+.web-map-field { display: grid; grid-template-columns: 96px minmax(0, 1fr); align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+.web-map-field.req > span::after { content: ' *'; color: var(--critical); }
+.web-map-field select.missing { border-color: var(--critical); color: var(--critical); }
+.web-map-preview { overflow-x: auto; }
+.web-map-preview table { border-collapse: collapse; font-size: 11.5px; }
+.web-map-preview th, .web-map-preview td { border: 1px solid var(--grid-line); padding: 3px 7px; white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.web-map-preview th { background: var(--page-plane); color: var(--text-secondary); font-weight: 600; }
+.web-map-warn { font-size: 12px; color: var(--critical); font-weight: 600; }
+.web-mini { font-size: 11.5px; padding: 4px 9px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary); cursor: pointer; }
 .web-slot-status.ok { color: var(--good); font-weight: 600; }
 .web-slot-status.err { color: var(--critical); font-weight: 600; }
 .web-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
@@ -195,7 +238,7 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
                 <button type="button" class="web-run" id="webRunBtn" disabled>📊 대시보드 만들기</button>
                 <span class="web-progress" id="webProgress">1. 총괄관리DB는 필수입니다.</span>
             </div>
-            <p class="web-footnote">엑셀에서 열어 둔 파일도 선택할 수 있습니다 -- 단, <b>마지막으로 저장된 내용</b>을 읽으므로 수정 중이면 먼저 저장하세요. 시트가 여러 개면 필요한 컬럼이 있는 시트를 자동으로 고르고, 목록에서 바꿀 수 있습니다.</p>
+            <p class="web-footnote">엑셀에서 열어 둔 파일도 선택할 수 있습니다 -- 단, <b>마지막으로 저장된 내용</b>을 읽으므로 수정 중이면 먼저 저장하세요. 파일을 고르면 <b>시트 · 헤더 행 · 컬럼(열 위치)</b>을 자동으로 맞추고 미리보기를 보여줍니다 -- 다르면 드롭다운에서 바꾸세요. 설정은 이 브라우저에 기억되어 다음에 같은 양식이면 자동 적용됩니다.</p>
             <p class="web-footnote">4. 해지파이프라인 · 7. 해지시설내역 섹션은 데스크톱 GUI 리포트에서 제공합니다.</p>
         </section>
 
@@ -309,18 +352,188 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
         if (el) { el.textContent = text; el.className = 'web-slot-status' + (cls ? ' ' + cls : ''); }
     };
 
-    const refreshRun = () => {
-        runBtn.disabled = !picked.db;
-        progress.textContent = picked.db ? '준비 완료 -- 대시보드 만들기를 누르세요.' : '1. 총괄관리DB는 필수입니다.';
+    const refreshRun = (keepMessage) => {
+        const dbMissing = picked.db ? missingRequired('db') : [];
+        runBtn.disabled = !picked.db || dbMissing.length > 0;
+        if (keepMessage) return;  // 실행 결과(완료/실패) 문구는 그대로 둔다
+        progress.textContent = !picked.db ? '1. 총괄관리DB는 필수입니다.'
+            : dbMissing.length ? '총괄관리DB의 필수 컬럼을 지정하세요: ' + dbMissing.join(', ')
+            : '준비 완료 -- 대시보드 만들기를 누르세요.';
     };
     const pickToken = {};  // key -> latest pick; a slower, older read must not overwrite a newer one
+    const SAVE_KEY = key => 'dataintel-load-' + key;
+    const loadSaved = key => { try { return JSON.parse(localStorage.getItem(SAVE_KEY(key)) || 'null'); } catch (e) { return null; } };
+
+    // ---- 시트 / 헤더 행 / 컬럼(열 위치) 설정 ----
+    const norm = v => (v === null || v === undefined) ? '' : String(v).replace(/ /g, ' ').trim();
+    function sheetRange(ws) { return ws && ws['!ref'] ? XLSX.utils.decode_range(ws['!ref']) : null; }
+    function headerCells(ws, headerRow) {
+        // headerRow: 엑셀 행 번호(1부터). -> [{idx(시트 첫 열 기준), letter, name}]
+        const r = sheetRange(ws);
+        if (!r) return [];
+        const out = [];
+        for (let c = r.s.c; c <= r.e.c; c++) {
+            const cell = ws[XLSX.utils.encode_cell({ r: headerRow - 1, c })];
+            out.push({ idx: c - r.s.c, letter: XLSX.utils.encode_col(c), name: norm(cell ? cell.v : null) });
+        }
+        return out;
+    }
+    const aliasHit = (spec, name) => spec.aliases.includes(name) || !!(spec.prefix && name.startsWith(spec.prefix));
+    function detectHeaderRow(ws, key) {
+        // 앞쪽 15줄 중 필요한 컬럼명이 가장 많이 들어있는 줄이 헤더. 없으면 제목 줄 규칙(handlers.py _has_title_row).
+        const r = sheetRange(ws);
+        if (!r) return 1;
+        const specs = (CFG.fieldSpecs[key] || []).concat((CFG.sheetHints[key] || []).map(n => ({ aliases: [n] })));
+        let best = null, bestHits = 0;
+        for (let row = r.s.r; row <= Math.min(r.s.r + 14, r.e.r); row++) {
+            const names = headerCells(ws, row + 1).map(c => c.name).filter(Boolean);
+            const hits = specs.filter(spec => names.some(n => aliasHit(spec, n))).length;
+            if (hits > bestHits) { best = row + 1; bestHits = hits; }
+        }
+        if (best) return best;
+        const first = headerCells(ws, r.s.r + 1).map(c => c.name);
+        const blank = first.slice(1).filter(n => !n).length;
+        return (first.length >= 3 && blank >= first.length - 2) ? r.s.r + 2 : r.s.r + 1;
+    }
+    function autoMap(key, cells, saved) {
+        // 저장된 설정(헤더 이름 -> 열 위치 순) -> 이름 자동 매칭 순으로 각 표준 컬럼의 열을 정한다
+        const map = {};
+        (CFG.fieldSpecs[key] || []).forEach(spec => {
+            const sv = saved && saved.fields ? saved.fields[spec.name] : undefined;
+            if (sv === '') { map[spec.name] = -1; return; }  // 사용자가 '(없음)'으로 둔 항목
+            let idx = -1;
+            if (sv) {
+                const byName = sv.header ? cells.find(c => c.name === sv.header) : null;
+                const byLetter = cells.find(c => c.letter === sv.letter);
+                idx = byName ? byName.idx : byLetter ? byLetter.idx : -1;
+            }
+            if (idx < 0) {
+                const exact = spec.aliases.map(a => cells.find(c => c.name === a)).find(Boolean);
+                const pref = spec.prefix ? cells.find(c => c.name.startsWith(spec.prefix)) : null;
+                idx = exact ? exact.idx : pref ? pref.idx : -1;
+            }
+            map[spec.name] = idx;
+        });
+        return map;
+    }
+    function missingRequired(key) {
+        const p = picked[key];
+        if (!p) return [];
+        return (CFG.fieldSpecs[key] || []).filter(f => f.required && !(p.map[f.name] >= 0)).map(f => f.name);
+    }
+    function saveSettings(key) {
+        const p = picked[key];
+        if (!p) return;
+        const cells = headerCells(p.wb.Sheets[p.sheet], p.headerRow);
+        const fields = {};
+        Object.keys(p.map).forEach(n => {
+            const c = cells.find(x => x.idx === p.map[n]);
+            fields[n] = c ? { header: c.name, letter: c.letter } : '';
+        });
+        try { localStorage.setItem(SAVE_KEY(key), JSON.stringify({ sheet: p.sheet, headerRow: p.headerRow, fields })); } catch (e) {}
+    }
+    function applySheet(key, sheet, headerRow, saved) {
+        const p = picked[key];
+        p.sheet = sheet;
+        const ws = p.wb.Sheets[sheet];
+        p.headerRow = headerRow || detectHeaderRow(ws, key);
+        p.map = autoMap(key, headerCells(ws, p.headerRow), saved);
+    }
+    function renderMapBox(key) {
+        const p = picked[key];
+        const box = document.querySelector('[data-map-for="' + key + '"]');
+        const slot = document.querySelector('.web-slot[data-key="' + key + '"]');
+        box.innerHTML = '';
+        if (!p) { box.hidden = true; slot.classList.remove('web-slot-wide'); return; }
+        box.hidden = false;
+        const specs = CFG.fieldSpecs[key] || [];
+        slot.classList.toggle('web-slot-wide', specs.length > 0);
+        const ws = p.wb.Sheets[p.sheet];
+        const cells = headerCells(ws, p.headerRow);
+        const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+
+        const row = mk('div', 'web-map-row');
+        const sheetLabel = mk('label', null, '시트');
+        const sheetSel = mk('select', 'web-sheet');
+        sheetSel.dataset.sheetFor = key;
+        p.wb.SheetNames.forEach(n => {  // 시트 전체 줄 수 (제목·헤더 줄 포함)
+            const r = sheetRange(p.wb.Sheets[n]);
+            sheetSel.appendChild(new Option(n + ' (' + (r ? r.e.r - r.s.r + 1 : 0).toLocaleString('ko-KR') + '줄)', n));
+        });
+        sheetSel.value = p.sheet;
+        sheetSel.addEventListener('change', () => { applySheet(key, sheetSel.value, null, null); saveSettings(key); renderMapBox(key); refreshRun(); });
+        sheetLabel.appendChild(sheetSel);
+        row.appendChild(sheetLabel);
+
+        const hrLabel = mk('label', null, '헤더 행');
+        const hr = mk('input');
+        hr.type = 'number'; hr.min = '1'; hr.value = p.headerRow; hr.dataset.headerFor = key;
+        hr.addEventListener('change', () => {
+            p.headerRow = Math.max(1, parseInt(hr.value, 10) || 1);
+            p.map = autoMap(key, headerCells(ws, p.headerRow), null);
+            saveSettings(key); renderMapBox(key); refreshRun();
+        });
+        hrLabel.appendChild(hr);
+        row.appendChild(hrLabel);
+        const auto = mk('button', 'web-mini', '자동 다시 맞추기');
+        auto.type = 'button';
+        auto.addEventListener('click', () => {
+            try { localStorage.removeItem(SAVE_KEY(key)); } catch (e) {}
+            applySheet(key, p.sheet, null, null); renderMapBox(key); refreshRun();
+        });
+        row.appendChild(auto);
+        box.appendChild(row);
+
+        if (specs.length) {
+            const grid = mk('div', 'web-map-fields');
+            specs.forEach(spec => {
+                const f = mk('label', 'web-map-field' + (spec.required ? ' req' : ''));
+                f.appendChild(mk('span', null, spec.name));
+                const sel = mk('select');
+                sel.dataset.fieldFor = key + ':' + spec.name;
+                sel.appendChild(new Option('(없음)', '-1'));
+                cells.forEach(c => sel.appendChild(new Option(c.letter + '열 · ' + (c.name || '(빈 헤더)'), String(c.idx))));
+                sel.value = String(p.map[spec.name] >= 0 ? p.map[spec.name] : -1);
+                if (spec.required && !(p.map[spec.name] >= 0)) sel.classList.add('missing');
+                sel.addEventListener('change', () => { p.map[spec.name] = parseInt(sel.value, 10); saveSettings(key); renderMapBox(key); refreshRun(); });
+                f.appendChild(sel);
+                grid.appendChild(f);
+            });
+            box.appendChild(grid);
+            const miss = missingRequired(key);
+            if (miss.length) box.appendChild(mk('div', 'web-map-warn', '필수 컬럼을 찾지 못했습니다: ' + miss.join(', ') + ' -- 드롭다운에서 열을 지정하세요.'));
+        }
+        // 미리보기: 지정한 컬럼(매핑이 없는 파일은 앞 6개 열) 기준 데이터 앞 3행
+        const shown = specs.length
+            ? specs.filter(sp => p.map[sp.name] >= 0).map(sp => ({ label: sp.name, idx: p.map[sp.name] }))
+            : cells.slice(0, 6).map(c => ({ label: c.letter + '열 ' + (c.name || ''), idx: c.idx }));
+        const r = sheetRange(ws);
+        if (shown.length && r) {
+            const pv = mk('div', 'web-map-preview');
+            const t = mk('table');
+            const head = mk('tr');
+            shown.forEach(x => head.appendChild(mk('th', null, x.label)));
+            t.appendChild(head);
+            let added = 0;
+            for (let rr = p.headerRow; rr <= r.e.r && added < 3; rr++) {
+                const vals = shown.map(x => { const cell = ws[XLSX.utils.encode_cell({ r: rr, c: r.s.c + x.idx })]; return cell ? (cell.w || norm(cell.v)) : ''; });
+                if (vals.every(v => v === '')) continue;
+                const tr = mk('tr');
+                vals.forEach(v => tr.appendChild(mk('td', null, v)));
+                t.appendChild(tr);
+                added++;
+            }
+            pv.appendChild(t);
+            box.appendChild(pv);
+        }
+    }
+
     document.querySelectorAll('.web-slot input[type=file]').forEach(input => {
         input.addEventListener('change', async () => {
             const key = input.dataset.key;
             const token = pickToken[key] = {};
-            const sel = document.querySelector('[data-sheet-for="' + key + '"]');
-            sel.hidden = true; sel.innerHTML = '';
             delete picked[key];
+            renderMapBox(key);
             const file = input.files && input.files[0];
             if (!file) { setStatus(key, '파일을 선택하세요'); refreshRun(); return; }
             setStatus(key, file.name + ' -- 여는 중...', 'ok');
@@ -329,32 +542,24 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
             try {
                 const wb = await readWorkbook(file);
                 if (pickToken[key] !== token) return;
-                sel.innerHTML = '';
+                const saved = loadSaved(key);
                 const sheets = wb.SheetNames.map(name => ({ name, rows: sheetRowCount(wb.Sheets[name]) }));
-                // 필요한 컬럼이 있고 데이터 행도 있는 시트를 우선 (헤더만 있는 빈 시트는 뒤로)
+                // 지난번 시트(같은 이름, 데이터 있음) -> 필요한 컬럼 + 데이터 있는 시트 -> 데이터 있는 첫 시트
                 const hasHint = sh => sheetHasColumn(wb.Sheets[sh.name], CFG.sheetHints[key] || []);
+                const savedSheet = saved ? sheets.find(sh => sh.name === saved.sheet && sh.rows > 0) : null;
                 const hinted = sheets.find(sh => sh.rows > 0 && hasHint(sh)) || sheets.find(hasHint);
-                const nonEmpty = sheets.find(sh => sh.rows > 0);
-                const chosen = (hinted || nonEmpty || sheets[0]).name;
-                picked[key] = { file, wb, sheet: chosen };
-                if (sheets.length > 1) {
-                    sheets.forEach(sh => sel.appendChild(new Option(sh.name + ' (' + sh.rows.toLocaleString('ko-KR') + '행)', sh.name)));
-                    sel.value = chosen;
-                    sel.hidden = false;
-                }
-                setStatus(key, file.name + (sheets.length > 1 ? ' · 시트 ' + sheets.length + '개' + (hinted ? ' (자동 선택: ' + chosen + ')' : '') : ''), 'ok');
+                const chosen = (savedSheet || hinted || sheets.find(sh => sh.rows > 0) || sheets[0]).name;
+                picked[key] = { file, wb };
+                applySheet(key, chosen, savedSheet ? saved.headerRow : null, savedSheet ? saved : null);
+                renderMapBox(key);
+                setStatus(key, file.name + ' · 시트 ' + chosen + ' · 헤더 ' + picked[key].headerRow + '행'
+                    + (savedSheet ? ' (지난 설정 적용)' : sheets.length > 1 && hinted ? ' (자동 선택)' : ''), 'ok');
             } catch (e) {
                 console.error(e);
                 if (pickToken[key] !== token) return;
                 setStatus(key, '파일을 열 수 없습니다: ' + (e && e.message ? e.message : e), 'err');
             }
             refreshRun();
-        });
-    });
-    document.querySelectorAll('.web-sheet').forEach(sel => {
-        sel.addEventListener('change', () => {
-            const key = sel.dataset.sheetFor;
-            if (picked[key]) { picked[key].sheet = sel.value; setStatus(key, picked[key].file.name + ' · 시트: ' + sel.value, 'ok'); }
         });
     });
 
@@ -366,12 +571,6 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
     function isoLocal(d) {
         const p = n => String(n).padStart(2, '0');
         return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
-    }
-    function hasTitleRow(header) {
-        // handlers.py _has_title_row: 첫 줄이 제목 한 칸(나머지는 빈 칸)이면 실제 헤더는 다음 줄
-        if (header.length < 3) return false;
-        const blank = header.slice(1).filter(c => c === null || c === undefined || String(c).trim() === '').length;
-        return blank >= header.length - 2;
     }
     async function readWorkbook(file) {
         const buf = await file.arrayBuffer();
@@ -385,33 +584,42 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
         return Math.max(0, r.e.r - r.s.r);  // 헤더 줄 제외
     }
     function sheetHasColumn(ws, names) {
-        // 첫 두 줄(제목 줄이 있는 경우 대비)에 원하는 컬럼명이 있는지만 본다 -- 시트 전체를 변환하지 않음
-        if (!ws || !ws['!ref'] || !names.length) return false;
-        const r = XLSX.utils.decode_range(ws['!ref']);
-        for (let row = r.s.r; row <= Math.min(r.s.r + 1, r.e.r); row++) {
+        // 앞쪽 15줄(제목 줄이 몇 줄 있어도)에 원하는 컬럼명이 있는지만 본다 -- 시트 전체를 변환하지 않음
+        const r = sheetRange(ws);
+        if (!r || !names.length) return false;
+        for (let row = r.s.r; row <= Math.min(r.s.r + 14, r.e.r); row++) {
             for (let col = r.s.c; col <= r.e.c; col++) {
                 const cell = ws[XLSX.utils.encode_cell({ r: row, c: col })];
-                if (cell && cell.v != null && names.includes(String(cell.v).replace(/\u00a0/g, ' ').trim())) return true;
+                if (cell && cell.v != null && names.includes(norm(cell.v))) return true;
             }
         }
         return false;
     }
-    function readTable(wb, sheetName) {
-        const ws = wb.Sheets[sheetName];
-        let aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: false });
+    function readTable(p) {
+        // p: { wb, sheet, headerRow(엑셀 행 번호), map: {표준컬럼명: 열 인덱스} }
+        const ws = p.wb.Sheets[p.sheet];
+        const r = sheetRange(ws);
+        if (!r) return { columns: [], rows: [] };
+        const rng = { s: { r: p.headerRow - 1, c: r.s.c }, e: r.e };
+        const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: false, range: rng });
         if (!aoa.length) return { columns: [], rows: [] };
-        if (hasTitleRow(aoa[0]) && aoa.length > 1) aoa = aoa.slice(1);
-        const width = aoa.reduce((m, r) => Math.max(m, r.length), 0);
+        const width = Math.max(r.e.c - r.s.c + 1, aoa.reduce((m, row) => Math.max(m, row.length), 0));
         const seen = {};
         const columns = Array.from({ length: width }, (_, i) => {
-            const raw = aoa[0][i];
-            let name = (raw === null || raw === undefined || String(raw).trim() === '')
-                ? 'Unnamed: ' + i : String(raw).replace(/ /g, ' ').trim();
+            let name = norm(aoa[0][i]) || 'Unnamed: ' + i;
             if (seen[name] !== undefined) { seen[name] += 1; name = name + '.' + seen[name]; } else { seen[name] = 0; }
             return name;
         });
-        const rows = aoa.slice(1).map(r => columns.map((_, i) => {
-            const v = r[i];
+        // 지정한 열을 엔진이 읽는 표준 이름으로 바꾼다 (같은 이름의 다른 열은 '(원본)'으로 비켜둔다)
+        Object.keys(p.map || {}).forEach(std => {
+            const idx = p.map[std];
+            if (!(idx >= 0) || idx >= width || columns[idx] === std) return;
+            const clash = columns.indexOf(std);
+            if (clash >= 0) columns[clash] = std + '(원본)';
+            columns[idx] = std;
+        });
+        const rows = aoa.slice(1).map(row => columns.map((_, i) => {
+            const v = row[i];
             if (v === undefined || v === null) return null;
             if (v instanceof Date) return isoLocal(v);
             if (typeof v === 'string') { const t = v.replace(/ /g, ' '); return t.trim() === '' ? null : t; }
@@ -447,7 +655,7 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
     }
 
     runBtn.addEventListener('click', async () => {
-        if (!picked.db) return;
+        if (!picked.db || missingRequired('db').length) return;
         if (typeof XLSX === 'undefined') { progress.textContent = '엑셀 읽기 모듈을 불러오지 못했습니다. 인터넷 연결을 확인 후 새로고침하세요.'; return; }
         runBtn.disabled = true;
         const t0 = performance.now();
@@ -457,7 +665,8 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
                 const p = picked[key];
                 progress.textContent = p.file.name + ' 읽는 중...';
                 await new Promise(r => setTimeout(r, 0));  // let the status paint before a long parse
-                const table = readTable(p.wb, p.sheet);
+                const table = readTable(p);
+                saveSettings(key);
                 if (key === 'db') {
                     payload.db = table;
                 } else if (key === 'zone_owner') {
@@ -468,7 +677,7 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
                     const wanted = Array.from(new Set(CFG.keyCandidates[key].concat(CFG.displayColumns[key])));
                     payload.files[key] = pickColumns(table, wanted);
                 }
-                setStatus(key, p.file.name + (p.wb.SheetNames.length > 1 ? ' · 시트 ' + p.sheet : '') + ' · ' + table.rows.length.toLocaleString('ko-KR') + '행', 'ok');
+                setStatus(key, p.file.name + ' · 시트 ' + p.sheet + ' · 헤더 ' + p.headerRow + '행 · ' + table.rows.length.toLocaleString('ko-KR') + '행', 'ok');
             }
             if (!payload.db.rows.length) throw new Error('총괄DB 시트 "' + picked.db.sheet + '"에 데이터 행이 없습니다.');
             progress.textContent = '병합·집계 중...';
@@ -486,7 +695,7 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
             console.error(e);
             progress.textContent = '⚠️ 처리 실패: ' + (e && e.message ? e.message : e);
         } finally {
-            runBtn.disabled = !picked.db;
+            refreshRun(true);
         }
     });
 
