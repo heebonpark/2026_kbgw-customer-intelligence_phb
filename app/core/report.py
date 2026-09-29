@@ -2015,15 +2015,35 @@ document.addEventListener('DOMContentLoaded', initDashNav);
     const SP_ZONE_COL_CANDIDATES = ['영업구역정보', '영업구역번호', '영업구역'];
 
     const STATUS_RANK_JS = { 미접수: 0, 접수: 1, 처리완료: 2 };  // handlers.py STATUS_RANK
-    const statusRank = v => (v in STATUS_RANK_JS ? STATUS_RANK_JS[v] : -1);
+    const statusRank = v => (typeof v === 'string' && v in STATUS_RANK_JS ? STATUS_RANK_JS[v] : -1);
+    let statusColUsed = null;
+    function normalizeStatus(v) {  // handlers.py _normalize_status
+        if (typeof v !== 'string') return v === undefined ? null : v;
+        const t = v.replace(/\\u00a0/g, ' ').trim();
+        const squeezed = t.replace(/\\s+/g, '');
+        return squeezed in STATUS_RANK_JS ? squeezed : t;
+    }
+    function detectStatusCol(rows, cols) {  // handlers.py detect_status_col
+        let best = null, bestHits = 0;
+        cols.forEach(c => {
+            let hits = 0;
+            rows.forEach(r => { if (typeof r[c] === 'string' && normalizeStatus(r[c]) in STATUS_RANK_JS) hits++; });
+            const prefer = c.startsWith('활동유무');
+            if (hits > bestHits || (hits === bestHits && hits > 0 && prefer && !(best || '').startsWith('활동유무'))) { best = c; bestHits = hits; }
+        });
+        if (!best) best = cols.includes('활동유무') ? '활동유무' : (cols.find(c => c.startsWith('활동유무')) || null);
+        return best;
+    }
 
     function rebuildMerged(config) {
         let rows = dbRowsBase.map(r => Object.assign({}, r));
         const dbColSet = new Set(dbRowsBase.length ? Object.keys(dbRowsBase[0]) : []);
-        // '활동유무(o,x)' 같은 헤더도 '활동유무'로 읽는다 (handlers.py process_and_merge와 같게)
-        const activityAlias = dbColSet.has('활동유무') ? null : Array.from(dbColSet).find(c => c.startsWith('활동유무'));
-        if (activityAlias) rows.forEach(r => { r['활동유무'] = r[activityAlias]; });
-        rows.forEach(r => { if (typeof r['활동유무'] === 'string') r['활동유무'] = r['활동유무'].replace(/\u00a0/g, ' ').trim(); });
+        // 처리완료/접수/미접수가 실제로 든 열을 값으로 찾아 '활동유무'로 맞춘다 (handlers.py detect_status_col과 같게)
+        statusColUsed = detectStatusCol(dbRowsBase, Array.from(dbColSet));
+        if (statusColUsed && statusColUsed !== '활동유무') {
+            rows.forEach(r => { if ('활동유무' in r) r['활동유무_원래열'] = r['활동유무']; r['활동유무'] = r[statusColUsed]; });
+        }
+        rows.forEach(r => { r['활동유무'] = normalizeStatus(r['활동유무']); });
         const spZoneCol = Object.keys(zoneOwnerMap).length ? SP_ZONE_COL_CANDIDATES.find(c => dbColSet.has(c)) : null;
 
         const originRes = applyMatching(rows, fileRowsByKey.original, config.original, DATA.displayColumns.original, 'origin', false);
@@ -3683,6 +3703,16 @@ document.addEventListener('DOMContentLoaded', initDashNav);
             // 실적 반영 근거: 총괄DB 활동유무 + VOC·순찰·해지 역반영으로 올라간 건수
             const lifted = allRows.filter(r => r['활동유무'] !== r['활동유무_총괄DB'] && r['sp 담당자 상태값']);
             const by = s => lifted.filter(r => r['활동유무'] === s).length;
+            // 어떤 열의 어떤 값으로 셌는지 -- 실적이 이상하면 이 줄로 바로 확인
+            const dist = new Map();
+            allRows.forEach(r => { const v = r['활동유무_총괄DB']; const k = (v === null || v === undefined || v === '') ? '빈칸' : String(v); dist.set(k, (dist.get(k) || 0) + 1); });
+            const order = ['처리완료', '접수', '미접수'];
+            const known = order.filter(k => dist.has(k)).map(k => k + ' ' + fmtInt(dist.get(k)));
+            const others = Array.from(dist).filter(([k]) => !order.includes(k)).sort((a, b) => b[1] - a[1]);
+            const otherText = others.length ? ' · 그 외 ' + others.slice(0, 4).map(([k, n]) => k + ' ' + fmtInt(n)).join(', ') + (others.length > 4 ? ' …' : '') : '';
+            tiles.appendChild(mkEl('p', 'section-desc status-diag',
+                '상태 기준 열: ' + (statusColUsed || '(찾지 못함)')
+                + (DATA.db && DATA.db.renamed && DATA.db.renamed[statusColUsed] ? ' (파일의 ' + DATA.db.renamed[statusColUsed] + ' 열)' : '') + ' -- ' + (known.length ? known.join(' · ') : '처리완료/접수/미접수 값 없음') + otherText));
             tiles.appendChild(mkEl('p', 'section-desc', lifted.length
                 ? '실적 반영: 총괄DB 활동유무 + 역반영(2번 VOC · 3번 순찰 · 7번 해지)으로 ' + fmtInt(lifted.length) + '건 상향 (처리완료 ' + fmtInt(by('처리완료')) + ' · 접수 ' + fmtInt(by('접수')) + ')'
                 : '실적 반영: 총괄DB 활동유무 기준 (2번 VOC · 3번 순찰 · 7번 해지 파일로 상향된 건 없음)'));

@@ -30,6 +30,34 @@ OPEN_VOC_STATES = {'미접수', '접수', '처리중', '결재요청'}
 # 활동유무 진행 단계 -- 실적 반영 시 더 진행된 상태를 인정 (report.py STATUS_RANK_JS와 같게)
 STATUS_RANK = {'미접수': 0, '접수': 1, '처리완료': 2}
 
+
+def _normalize_status(v):
+    """' 처리 완료 ' -> '처리완료' (상태값일 때만 공백 제거, 나머지는 앞뒤 공백만 정리)."""
+    if not isinstance(v, str):
+        return v
+    t = v.replace('\xa0', ' ').strip()
+    squeezed = re.sub(r'\s+', '', t)
+    return squeezed if squeezed in STATUS_RANK else t
+
+
+def detect_status_col(df):
+    """처리완료/접수/미접수가 실제로 들어 있는 열을 값으로 찾는다. 총괄DB마다 이 값이
+    '활동유무'에 있기도 하고 '상태'에 있기도 해서(이때 '활동유무(o,x)'에는 방문상담/재계약),
+    이름만 보고 고르면 실적이 0건이 된다. 상태값이 가장 많은 열, 같으면 이름이 활동유무 쪽.
+    report.py detectStatusCol()과 같은 규칙."""
+    best, best_hits = None, 0
+    for col in df.columns:
+        # 글자 열만 (pandas 2는 object, pandas 3은 str 타입)
+        if not (df[col].dtype == object or pd.api.types.is_string_dtype(df[col])):
+            continue
+        hits = int(df[col].map(_normalize_status).isin(STATUS_RANK.keys()).sum())
+        prefer = str(col).startswith('활동유무')
+        if hits > best_hits or (hits == best_hits and hits > 0 and prefer and not str(best).startswith('활동유무')):
+            best, best_hits = col, hits
+    if best is None:  # 상태값이 전혀 없으면 이전처럼 이름으로
+        best = '활동유무' if '활동유무' in df.columns else next((c for c in df.columns if str(c).startswith('활동유무')), None)
+    return best
+
 # 8. 영업구역담당자 -- SP 전용 구역번호 -> 담당자명 표. 총괄DB의 SP 구역
 # 컬럼(영업구역정보)과 이 파일의 구역번호를 맞춰 '영업구역담당자'를 채운다.
 SP_ZONE_COL_CANDIDATES = ['영업구역정보', '영업구역번호', '영업구역']
@@ -301,15 +329,16 @@ def process_and_merge(files_dict, matching_config):
     merged_df = db_df.copy()
     match_report = {}
 
-    # 활동유무 헤더가 '활동유무(o,x)'처럼 붙어 나오는 내보내기도 있다 -- 집계는
-    # 전부 '활동유무'를 읽으므로 이름을 맞춰 둔다 (report.py rebuildMerged와 같게).
-    if '활동유무' not in merged_df.columns:
-        alias = next((c for c in merged_df.columns if str(c).startswith('활동유무')), None)
-        if alias:
-            merged_df['활동유무'] = merged_df[alias]
+    # 실적 집계는 전부 '활동유무'(처리완료/접수/미접수)를 읽는다. 그 값이 든 열을 값으로
+    # 찾아 '활동유무'로 맞춘다 -- 예: 상태 열에 있고 활동유무(o,x)에는 방문상담/재계약인 총괄DB.
+    status_col = detect_status_col(merged_df)
+    match_report['status_col'] = status_col
+    if status_col and status_col != '활동유무':
+        if '활동유무' in merged_df.columns:
+            merged_df['활동유무_원래열'] = merged_df['활동유무']
+        merged_df['활동유무'] = merged_df[status_col]
     if '활동유무' in merged_df.columns:
-        # '처리완료 '처럼 공백이 붙은 값도 같은 상태로 센다
-        merged_df['활동유무'] = _strip_invisible_whitespace(merged_df['활동유무'].astype(object))
+        merged_df['활동유무'] = merged_df['활동유무'].astype(object).map(_normalize_status)
 
     for key, suffix in [('original', 'origin'), ('facility', 'fac'), ('cancel', 'cancel'), ('cancelled_facility', 'cancelfac')]:
         file_df = files_dict.get(key)

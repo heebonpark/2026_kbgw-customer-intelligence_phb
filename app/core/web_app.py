@@ -422,12 +422,32 @@ __DASH_SECTIONS__
         });
         try { localStorage.setItem(SAVE_KEY(key), JSON.stringify({ sheet: p.sheet, headerRow: p.headerRow, fields })); } catch (e) {}
     }
+    // 처리완료/접수/미접수가 실제로 든 열 (이름이 아니라 값으로 -- 엔진의 detectStatusCol과 같은 규칙)
+    const STATUS_VALUES = ['처리완료', '접수', '미접수'];
+    function statusHits(ws, headerRow, idx) {
+        const r = sheetRange(ws);
+        if (!r) return 0;
+        let hits = 0;
+        for (let rr = headerRow; rr <= Math.min(r.e.r, headerRow + 5000); rr++) {
+            const cell = ws[XLSX.utils.encode_cell({ r: rr, c: r.s.c + idx })];
+            if (cell && typeof cell.v === 'string' && STATUS_VALUES.includes(cell.v.replace(/\s+/g, ''))) hits++;
+        }
+        return hits;
+    }
     function applySheet(key, sheet, headerRow, saved) {
         const p = picked[key];
         p.sheet = sheet;
         const ws = p.wb.Sheets[sheet];
         p.headerRow = headerRow || detectHeaderRow(ws, key);
-        p.map = autoMap(key, headerCells(ws, p.headerRow), saved);
+        const cells = headerCells(ws, p.headerRow);
+        p.map = autoMap(key, cells, saved);
+        if (key === 'db') {
+            // 활동유무: 지정된 열에 상태값이 더 적으면, 상태값이 가장 많은 열로 (예: 상태 열)
+            let best = -1, bestHits = 0;
+            cells.forEach(c => { const h = statusHits(ws, p.headerRow, c.idx); if (h > bestHits) { best = c.idx; bestHits = h; } });
+            const cur = p.map['활동유무'];
+            if (best >= 0 && (cur === undefined || cur < 0 || statusHits(ws, p.headerRow, cur) < bestHits)) p.map['활동유무'] = best;
+        }
     }
     function renderMapBox(key) {
         const p = picked[key];
@@ -744,11 +764,13 @@ __DASH_SECTIONS__
             return name;
         });
         // 지정한 열을 엔진이 읽는 표준 이름으로 바꾼다 (같은 이름의 다른 열은 '(원본)'으로 비켜둔다)
+        const renamed = {};  // 표준 이름 -> 파일의 원래 헤더 (화면 안내용)
         Object.keys(p.map || {}).forEach(std => {
             const idx = p.map[std];
             if (!(idx >= 0) || idx >= width || columns[idx] === std) return;
             const clash = columns.indexOf(std);
             if (clash >= 0) columns[clash] = std + '(원본)';
+            renamed[std] = columns[idx];
             columns[idx] = std;
         });
         const rows = aoa.slice(1).map(row => columns.map((_, i) => {
@@ -758,7 +780,7 @@ __DASH_SECTIONS__
             if (typeof v === 'string') { const t = v.replace(/ /g, ' '); return t.trim() === '' ? null : t; }
             return v;
         }));
-        return { columns, rows };
+        return { columns, rows, renamed };
     }
     function pickColumns(table, wanted) {
         const idx = wanted.map(c => table.columns.indexOf(c)).filter(i => i >= 0);
