@@ -1,1188 +1,11 @@
-import html
-import json
-import math
-import random
-import string
-import calendar
-from datetime import datetime
-
-import pandas as pd
-
-from .analytics import (
-    build_dashboard, build_table, build_cancel_dashboard, build_eda_stats,
-    find_unregistered_high_value_cancellations, build_progress_matrix, PROGRESS_TYPES,
-    build_progress_type_charts, build_branch_insights, build_sp_rep_performance,
-    build_sp_pending_contact_list, build_recontract_target_analysis, kakao_map_link,
-    build_zone_activity, ZONE_LABELS, ZONE_SP_MODES, ZONE_SP_MODE_ORDER, _fmt_compact_won,
-)
-from .handlers import HQ_ORDER, BRANCH_ORDER, build_zone_owner_map
-from .matching_config import (
-    MATCHABLE_FILES, FILE_LABELS, DB_KEY_CANDIDATES, FILE_KEY_CANDIDATES,
-    FILE_DISPLAY_COLUMNS, load_matching_config,
-)
-
-# ---------------------------------------------------------------------------
-# Small helpers
-# ---------------------------------------------------------------------------
-
-# A second, separate password that unlocks the admin-only matching-config
-# panel on top of normal viewing access (entering this instead of the viewer
-# password grants both). Keeps 매칭설정 restricted the same way the Streamlit
-# app restricts it to the 'admin' role -- see app/main.py render_matching_admin().
-DEFAULT_ADMIN_PASSWORD = "0303"
-
-
-def generate_random_password(length=5):
-    """Generates a random English letter password (kept for callers that
-    explicitly want a one-off random password instead of the fixed default)."""
-    letters = string.ascii_letters
-    return ''.join(random.choice(letters) for i in range(length))
-
-
-def get_end_of_month_iso():
-    """Returns the end of the current month in ISO format (YYYY-MM-DD)."""
-    now = datetime.now()
-    last_day = calendar.monthrange(now.year, now.month)[1]
-    return f"{now.year}-{now.month:02d}-{last_day:02d}"
-
-
-def _e(value):
-    """HTML-escapes any value for safe interpolation into markup."""
-    return html.escape(str(value), quote=True)
-
-
-def _fmt_value(value, unit):
-    if unit == '원':
-        return f"{value:,.0f}원"
-    return f"{value:,.0f}{unit}"
-
-
-# Categorical slots (light / dark) -- from the validated reference palette.
-SERIES_SLOTS = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8']
-
-# Fixed label -> role bindings so a status color always means the same thing
-# and a category never gets recolored when the underlying counts change.
-STATUS_ROLE_MAP = {
-    '처리완료': 'good', '방어성공': 'good', '자동재계약': 'good',
-    '접수': 'warning', '진행중': 'warning', '수동재계약': 'warning',
-    '미접수': 'critical', '방어실패': 'critical', '재계약 없음': 'critical',
-    '미상': 'muted', '기타': 'muted',
-}
-
-
-# ---------------------------------------------------------------------------
-# Chart rendering (plain HTML/CSS bars -- no chart library dependency)
-# ---------------------------------------------------------------------------
-
-def render_stat_tiles(kpis):
-    tiles = []
-    for k in kpis:
-        tiles.append(f"""
-        <div class="stat-tile">
-            <div class="stat-label">{_e(k['label'])}</div>
-            <div class="stat-value">{_e(k['value'])}</div>
-            <div class="stat-sub">{_e(k['sub'])}</div>
-        </div>""")
-    return "".join(tiles)
-
-
-def _color_role_for(label, index, mode):
-    if mode == 'status':
-        return f"role-{STATUS_ROLE_MAP.get(label, 'muted')}"
-    if label in ('미상', '기타'):
-        return "role-muted"
-    return f"role-{SERIES_SLOTS[index % len(SERIES_SLOTS)]}"
-
-
-def render_magnitude_chart(chart, chart_id):
-    """Single-hue horizontal bar list -- for comparing magnitudes (one series)."""
-    items = [it for it in chart['items'] if it['value'] is not None]
-    # A chart with at most one non-zero bar carries no comparison -- the KPI
-    # tiles already say the number; skip rather than ship a one-bar chart.
-    if len([it for it in items if it['value'] > 0]) < 2:
-        return ""
-    max_val = max((it['value'] for it in items), default=0) or 1
-    unit = chart['unit']
-
-    rows = []
-    for it in items:
-        pct = max(0.0, min(100.0, it['value'] / max_val * 100))
-        rows.append(f"""
-        <div class="bar-row" tabindex="0" title="{_e(it['label'])}: {_e(_fmt_value(it['value'], unit))}">
-            <span class="bar-row-label">{_e(it['label'])}</span>
-            <div class="bar-row-track">
-                <div class="bar-row-fill role-s1" style="width:{pct:.2f}%"></div>
-            </div>
-            <span class="bar-row-value">{_e(_fmt_value(it['value'], unit))}</span>
-        </div>""")
-
-    return f"""
-    <section class="chart-card" id="{chart_id}">
-        <h3 class="chart-title">{_e(chart['title'])}</h3>
-        <div class="bar-list">{"".join(rows)}</div>
-    </section>"""
-
-
-def render_stacked_chart(chart, chart_id, mode='categorical'):
-    """One segmented bar (part-to-whole) + legend -- for a small set of categories."""
-    items = [it for it in chart['items'] if it['value'] is not None]
-    total = sum(it['value'] for it in items)
-    if not items or total == 0:
-        return ""
-
-    segments = []
-    legend = []
-    for i, it in enumerate(items):
-        pct = it['value'] / total * 100
-        role = _color_role_for(it['label'], i, mode)
-        segments.append(
-            f'<div class="stack-seg {role}" style="width:{pct:.2f}%" '
-            f'tabindex="0" title="{_e(it["label"])}: {_e(_fmt_value(it["value"], chart["unit"]))} ({pct:.1f}%)"></div>'
-        )
-        legend.append(f"""
-        <div class="legend-item">
-            <span class="legend-swatch {role}"></span>
-            <span class="legend-label">{_e(it['label'])}</span>
-            <span class="legend-value">{_e(_fmt_value(it['value'], chart['unit']))} ({pct:.1f}%)</span>
-        </div>""")
-
-    note = chart.get('note')
-    note_html = f'<p class="chart-note">{_e(note)}</p>' if note else ""
-
-    return f"""
-    <section class="chart-card" id="{chart_id}">
-        <h3 class="chart-title">{_e(chart['title'])}</h3>
-        {note_html}
-        <div class="stack-bar">{"".join(segments)}</div>
-        <div class="legend-grid">{"".join(legend)}</div>
-    </section>"""
-
-
-MAIN_CHART_SPECS = [
-    ('hq_count_chart', 'magnitude'),
-    ('branch_count_chart', 'magnitude'),
-    ('branch_amount_chart', 'magnitude'),
-    ('activity_type_chart', 'categorical'),
-    ('activity_status_chart', 'status'),
-    ('recontract_chart', 'categorical'),
-    ('voc_type_chart', 'magnitude'),
-    ('patrol_result_chart', 'magnitude'),
-    ('expiry_chart', 'magnitude'),
-]
-
-CANCEL_CHART_SPECS = [
-    ('cancel_hq_chart', 'magnitude'),
-    ('cancel_defense_chart', 'status'),
-    ('cancel_risk_chart', 'magnitude'),
-    ('cancel_issue_chart', 'magnitude'),
-    ('cancel_reason_chart', 'magnitude'),
-    ('cancel_recontract_chart', 'categorical'),
-]
-
-
-def render_chart_grid(dashboard, specs):
-    parts = []
-    for key, mode in specs:
-        chart = dashboard.get(key)
-        if not chart or not chart.get('items'):
-            continue
-        if mode == 'magnitude':
-            parts.append(render_magnitude_chart(chart, key))
-        else:
-            parts.append(render_stacked_chart(chart, key, mode=mode))
-    return "".join(parts)
-
-
-# ---------------------------------------------------------------------------
-# Table rendering
-# ---------------------------------------------------------------------------
-
-def render_table(columns, rows, filterable=True):
-    branch_idx = columns.index('지사') if '지사' in columns else None
-    type_idx = columns.index('구분') if '구분' in columns else None
-
-    thead = "".join(f"<th>{_e(c)}</th>" for c in columns)
-
-    body_rows = []
-    for r in rows:
-        attrs = ""
-        if filterable and branch_idx is not None:
-            attrs += f' data-branch="{_e(r.get("지사") or "")}"'
-        if filterable and type_idx is not None:
-            attrs += f' data-type="{_e(r.get("구분") or "")}"'
-        cells = []
-        for c in columns:
-            v = r.get(c)
-            if v is None:
-                cells.append("<td class=\"cell-empty\">-</td>")
-            elif c in ('월정산금액', '월정료'):
-                cells.append(f'<td class="cell-num">{v:,.0f}</td>')
-            else:
-                cells.append(f"<td>{_e(v)}</td>")
-        body_rows.append(f"<tr{attrs}>{''.join(cells)}</tr>")
-
-    table_html = f"""
-    <div class="table-scroll">
-        <table id="dataTable">
-            <thead><tr>{thead}</tr></thead>
-            <tbody>{"".join(body_rows)}</tbody>
-        </table>
-    </div>"""
-
-    if not filterable:
-        return table_html
-
-    branches = sorted({r.get('지사') for r in rows if r.get('지사')})
-    types = sorted({r.get('구분') for r in rows if r.get('구분')})
-    branch_options = "".join(f'<option value="{_e(b)}">{_e(b)}</option>' for b in branches)
-    type_options = "".join(f'<option value="{_e(t)}">{_e(t)}</option>' for t in types)
-
-    toolbar = f"""
-    <div class="table-toolbar">
-        <input type="text" id="tableSearch" class="filter-input" placeholder="상호/계약번호/담당자 검색">
-        <select id="branchFilter" class="filter-select">
-            <option value="">전체 지사</option>
-            {branch_options}
-        </select>
-        <select id="typeFilter" class="filter-select">
-            <option value="">전체 구분</option>
-            {type_options}
-        </select>
-        <span id="rowCount" class="row-count"></span>
-    </div>"""
-
-    return toolbar + table_html
-
-
-def render_simple_table(columns, rows):
-    thead = "".join(f"<th>{_e(c)}</th>" for c in columns)
-    body_rows = []
-    for r in rows:
-        cells = []
-        for c in columns:
-            v = r.get(c)
-            if v is None:
-                cells.append("<td class=\"cell-empty\">-</td>")
-            elif c in ('월정료', '월정산금액'):
-                cells.append(f'<td class="cell-num">{v:,.0f}</td>')
-            else:
-                cells.append(f"<td>{_e(v)}</td>")
-        body_rows.append(f"<tr>{''.join(cells)}</tr>")
-    return f"""
-    <div class="table-scroll">
-        <table>
-            <thead><tr>{thead}</tr></thead>
-            <tbody>{"".join(body_rows)}</tbody>
-        </table>
-    </div>"""
-
-
-# ---------------------------------------------------------------------------
-# 지사 x 활동대상구분(SP/SE/SG) 진척율 매트릭스 -- 총괄DB 원본 컬럼만으로
-# 계산되는, 매칭 설정과 무관한 지표. 진척율은 색상 강도(sequential blue)로
-# 인코딩한다 -- 값이 클수록 진하게, 값 자체는 셀 안에 항상 직접 라벨링.
-# ---------------------------------------------------------------------------
-
-def _progress_cell_style(pct):
-    """진척율을 상태색(위험/주의/양호)으로 인코딩한다 -- 값이 높을수록 진해
-    지는 단색 그라데이션 대신, 부진 지사(낮은 진척율)가 즉시 눈에 띄도록
-    빨간 톤을 쓴다. 부진은 강하게(55%), 양호는 옅게(22%) 칠해서 '나쁜 것'
-    쪽으로 시선이 먼저 가게 한 것도 의도적이다."""
-    pct = max(0.0, min(100.0, pct))
-    if pct < 30:
-        var_name, opacity, text_role = '--critical', 55, 'progress-text-light'
-    elif pct < 55:
-        var_name, opacity, text_role = '--warning', 38, 'progress-text-dark'
-    else:
-        var_name, opacity, text_role = '--good', 22, 'progress-text-dark'
-    return f'background: color-mix(in srgb, var({var_name}) {opacity}%, var(--surface-1));', text_role
-
-
-def render_progress_matrix(matrix):
-    if matrix is None:
-        return ""
-
-    # SP is tracked with an explicit 접수/미접수 split (no unlogged rows);
-    # SE/SG only ever carry 처리완료 vs unlogged, so they get the simpler
-    # 처리완료/미처리 pair. 전체 rolls back up to that simpler pair too.
-    group_header = "<th rowspan=\"2\">지사</th>"
-    group_header += '<th colspan="5" class="progress-group-th">SP</th>'
-    for t in ['SE', 'SG']:
-        group_header += f'<th colspan="4" class="progress-group-th">{_e(t)}</th>'
-    group_header += '<th colspan="5" class="progress-group-th">전체</th>'
-
-    sub_header = "<th>처리완료</th><th>접수</th><th>미접수</th><th>계</th><th>진척율</th>"
-    for _ in ['SE', 'SG']:
-        sub_header += "<th>처리완료</th><th>미처리</th><th>계</th><th>진척율</th>"
-    sub_header += "<th>처리완료</th><th>미처리</th><th>계</th><th>진척율</th><th>순위</th>"
-
-    def render_row(row, is_total=False):
-        cells = [f'<td class="progress-branch{" progress-total-label" if is_total else ""}">{_e(row["지사"])}</td>']
-
-        sp = row['SP']
-        style, text_role = _progress_cell_style(sp['진척율'])
-        cells.append(f'<td class="cell-num">{sp["처리완료"]:,}</td>')
-        cells.append(f'<td class="cell-num">{sp["접수"]:,}</td>')
-        cells.append(f'<td class="cell-num">{sp["미접수"]:,}</td>')
-        cells.append(f'<td class="cell-num">{sp["계"]:,}</td>')
-        cells.append(f'<td class="cell-num progress-cell {text_role}" style="{style}">{sp["진척율"]:.1f}%</td>')
-
-        for t in ['SE', 'SG', '전체']:
-            cell = row[t]
-            style, text_role = _progress_cell_style(cell['진척율'])
-            cells.append(f'<td class="cell-num">{cell["처리완료"]:,}</td>')
-            cells.append(f'<td class="cell-num">{cell["미처리"]:,}</td>')
-            cells.append(f'<td class="cell-num">{cell["계"]:,}</td>')
-            cells.append(
-                f'<td class="cell-num progress-cell {text_role}" style="{style}">{cell["진척율"]:.1f}%</td>'
-            )
-        if not is_total:
-            cells.append(f'<td class="cell-num progress-rank">{row["순위"]}</td>')
-        else:
-            cells.append('<td class="cell-num">-</td>')
-        row_attrs = ' class="progress-total-row"' if is_total else ''
-        return f'<tr{row_attrs}>{"".join(cells)}</tr>'
-
-    body_rows = [render_row(r) for r in matrix['branch_rows']]
-    body_rows.append(render_row(matrix['total_row'], is_total=True))
-
-    type_summary = " · ".join(f"{t} {matrix['type_totals'][t]:,}건" for t in PROGRESS_TYPES)
-
-    return f"""
-    <p class="section-desc">활동대상구분 기준 이번 달 대상 건수 -- {type_summary}</p>
-    <div class="table-scroll progress-table-scroll">
-        <table class="progress-table">
-            <thead>
-                <tr>{group_header}</tr>
-                <tr>{sub_header}</tr>
-            </thead>
-            <tbody>{"".join(body_rows)}</tbody>
-        </table>
-    </div>"""
-
-
-PROGRESS_SERIES_ROLE = {'SP': 'role-s3', 'SE': 'role-s2', 'SG': 'role-s1'}
-
-
-def render_progress_bar_chart(matrix):
-    if matrix is None or not matrix['branch_rows']:
-        return ""
-
-    legend = "".join(
-        f'<div class="legend-item"><span class="legend-swatch {PROGRESS_SERIES_ROLE[t]}"></span>'
-        f'<span class="legend-label">{_e(t)}</span></div>'
-        for t in PROGRESS_TYPES
-    )
-
-    groups = []
-    for row in matrix['branch_rows']:
-        bars = ""
-        for t in PROGRESS_TYPES:
-            pct = row[t]['진척율']
-            bars += (
-                f'<div class="progress-chart-bar {PROGRESS_SERIES_ROLE[t]}" style="height:{max(pct,1):.1f}%" '
-                f'tabindex="0" title="{_e(row["지사"])} {_e(t)}: {pct:.1f}%"></div>'
-            )
-        groups.append(f"""
-        <div class="progress-chart-group">
-            <div class="progress-chart-bars">{bars}</div>
-            <span class="progress-chart-label">{_e(row['지사'])}</span>
-        </div>""")
-
-    return f"""
-    <div class="legend-grid progress-chart-legend">{legend}</div>
-    <div class="progress-chart">{"".join(groups)}</div>"""
-
-
-def render_progress_type_chart(chart, role, chart_id):
-    """One SP/SE/SG chart-card: branches ranked by 진척율 descending -- reads
-    like a leaderboard, easier to scan than picking one column out of the
-    14-column combined table below."""
-    items = chart['items']
-    if not items:
-        return ""
-    rows = []
-    for it in items:
-        pct = max(0.0, min(100.0, it['value']))
-        rows.append(f"""
-        <div class="bar-row" tabindex="0" title="{_e(it['label'])}: {it['value']:.1f}% ({_e(it['sub'])})">
-            <span class="bar-row-label">{_e(it['label'])}</span>
-            <div class="bar-row-track">
-                <div class="bar-row-fill {role}" style="width:{pct:.2f}%"></div>
-            </div>
-            <span class="bar-row-value">{it['value']:.1f}% <span class="chart-note" style="display:inline;margin:0;">({_e(it['sub'])})</span></span>
-        </div>""")
-    return f"""
-    <section class="chart-card" id="{chart_id}">
-        <h3 class="chart-title">{_e(chart['title'])}</h3>
-        <div class="bar-list">{"".join(rows)}</div>
-    </section>"""
-
-
-def _bar_row_html(it, role):
-    pct = max(0.0, min(100.0, it['value']))
-    return f"""
-    <div class="bar-row" tabindex="0" title="{_e(it['label'])}: {it['value']:.1f}% ({_e(it['sub'])})">
-        <span class="bar-row-label">{_e(it['label'])}</span>
-        <div class="bar-row-track">
-            <div class="bar-row-fill {role}" style="width:{pct:.2f}%"></div>
-        </div>
-        <span class="bar-row-value">{it['value']:.1f}% <span class="chart-note" style="display:inline;margin:0;">({_e(it['sub'])})</span></span>
-    </div>"""
-
-
-def render_grouped_bar_chart(title, groups, role, chart_id):
-    """Like render_progress_type_chart, but items arrive pre-grouped (e.g. by
-    지사) with a header row between groups -- shows a 지사 -> 담당자
-    hierarchy inside one scrollable chart-card instead of a flat list."""
-    groups = [g for g in groups if g['items']]
-    if not groups:
-        return ""
-    parts = []
-    for g in groups:
-        parts.append(
-            f'<div class="bar-group-header"><span>{_e(g["label"])}</span>'
-            f'<span class="bar-group-count">{len(g["items"])}명</span></div>'
-        )
-        parts.extend(_bar_row_html(it, role) for it in g['items'])
-    return f"""
-    <section class="chart-card" id="{chart_id}">
-        <h3 class="chart-title">{_e(title)}</h3>
-        <div class="bar-list">{"".join(parts)}</div>
-    </section>"""
-
-
-def render_progress_type_dashboard(charts):
-    """SP/SE/SG 담당유형별 대시보드 -- 세 개의 독립된 리더보드 카드로 구성."""
-    if charts is None:
-        return ""
-    parts = [render_progress_type_chart(charts[t], PROGRESS_SERIES_ROLE[t], f'progressType{t}Chart') for t in PROGRESS_TYPES]
-    parts = [p for p in parts if p]
-    if not parts:
-        return ""
-    return f'<div class="chart-grid">{"".join(parts)}</div>'
-
-
-# 구역별 활동유무 -- SP는 처리완료/접수/미접수, SE/SG는 처리완료/미처리로
-# 나눠 누적 막대로 그린다. 막대 길이는 가장 큰 구역의 대상 건수 대비라서
-# 구역 간 물량 차이도 함께 보인다.
-ZONE_SEGMENTS = {
-    'SP': [('처리완료', 'role-good'), ('접수', 'role-warning'), ('미접수', 'role-critical')],
-    'SE': [('처리완료', 'role-good'), ('미처리', 'role-critical')],
-    'SG': [('처리완료', 'role-good'), ('미처리', 'role-critical')],
-}
-ZONE_SEGMENT_LABELS = {'접수': '미처리(접수)'}
-
-
-def _zone_table_columns(t):
-    if t == 'SP':
-        return ['대상', '처리완료', '접수', '미접수', '처리율']
-    return ['대상', '처리완료', '미처리', '처리율']
-
-
-def _zone_card_html(t, data):
-    rows = data['rows']
-    total = data['total']
-    max_total = max((r['대상'] for r in rows), default=0) or 1
-    segments = ZONE_SEGMENTS[t]
-
-    legend = "".join(
-        f'<div class="legend-item"><span class="legend-swatch {role}"></span>'
-        f'<span class="legend-label">{_e(ZONE_SEGMENT_LABELS.get(key, key))}</span></div>'
-        for key, role in segments
-    )
-
-    bar_rows = []
-    for r in rows:
-        segs = ""
-        for key, role in segments:
-            if not r[key]:
-                continue
-            pct = r[key] / max_total * 100
-            text = f"{r[key]:,}"
-            segs += (f'<div class="zone-seg {role}" style="width:{pct:.2f}%">'
-                     f'<span class="zl{min(len(text), 5)}">{text}</span></div>')
-        tip = " · ".join(f"{ZONE_SEGMENT_LABELS.get(k, k)} {r[k]:,}" for k, _ in segments)
-        bar_rows.append(f"""
-        <div class="zone-row" tabindex="0" title="{_e(r['라벨'])}: 대상 {r['대상']:,}건 · {_e(tip)} · 처리율 {r['처리율']:.1f}%">
-            <span class="bar-row-label">{_e(r['라벨'])}</span>
-            <div class="zone-track">{segs}</div>
-            <span class="bar-row-value">{r['처리율']:.1f}% <span class="zone-sub">({r['처리완료']:,}/{r['대상']:,}건)</span></span>
-        </div>""")
-
-    mode = data.get('mode')
-    if mode:
-        _, group_title, head_label = ZONE_SP_MODES[mode]
-        count_label = f"{len(rows):,}" + {'owner': '명', 'zone': '개 구역'}.get(mode, '개 그룹')
-    else:
-        group_title, head_label = f"{ZONE_LABELS[t]}별", f"지사_{ZONE_LABELS[t]}"
-        count_label = f"{len(rows):,}개 구역"
-    mode_pills = ""
-    if mode:
-        mode_pills = '<div class="filter-pill-row zone-mode-row">' + "".join(
-            f'<button type="button" class="filter-pill{" active" if m == mode else ""}" data-zone-mode="{m}">'
-            f'{_e(ZONE_SP_MODES[m][2])}</button>'
-            for m in ZONE_SP_MODE_ORDER
-        ) + '</div>'
-
-    columns = _zone_table_columns(t)
-    head = f"<th>{_e(head_label)}</th>" + "".join(
-        f"<th>{_e(ZONE_SEGMENT_LABELS.get(c, c))}</th>" for c in columns
-    )
-
-    def table_row(label, r, is_total=False):
-        cells = [f'<td class="progress-branch{" progress-total-label" if is_total else ""}">{_e(label)}</td>']
-        for c in columns:
-            if c == '처리율':
-                style, text_role = _progress_cell_style(r[c])
-                cells.append(f'<td class="cell-num progress-cell {text_role}" style="{style}">{r[c]:.1f}%</td>')
-            else:
-                cells.append(f'<td class="cell-num">{r[c]:,}</td>')
-        attrs = ' class="progress-total-row"' if is_total else ''
-        return f'<tr{attrs}>{"".join(cells)}</tr>'
-
-    body = "".join(table_row(r['라벨'], r) for r in rows) + table_row('계', total, is_total=True)
-
-    summary = f"대상 {total['대상']:,}건 · 처리완료 {total['처리완료']:,}건 · "
-    if t == 'SP':
-        summary += f"미처리(접수) {total['접수']:,}건 · 미접수 {total['미접수']:,}건 · "
-    else:
-        summary += f"미처리 {total['미처리']:,}건 · "
-    summary += f"처리율 {total['처리율']:.1f}%"
-
-    return f"""
-    <section class="chart-card zone-card" id="zoneActivity{t}" data-mode="{_e(mode or 'zone')}">
-        <h3 class="chart-title">{_e(t)} {_e(group_title)} 활동유무 <span class="zone-sub">({_e(data['zone_col'])} 기준, {count_label}, 지사순)</span></h3>
-        {mode_pills}
-        <p class="chart-note">{_e(summary)}</p>
-        <div class="legend-grid zone-legend">{legend}</div>
-        <div class="zone-list">{"".join(bar_rows)}</div>
-        <details class="zone-table-toggle">
-            <summary>{_e(group_title)} 건수 표 보기</summary>
-            <div class="table-scroll"><table class="progress-table">
-                <thead><tr>{head}</tr></thead>
-                <tbody>{body}</tbody>
-            </table></div>
-        </details>
-    </section>"""
-
-
-def render_zone_activity_section(zone_data):
-    if not zone_data:
-        return ('<div class="empty-card">구역별로 집계할 데이터가 없습니다 '
-                '(영업구역정보/기술구역정보/구역정보 컬럼을 찾지 못했습니다).</div>')
-    return "".join(_zone_card_html(t, zone_data[t]) for t in PROGRESS_TYPES if t in zone_data)
-
-
-def render_branch_insights(insights, section_id="progressInsight"):
-    """지사별 분석리포트 요약 -- 최고/최저(전체) + 유형별 최저 지사를 짧은
-    콜아웃 카드로. 숫자 표를 다시 읽지 않아도 핵심을 바로 파악하게 한다."""
-    if insights is None:
-        return f'<div class="empty-card" id="{section_id}">진척율을 계산할 데이터가 없습니다.</div>'
-
-    def card(label, d, css_cls):
-        return f"""
-        <div class="callout {css_cls}">
-            <span class="insight-label">{_e(label)}</span>
-            <span class="insight-value"><strong>{_e(d['지사'])}</strong> -- {d['진척율']:.1f}% ({d['처리완료']:,}/{d['계']:,}건)</span>
-        </div>"""
-
-    cards = [
-        card("전체 진척율 최고 지사", insights['best'], 'callout-good'),
-        card("전체 진척율 최저 지사 (집중관리 필요)", insights['worst'], 'callout-warning'),
-    ]
-    type_labels = {'SP': 'SP 진척율 최저 지사', 'SE': 'SE 진척율 최저 지사', 'SG': 'SG 진척율 최저 지사'}
-    for t in PROGRESS_TYPES:
-        if t in insights['type_worst']:
-            cards.append(card(type_labels[t], insights['type_worst'][t], 'callout-warning'))
-
-    return f"""
-    <p class="section-desc" id="{section_id}Note">전사 평균 진척율 {insights['avg_pct']:.1f}% 기준 요약입니다.</p>
-    <div class="insight-grid" id="{section_id}">{"".join(cards)}</div>"""
-
-
-def render_sp_rep_section(sp_perf, section_id="spRepSection"):
-    """SP 부진자 추가분석 -- 지사가 아닌 총괄DB 'SP담당' 컬럼(개인 담당자)
-    기준. 표본이 작은 담당자(min_count 미만)를 부진자 판정에서 제외하는
-    이유는 build_sp_rep_performance()의 docstring 참고."""
-    if sp_perf is None:
-        return ""
-    if not sp_perf['reps']:
-        return f'<div class="empty-card" id="{section_id}">SP 활동 데이터가 없어 담당자별 분석을 표시할 수 없습니다.</div>'
-
-    groups = []
-    for r in sp_perf['chart_reps']:
-        label = r['지사'] or '미상'
-        if not groups or groups[-1]['label'] != label:
-            groups.append({"label": label, "items": []})
-        groups[-1]['items'].append({
-            "label": r['담당자'],
-            "value": r['진척율'],
-            "sub": f"{r['처리완료']:,}/{r['계']:,}건" + (f" · {r['영업구역']}" if r['영업구역'] else ""),
-        })
-    if not groups:
-        chart_html = '<div class="empty-card">100% 달성자를 제외하면 표시할 담당자가 없습니다 (강북/강원본부 SP 전원 100% 달성).</div>'
-    else:
-        chart_html = render_grouped_bar_chart(
-            "SP 담당자별 진척율 (강북/강원본부, 100% 달성자 제외, 지사·담당자순)",
-            groups, PROGRESS_SERIES_ROLE['SP'], f'{section_id}Chart',
-        )
-
-    note = (
-        f"SP 담당자 전체 평균 진척율 {sp_perf['avg_pct']:.1f}% 기준, "
-        f"최소 {sp_perf['min_count']}건 이상 처리한 담당자 중 평균 미달 인원은 "
-        f"<strong>{sp_perf['underperformer_count']}명</strong>입니다."
-    )
-
-    if not sp_perf['underperformers']:
-        table_html = '<div class="empty-card">평균 미달 담당자가 없습니다.</div>'
-    else:
-        columns = ['담당자', '지사', '영업구역', '처리완료', '접수', '미접수', '계', '진척율']
-        rows = [
-            {
-                '담당자': r['담당자'], '지사': r['지사'] or '-', '영업구역': r['영업구역'] or '-',
-                '처리완료': f"{r['처리완료']:,}", '접수': f"{r['접수']:,}",
-                '미접수': f"{r['미접수']:,}", '계': f"{r['계']:,}",
-                '진척율': f"{r['진척율']:.1f}%",
-            }
-            for r in sp_perf['underperformers']
-        ]
-        table_html = render_simple_table(columns, rows)
-
-    return f"""
-    <p class="section-desc">{note}</p>
-    <div class="chart-grid" id="{section_id}ChartWrap">{chart_html}</div>
-    <div class="table-section" id="{section_id}TableWrap">{table_html}</div>"""
-
-
-def _pending_rep_card_html(rep, idx, section_id):
-    text_id = f'{section_id}Text{idx}'
-    rows = []
-    for it in rep['items']:
-        status_cls = 'status-' + it['상태'] if it['상태'] else ''
-        amount_str = f"{it['월정료']:,.0f}원" if it['월정료'] is not None else '-'
-        map_link = (
-            f'<a class="pending-map-link" href="{_e(it["지도링크"])}" target="_blank" rel="noopener">🗺 지도</a>'
-            if it.get('지도링크') else '<span class="pending-map-link disabled">🗺 지도</span>'
-        )
-        rows.append(f"""
-        <div class="pending-detail-row">
-            <span class="pending-status {status_cls}">{_e(it['상태'])}</span>
-            <span>{_e(it['계약번호'] if it['계약번호'] is not None else '-')} · {_e(it['상호'] or '-')}</span>
-            <span class="cell-num">{_e(amount_str)}</span>
-            {map_link}
-        </div>""")
-
-    return f"""
-    <div class="pending-rep-card">
-        <div class="pending-rep-header">
-            <span class="pending-rep-title">{_e(rep['담당자'])}</span>
-            <span class="pending-rep-counts">미접수 {rep['미접수_count']:,} · 접수 {rep['접수_count']:,} · 계 {rep['count']:,}건</span>
-            <button class="ghost-btn small" type="button" onclick="copyPendingText('{text_id}', this)">📋 복사 (메일/문자용)</button>
-        </div>
-        <pre class="copy-block" id="{text_id}">{_e(rep['text'])}</pre>
-        <div class="pending-detail-list">{"".join(rows)}</div>
-    </div>"""
-
-
-def render_sp_pending_section(pending, section_id="spPendingSection"):
-    """미접수/접수 상태인 SP 건을 담당자별로 묶어 메일/문자 발송용 텍스트
-    (계약번호/상호/월정료)를 만든다. 설치주소가 있으면 카카오맵 검색 링크도
-    붙여 담당자가 바로 찾아갈 수 있게 한다 (지도 API 키 없이 동작 -- 위젯을
-    임베드하는 대신 카카오맵 자체 검색으로 넘기는 방식)."""
-    if pending is None:
-        return f'<div class="empty-card" id="{section_id}">미접수/접수 상태인 SP 건이 없습니다 (강북/강원본부 기준).</div>'
-
-    cards = [_pending_rep_card_html(rep, i, section_id) for i, rep in enumerate(pending['reps'])]
-    return f"""
-    <p class="section-desc" id="{section_id}Note">
-        강북/강원본부 SP 활동 중 미접수/접수 상태인 <strong>{pending['total_count']:,}건</strong>을 담당자별로 정리했습니다.
-        각 담당자 카드의 '복사' 버튼을 누르면 계약번호/상호/월정료 목록이 클립보드에 복사되어 메일이나 문자에 바로 붙여넣을 수 있습니다.
-    </p>
-    <div id="{section_id}Cards">{"".join(cards)}</div>"""
-
-
-def _recontract_detail_row_html(r):
-    badge_cls = 'recontract-badge-achieved' if r['구분'] == '실적' else 'recontract-badge-focus'
-    badge_label = '실적' if r['구분'] == '실적' else '집중'
-    status_bits = [b for b in [r.get('계약상태'), r.get('만기도래월')] if b and not (isinstance(b, float) and math.isnan(b))]
-    map_link_url = kakao_map_link(r.get('설치주소'))
-    map_link = (
-        f'<a class="pending-map-link" href="{_e(map_link_url)}" target="_blank" rel="noopener">🗺 지도</a>'
-        if map_link_url else '<span class="pending-map-link disabled">🗺 지도</span>'
-    )
-    return f"""
-    <div class="pending-detail-row">
-        <span class="recontract-badge {badge_cls}">{_e(badge_label)}</span>
-        <span>{_e(r['계약번호'] if r['계약번호'] is not None else '-')} · {_e(r['상호'] or '-')} ({_e(' · '.join(str(b) for b in status_bits) or '-')})</span>
-        <span class="cell-num">{_e(r.get('재계약여부') or '-')}</span>
-        {map_link}
-    </div>"""
-
-
-def render_recontract_section(analysis, section_id="recontractSection"):
-    """재계약대상(SP) 분석 -- analytics.py build_recontract_target_analysis()
-    결과를 KPI + 지사별/담당별 리더보드 + 담당자별 상세 리스트(지도 링크 포함)
-    로 렌더링한다."""
-    if analysis is None:
-        return f'<div class="empty-card" id="{section_id}">재계약대상(SP)으로 분류할 데이터가 없습니다 (총괄DB와 관리고객원본이 매칭된 SP 건이 없음).</div>'
-
-    stat_html = render_stat_tiles(analysis['kpis'])
-
-    branch_items = [
-        {"label": r['label'], "value": r['pct'], "sub": f"{r['achieved']:,}/{r['total']:,}건"}
-        for r in analysis['by_branch']
-    ]
-    branch_chart_html = render_progress_type_chart(
-        {"title": "지사별 재계약 실적율", "items": branch_items}, PROGRESS_SERIES_ROLE['SP'], f'{section_id}BranchChart',
-    ) if branch_items else '<div class="empty-card">지사 정보가 없습니다.</div>'
-
-    owner_items_sorted = sorted(analysis['by_owner'], key=lambda r: r['pct'])
-    owner_items = [
-        {"label": r['label'], "value": r['pct'], "sub": f"{r['achieved']:,}/{r['total']:,}건"}
-        for r in owner_items_sorted
-    ]
-    owner_chart_html = render_progress_type_chart(
-        {"title": "담당자별 재계약 실적율 (집중 필요 우선)", "items": owner_items}, PROGRESS_SERIES_ROLE['SP'], f'{section_id}OwnerChart',
-    ) if owner_items else '<div class="empty-card">담당자 정보가 없습니다.</div>'
-
-    groups = []
-    for r in analysis['detail_rows']:
-        owner = r['담당자']
-        if not groups or groups[-1]['owner'] != owner:
-            groups.append({"owner": owner, "rows": []})
-        groups[-1]['rows'].append(r)
-
-    if not groups:
-        list_html = '<div class="empty-card">표시할 재계약대상 건이 없습니다.</div>'
-    else:
-        cards = []
-        for g in groups:
-            achieved_n = sum(1 for r in g['rows'] if r['구분'] == '실적')
-            focus_n = len(g['rows']) - achieved_n
-            rows_html = "".join(_recontract_detail_row_html(r) for r in g['rows'])
-            cards.append(f"""
-            <div class="pending-rep-card">
-                <div class="pending-rep-header">
-                    <span class="pending-rep-title">{_e(g['owner'])}</span>
-                    <span class="pending-rep-counts">실적 {achieved_n:,} · 집중대상 {focus_n:,} · 계 {len(g['rows']):,}건</span>
-                </div>
-                <div class="pending-detail-list">{rows_html}</div>
-            </div>""")
-        list_html = "".join(cards)
-
-    return f"""
-    <p class="section-desc" id="{section_id}Note">
-        총괄DB(SP)와 관리고객원본을 계약번호로 매칭해 계약상태·만기도래월이 확인된 <strong>{analysis['total']:,}건</strong>을 재계약대상으로 삼았습니다.
-        이 중 수동재계약이면서 서비스재개시일이 {analysis['current_year']}년인 <strong>{analysis['achieved_count']:,}건</strong>은 실적,
-        나머지 <strong>{analysis['focus_count']:,}건</strong>은 집중 재계약 활동 대상입니다.
-    </p>
-    <div class="stat-grid" id="{section_id}Stats">{stat_html}</div>
-    <div class="chart-grid" id="{section_id}Charts">{branch_chart_html}{owner_chart_html}</div>
-    <div id="{section_id}List">{list_html}</div>"""
-
-
-# ---------------------------------------------------------------------------
-# Global filter bar (본부/지사/담당자) -- scopes the KPI tiles, chart grid,
-# progress matrix and detail table below it (never the independent 해지
-# 파이프라인 / 넛지 sections). Filtering is applied entirely client-side by
-# the JS engine in APP_SCRIPT_TEMPLATE, on top of whatever the matching
-# admin panel currently produces -- see 'renderAll()' there.
-# ---------------------------------------------------------------------------
-
-def render_global_filter_bar(df):
-    if df is None or df.empty:
-        return ""
-
-    hq_col = '관리본부' if '관리본부' in df.columns else '본부'
-    hq_present = set(df[hq_col].dropna().unique()) if hq_col in df.columns else set()
-    hqs = [h for h in HQ_ORDER if h in hq_present] + sorted(h for h in hq_present if h not in HQ_ORDER)
-
-    branch_col = '관리지사' if '관리지사' in df.columns else '지사'
-    branch_present = set(df[branch_col].dropna().unique()) if branch_col in df.columns else set()
-    branches = [b for b in BRANCH_ORDER if b in branch_present] + sorted(b for b in branch_present if b not in BRANCH_ORDER)
-
-    activity_col = '활동대상구분'
-    activity_present = set(df[activity_col].dropna().unique()) if activity_col in df.columns else set()
-    ACTIVITY_ORDER = ['SP', 'SE', 'SG']
-    activities = [a for a in ACTIVITY_ORDER if a in activity_present] + sorted(a for a in activity_present if a not in ACTIVITY_ORDER)
-
-    owners = sorted(df['SP담당'].dropna().unique().tolist()) if 'SP담당' in df.columns else []
-
-    def pills(dim, values):
-        buttons = [f'<button type="button" class="filter-pill active" data-dim="{dim}" data-value="">전체</button>']
-        for v in values:
-            buttons.append(f'<button type="button" class="filter-pill" data-dim="{dim}" data-value="{_e(v)}">{_e(v)}</button>')
-        return "".join(buttons)
-
-    hq_group = f"""
-        <div class="filter-group">
-            <span class="filter-group-label">본부</span>
-            <div class="filter-pill-row" id="hqFilterRow">{pills('hq', hqs)}</div>
-        </div>""" if hqs else ""
-
-    branch_group = f"""
-        <div class="filter-group">
-            <span class="filter-group-label">지사</span>
-            <div class="filter-pill-row" id="branchFilterRow">{pills('branch', branches)}</div>
-        </div>""" if branches else ""
-
-    activity_group = f"""
-        <div class="filter-group">
-            <span class="filter-group-label">대상구분</span>
-            <div class="filter-pill-row" id="activityFilterRow">{pills('activity', activities)}</div>
-        </div>""" if activities else ""
-
-    owner_options = "".join(f'<option value="{_e(o)}">{_e(o)}</option>' for o in owners)
-    owner_group = f"""
-        <div class="filter-group">
-            <span class="filter-group-label">담당자</span>
-            <select id="ownerFilterSelect" class="filter-select">
-                <option value="">전체 담당자</option>
-                {owner_options}
-            </select>
-        </div>""" if owners else ""
-
-    return f"""
-    <div class="global-filter-bar" id="globalFilterBar">
-        {hq_group}
-        {branch_group}
-        {activity_group}
-        {owner_group}
-        <span class="filter-summary" id="globalFilterSummary"></span>
-    </div>"""
-
-
-# ---------------------------------------------------------------------------
-# 해지 파이프라인 -- independent section (own KPIs/charts/table, never
-# joined onto the 총괄DB-anchored dashboard above).
-# ---------------------------------------------------------------------------
-
-def render_cancel_section(cancel_df, hq_filter='강북/강원'):
-    if cancel_df is None or cancel_df.empty:
-        return f"""
-        <details class="section-collapse" open><summary class="section-title">해지 파이프라인 현황 <span class="badge">독립 데이터 · 강북/강원본부 기준</span></summary>
-        <div class="empty-card">해지 파이프라인 파일이 업로드되지 않았습니다. 업로드 시 총괄DB와 무관하게 별도 섹션으로 표시됩니다.</div>
-        </details>"""
-
-    dash = build_cancel_dashboard(cancel_df, hq_filter=hq_filter)
-    if dash is None:
-        return f"""
-        <details class="section-collapse" open><summary class="section-title">해지 파이프라인 현황 <span class="badge">독립 데이터 · 강북/강원본부 기준</span></summary>
-        <div class="empty-card">해지 파이프라인 데이터 중 강북/강원본부 소속 시설이 없습니다.</div>
-        </details>"""
-
-    stat_html = render_stat_tiles(dash['kpis'])
-    chart_html = render_chart_grid(dash['charts'], CANCEL_CHART_SPECS)
-    table_html = render_simple_table(dash['table_columns'], dash['table_rows'])
-
-    return f"""
-    <details class="section-collapse" open><summary class="section-title">해지 파이프라인 현황 <span class="badge">독립 데이터 · 강북/강원본부 기준</span></summary>
-    <p class="section-desc">총괄DB와 매칭하지 않고 원본 그대로 집계한, 강북/강원본부 소속 해지 파이프라인 현황입니다.</p>
-    <div class="stat-grid">{stat_html}</div>
-    <div class="chart-grid">{chart_html}</div>
-    <div class="table-section">{table_html}</div>
-    </details>"""
-
-
-# ---------------------------------------------------------------------------
-# 확장: 고액 미등록 해지 알림 -- '해지시설내역' 업로드가 있을 때만 활성화.
-# ---------------------------------------------------------------------------
-
-def render_nudge_section(cancelled_facility_df, cancel_df, threshold=100_000):
-    nudge = find_unregistered_high_value_cancellations(cancelled_facility_df, cancel_df, threshold=threshold)
-
-    if nudge is None:
-        return f"""
-        <details class="section-collapse" open><summary class="section-title">고액 해지 미등록 알림 <span class="badge badge-soon">확장 예정</span></summary>
-        <div class="empty-card">
-            '해지시설 내역' 파일을 업로드하면, 월정료 {threshold:,}원 이상인데 해지 파이프라인에
-            등록되지 않은 계약을 자동으로 찾아 등록을 독려하는 알림이 여기에 표시됩니다.
-        </div>
-        </details>"""
-
-    if not nudge.get('active'):
-        return f"""
-        <details class="section-collapse" open><summary class="section-title">고액 해지 미등록 알림</summary>
-        <div class="empty-card">{_e(nudge.get('reason', '컬럼을 확인할 수 없습니다.'))}</div>
-        </details>"""
-
-    if nudge['count'] == 0:
-        return f"""
-        <details class="section-collapse" open><summary class="section-title">고액 해지 미등록 알림</summary>
-        <div class="empty-card">
-            월정료 {threshold:,}원 이상 해지 건 {nudge['total_high_value']:,}건 모두 해지 파이프라인에 등록되어 있습니다.
-        </div>
-        </details>"""
-
-    columns = nudge.get('columns') or ['계약번호', '고객상호', '본부', '지사', '월정료']
-    table_html = _nudge_table_html(columns, nudge['rows'])
-    filter_html = _nudge_status_filter_html(nudge.get('status_values') or [])
-    branch_summary_html = _nudge_branch_summary_html(nudge.get('by_branch') or [])
-    charts_html = _nudge_charts_html(nudge.get('by_branch') or [], nudge['rows'])
-
-    return f"""
-    <details class="section-collapse" open><summary class="section-title">고액 해지 미등록 알림</summary>
-    <div class="callout callout-warning">
-        월정료 {threshold:,}원 이상 해지 건 {nudge['total_high_value']:,}건 중
-        <strong>{nudge['count']:,}건({_fmt_won(nudge['amount_sum'])})이 해지 파이프라인에 미등록</strong> 상태입니다.
-        아래 목록을 해지 파이프라인에 등록하도록 담당자에게 독려하세요.
-    </div>
-    {charts_html}
-    {filter_html}
-    <div class="stat-grid" id="nudgeBranchSummary">{branch_summary_html}</div>
-    <div class="table-section">{table_html}</div>
-    </details>"""
-
-
-def _fmt_won(v):
-    return f"{v:,.0f}원"
-
-
-def _nudge_table_html(columns, rows):
-    """Like render_simple_table, but each <tr> also carries data-status/
-    data-branch/data-amount so applyNudgeFilter() (vanilla JS, no server
-    round-trip) can filter by 계약상태(중) and recompute the 지사별 요약
-    tiles above it without needing this section wired into the big
-    filter/recompute engine the rest of the report uses."""
-    thead = "".join(f"<th>{_e(c)}</th>" for c in columns)
-    body_rows = []
-    for r in rows:
-        status = r.get('계약상태(중)') or ''
-        branch = r.get('지사') or ''
-        amount = r.get('월정료')
-        attrs = f' data-status="{_e(status)}" data-branch="{_e(branch)}" data-amount="{amount if amount is not None else 0}"'
-        cells = []
-        for c in columns:
-            v = r.get(c)
-            if v is None:
-                cells.append('<td class="cell-empty">-</td>')
-            elif c == '월정료':
-                cells.append(f'<td class="cell-num">{v:,.0f}</td>')
-            else:
-                cells.append(f"<td>{_e(v)}</td>")
-        body_rows.append(f"<tr{attrs}>{''.join(cells)}</tr>")
-    return f"""
-    <div class="table-scroll">
-        <table id="nudgeTable">
-            <thead><tr>{thead}</tr></thead>
-            <tbody>{"".join(body_rows)}</tbody>
-        </table>
-    </div>"""
-
-
-def _nudge_status_filter_html(status_values):
-    if not status_values:
-        return ""
-    buttons = ['<button class="filter-pill active" type="button" data-value="">전체</button>']
-    for v in status_values:
-        buttons.append(f'<button class="filter-pill" type="button" data-value="{_e(v)}">{_e(v)}</button>')
-    return f'<div class="filter-pill-row" id="nudgeStatusFilterRow">{"".join(buttons)}</div>'
-
-
-def _nudge_branch_summary_html(by_branch):
-    tiles = []
-    for r in by_branch:
-        tiles.append(f"""
-        <div class="stat-tile">
-            <div class="stat-label">{_e(r['지사'])}</div>
-            <div class="stat-value">{r['건수']:,}건</div>
-            <div class="stat-sub">{r['월정료합계']:,}원</div>
-        </div>""")
-    return "".join(tiles)
-
-
-def _nudge_charts_html(by_branch, rows, section_id="nudgeSection"):
-    """지사별 건수/금액 타일 옆에 실제 차트 두 개를 더해 한눈에 훑을 수
-    있게 한다 -- 지사별 미등록 금액(크기 비교) + 계약상태(중) 분포(구성비)."""
-    parts = []
-    if by_branch:
-        branch_chart = {
-            "title": "지사별 미등록 월정료 합계",
-            "unit": "원",
-            "items": [{"label": r['지사'], "value": r['월정료합계']} for r in by_branch],
-        }
-        chart_html = render_magnitude_chart(branch_chart, f'{section_id}BranchChart')
-        if chart_html:
-            parts.append(chart_html)
-
-    status_counts = {}
-    for r in rows:
-        s = r.get('계약상태(중)')
-        if s:
-            status_counts[s] = status_counts.get(s, 0) + 1
-    if status_counts:
-        status_items = sorted(status_counts.items(), key=lambda kv: -kv[1])
-        status_chart = {
-            "title": "계약상태(중) 분포",
-            "unit": "건",
-            "items": [{"label": k, "value": v} for k, v in status_items],
-        }
-        chart_html = render_stacked_chart(status_chart, f'{section_id}StatusChart', mode='categorical')
-        if chart_html:
-            parts.append(chart_html)
-
-    if not parts:
-        return ""
-    return f'<div class="chart-grid">{"".join(parts)}</div>'
-
-
-def render_eda_section_body(eda, section_id="edaSection"):
-    """The recomputable part of the EDA section (everything but the static
-    <h2> title) -- lives inside #edaSectionWrap so renderEdaSectionEl() in
-    APP_SCRIPT_TEMPLATE can replace just this on filter/matching-config
-    changes, mirroring this function 1:1."""
-    if eda is None:
-        return f'<div class="empty-card" id="{section_id}">월정산금액 데이터가 충분하지 않아 분포/이상치 분석을 표시할 수 없습니다.</div>'
-
-    s = eda['stats']
-    stat_tiles = render_stat_tiles([
-        {"label": "분석 대상 계약", "value": f"{s['count']:,}", "sub": "건 (0원 제외)"},
-        {"label": "평균", "value": _fmt_compact_won(s['mean']), "sub": f"{s['mean']:,.0f}원"},
-        {"label": "중앙값", "value": _fmt_compact_won(s['median']), "sub": f"{s['median']:,.0f}원"},
-        {"label": "표준편차", "value": _fmt_compact_won(s['std']), "sub": f"{s['std']:,.0f}원"},
-        {"label": "IQR 이상치", "value": f"{eda['outlier_count']:,}", "sub": "건"},
-    ])
-    dist_chart_html = render_magnitude_chart(eda['dist_chart'], f'{section_id}DistChart')
-
-    bounds_note = (
-        f"IQR(사분위범위) 기준: Q1={s['q1']:,.0f}원, Q3={s['q3']:,.0f}원 -- "
-        f"{s['upper_bound']:,.0f}원 초과는 고액 이상치, {s['lower_bound']:,.0f}원 미만(0원 제외)은 저액 이상치로 분류합니다."
-    )
-
-    if eda['outlier_count'] == 0:
-        outlier_html = '<div class="empty-card">IQR 기준 이상치로 분류된 계약이 없습니다.</div>'
-    else:
-        table_html = render_simple_table(eda['outlier_columns'], eda['outlier_rows'])
-        shown = len(eda['outlier_rows'])
-        more_note = f" (심각도순 상위 {shown:,}건 표시, 전체 {eda['outlier_count']:,}건 중)" if shown < eda['outlier_count'] else ""
-        outlier_html = f'<p class="chart-note">이상치 목록{more_note}</p><div class="table-section">{table_html}</div>'
-
-    return f"""
-    <p class="section-desc">{_e(bounds_note)}</p>
-    <div class="stat-grid" id="{section_id}">{stat_tiles}</div>
-    <div class="chart-grid">{dist_chart_html}</div>
-    {outlier_html}"""
-
-
-# ---------------------------------------------------------------------------
-# Client-side matching admin -- embeds a trimmed, JOIN-ready slice of the raw
-# files so the checkbox condition builder can re-run the composite-key match
-# and redraw the 총괄DB dashboard entirely in the browser, no server needed.
-# ---------------------------------------------------------------------------
-
-def _json_safe(value):
-    if value is None:
-        return None
-    if isinstance(value, float) and math.isnan(value):
-        return None
-    if pd.isna(value):
-        return None
-    if isinstance(value, pd.Timestamp):
-        return value.strftime('%Y-%m-%dT%H:%M:%S')
-    if hasattr(value, 'item'):
-        return value.item()
-    return value
-
-
-def _table_payload(df, columns):
-    cols = [c for c in columns if df is not None and c in df.columns]
-    if df is None or not cols:
-        return {"columns": [], "rows": []}
-    sub = df[cols]
-    rows = [[_json_safe(v) for v in row] for row in sub.itertuples(index=False, name=None)]
-    return {"columns": cols, "rows": rows}
-
-
-def _prefilter_to_possible_matches(file_df, file_key_cols, db_key_values):
-    """Keeps only rows that COULD match some DB row under some candidate key
-    (regardless of which condition the admin ends up choosing) -- shrinks a
-    51k-row file down to a few thousand before it's embedded in the HTML."""
-    if file_df is None:
-        return None
-    mask = pd.Series(False, index=file_df.index)
-    hit_any = False
-    for col in file_key_cols:
-        if col in file_df.columns:
-            mask = mask | file_df[col].isin(db_key_values)
-            hit_any = True
-    if not hit_any:
-        return file_df.iloc[0:0]
-    return file_df[mask]
-
-
-def build_embedded_data(raw_files, matching_config):
-    db_df = raw_files.get('db') if raw_files else None
-    if db_df is None:
-        return None
-
-    db_key_values = set()
-    for col in DB_KEY_CANDIDATES:
-        if col in db_df.columns:
-            db_key_values |= set(db_df[col].dropna().tolist())
-
-    files_payload = {}
-    for key in MATCHABLE_FILES:
-        fdf = raw_files.get(key)
-        cols = list(dict.fromkeys(FILE_KEY_CANDIDATES[key] + FILE_DISPLAY_COLUMNS[key]))
-        if fdf is not None:
-            fdf = _prefilter_to_possible_matches(fdf, FILE_KEY_CANDIDATES[key], db_key_values)
-        files_payload[key] = _table_payload(fdf, cols)
-
-    return {
-        "db": _table_payload(db_df, list(db_df.columns)),
-        "files": files_payload,
-        "matchingConfig": matching_config,
-        "fileLabels": FILE_LABELS,
-        "dbKeyCandidates": DB_KEY_CANDIDATES,
-        "fileKeyCandidates": FILE_KEY_CANDIDATES,
-        "displayColumns": FILE_DISPLAY_COLUMNS,
-        "hqOrder": HQ_ORDER,
-        "branchOrder": BRANCH_ORDER,
-        "zoneOwnerMap": build_zone_owner_map(raw_files.get('zone_owner')),
-    }
-
-
-def render_admin_panel_shell():
-    """Wrapped in #adminOnlyWrap, hidden by default (see CSS + checkPassword()
-    in APP_SCRIPT_TEMPLATE) -- only visible after unlocking with the admin
-    password (DEFAULT_ADMIN_PASSWORD), not the regular viewer password."""
-    return """
-    <div id="adminOnlyWrap" style="display:none">
-    <details class="admin-details">
-        <summary>🛠 관리자: 컬럼 매칭 설정 (다중조건, 브라우저에서 즉시 재계산)</summary>
-        <div class="admin-body">
-            <p class="section-desc">
-                체크된 조건이 2개 이상이면 모두 동시에 일치해야 매칭됩니다 (AND 복합키).
-                조건을 바꾸고 <strong>적용</strong>을 누르면 위 대시보드 전체가 이 브라우저 안에서 다시 계산됩니다.
-                서버로 아무것도 전송되지 않습니다.
-            </p>
-            <div id="matchingAdminPanel"></div>
-            <div class="admin-toolbar">
-                <button id="applyMatchBtn" class="primary-btn" type="button">적용 (재계산)</button>
-                <button id="resetMatchBtn" class="ghost-btn" type="button">기본값으로 초기화</button>
-                <button id="exportMatchBtn" class="ghost-btn" type="button">설정 내보내기 (JSON)</button>
-                <label class="ghost-btn file-btn">
-                    설정 가져오기 (JSON)
-                    <input type="file" id="importMatchInput" accept="application/json" hidden>
-                </label>
-                <span id="matchSummary" class="match-summary"></span>
-            </div>
-            <div class="admin-log">
-                <h4 class="admin-log-title">변경 이력 (이 세션 동안)</h4>
-                <ul id="changeLog" class="change-log-list"><li class="change-log-empty">아직 변경 내역이 없습니다.</li></ul>
-            </div>
-        </div>
-    </details>
-    </div>
-    <div id="toastContainer" class="toast-container"></div>"""
-
-
-# ---------------------------------------------------------------------------
-# Full report assembly
-# ---------------------------------------------------------------------------
-
-CSS = """
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Data Intel PRO 웹 대시보드</title>
+<style>
 :root {
     color-scheme: light;
     --surface-1:      #fcfcfb;
@@ -1619,14 +442,176 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
     transition: opacity 0.2s ease, transform 0.2s ease; max-width: 360px;
 }
 .toast.show { opacity: 1; transform: translateY(0); }
-"""
+</style>
+<style>
+#content { display: block; }
+.web-upload { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 20px; margin-bottom: 24px; }
+.web-upload h2 { font-size: 17px; margin: 0 0 4px; color: var(--text-primary); }
+.web-upload .web-privacy { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 16px; }
+.web-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 10px; }
+.web-slot { display: flex; flex-direction: column; gap: 6px; border: 1px dashed var(--baseline); border-radius: 10px; padding: 12px 14px; cursor: pointer; background: var(--page-plane); }
+.web-slot:hover { border-color: var(--brand); }
+.web-slot-required { border-style: solid; border-color: color-mix(in srgb, var(--brand) 55%, var(--border)); }
+.web-slot-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+.web-slot-note { font-weight: 400; color: var(--text-muted); font-size: 11.5px; }
+.web-slot input[type=file] { font-size: 12px; color: var(--text-secondary); max-width: 100%; }
+.web-slot-status { font-size: 11.5px; color: var(--text-muted); }
+.web-slot-status.ok { color: var(--good); font-weight: 600; }
+.web-slot-status.err { color: var(--critical); font-weight: 600; }
+.web-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.web-run { font-size: 15px; font-weight: 700; padding: 11px 22px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; }
+.web-run:disabled { opacity: .5; cursor: not-allowed; }
+.web-progress { font-size: 13px; color: var(--text-secondary); }
+.web-footnote { font-size: 11.5px; color: var(--text-muted); margin: 12px 0 0; }
+#webDashboard[hidden] { display: none; }
+</style>
+</head>
+<body>
 
+<div class="fab-container">
+    <button id="btnTheme" class="fab-btn" title="다크 모드 변경">🌙</button>
+    <button id="btnTop" class="fab-btn" title="맨 위로 가기">⬆️</button>
+</div>
 
-APP_SCRIPT_TEMPLATE = """
+<div id="content">
+    <div class="topbar">
+        <div>
+            <h1>Data Intel PRO 관리고객 대시보드 <span style="font-weight:400;font-size:0.7em;color:var(--text-muted)">웹</span></h1>
+            <div class="meta" id="reportMeta">파일을 선택하면 이 브라우저 안에서 바로 대시보드를 만듭니다.</div>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()">🌓 테마 전환</button>
+    </div>
+    <div class="container">
+        <section class="web-upload" id="webUpload">
+            <h2>📂 원본 파일 선택</h2>
+            <p class="web-privacy">🔒 파일은 서버로 전송되지 않습니다 -- 이 브라우저 안에서만 읽고 계산하며, 창을 닫으면 사라집니다.</p>
+            <div class="web-slots">
+        <label class="web-slot web-slot-required" data-key="db">
+            <span class="web-slot-title">1. 총괄관리DB <span class="web-slot-note">(필수)</span></span>
+            <input type="file" accept=".xlsx,.xls,.csv" data-key="db">
+            <span class="web-slot-status" data-status-for="db">파일을 선택하세요</span>
+        </label>
+        <label class="web-slot" data-key="voc">
+            <span class="web-slot-title">2. 월/일일 SP관리활동 (VOC) <span class="web-slot-note">(선택)</span></span>
+            <input type="file" accept=".xlsx,.xls,.csv" data-key="voc">
+            <span class="web-slot-status" data-status-for="voc">파일을 선택하세요</span>
+        </label>
+        <label class="web-slot" data-key="patrol">
+            <span class="web-slot-title">3. 월/일일 SE,SG 정기점검 <span class="web-slot-note">(선택)</span></span>
+            <input type="file" accept=".xlsx,.xls,.csv" data-key="patrol">
+            <span class="web-slot-status" data-status-for="patrol">파일을 선택하세요</span>
+        </label>
+        <label class="web-slot" data-key="original">
+            <span class="web-slot-title">5. 2026년 관리고객원본 <span class="web-slot-note">(선택)</span></span>
+            <input type="file" accept=".xlsx,.xls,.csv" data-key="original">
+            <span class="web-slot-status" data-status-for="original">파일을 선택하세요</span>
+        </label>
+        <label class="web-slot" data-key="facility">
+            <span class="web-slot-title">6. 시설현황 <span class="web-slot-note">(선택)</span></span>
+            <input type="file" accept=".xlsx,.xls,.csv" data-key="facility">
+            <span class="web-slot-status" data-status-for="facility">파일을 선택하세요</span>
+        </label>
+        <label class="web-slot" data-key="zone_owner">
+            <span class="web-slot-title">8. 영업구역담당자 <span class="web-slot-note">(선택 · SP 구역번호→담당자명)</span></span>
+            <input type="file" accept=".xlsx,.xls,.csv" data-key="zone_owner">
+            <span class="web-slot-status" data-status-for="zone_owner">파일을 선택하세요</span>
+        </label></div>
+            <div class="web-actions">
+                <button type="button" class="web-run" id="webRunBtn" disabled>📊 대시보드 만들기</button>
+                <span class="web-progress" id="webProgress">1. 총괄관리DB는 필수입니다.</span>
+            </div>
+            <p class="web-footnote">4. 해지파이프라인 · 7. 해지시설내역 섹션은 데스크톱 GUI 리포트에서 제공합니다.</p>
+        </section>
+
+        <div id="webDashboard" hidden>
+        
+    <div id="adminOnlyWrap" style="display:none">
+    <details class="admin-details">
+        <summary>🛠 관리자: 컬럼 매칭 설정 (다중조건, 브라우저에서 즉시 재계산)</summary>
+        <div class="admin-body">
+            <p class="section-desc">
+                체크된 조건이 2개 이상이면 모두 동시에 일치해야 매칭됩니다 (AND 복합키).
+                조건을 바꾸고 <strong>적용</strong>을 누르면 위 대시보드 전체가 이 브라우저 안에서 다시 계산됩니다.
+                서버로 아무것도 전송되지 않습니다.
+            </p>
+            <div id="matchingAdminPanel"></div>
+            <div class="admin-toolbar">
+                <button id="applyMatchBtn" class="primary-btn" type="button">적용 (재계산)</button>
+                <button id="resetMatchBtn" class="ghost-btn" type="button">기본값으로 초기화</button>
+                <button id="exportMatchBtn" class="ghost-btn" type="button">설정 내보내기 (JSON)</button>
+                <label class="ghost-btn file-btn">
+                    설정 가져오기 (JSON)
+                    <input type="file" id="importMatchInput" accept="application/json" hidden>
+                </label>
+                <span id="matchSummary" class="match-summary"></span>
+            </div>
+            <div class="admin-log">
+                <h4 class="admin-log-title">변경 이력 (이 세션 동안)</h4>
+                <ul id="changeLog" class="change-log-list"><li class="change-log-empty">아직 변경 내역이 없습니다.</li></ul>
+            </div>
+        </div>
+    </details>
+    </div>
+    <div id="toastContainer" class="toast-container"></div>
+        <div id="globalFilterBarWrap"></div>
+
+        <details class="section-collapse">
+        <summary class="section-title">🔄 재계약대상(SP)</summary>
+        <div id="recontractSectionWrap"></div>
+        </details>
+
+        <details class="section-collapse" open>
+        <summary class="section-title">총괄DB 기준 대시보드</summary>
+        <div class="stat-grid" id="statGrid"></div>
+        <div class="chart-grid" id="chartGrid"></div>
+        <div id="top10Section"></div>
+        <div id="treeSummarySection"></div>
+        </details>
+
+        <details class="section-collapse" open>
+        <summary class="section-title">지사별 활동 진척율 (SP/SE/SG)</summary>
+        <div id="progressInsightWrap"></div>
+        <div id="progressTypeWrap"></div>
+        <div class="table-section" id="progressSection"></div>
+        </details>
+
+        <details class="section-collapse" open>
+        <summary class="section-title">구역별 활동 현황 (SP 영업구역 · SE 기술구역 · SG 구역)</summary>
+        <div id="zoneActivityWrap"></div>
+        </details>
+
+        <details class="subsection-collapse" open>
+        <summary class="subsection-title">SP 부진자 추가분석 (담당자 기준)</summary>
+        <div id="spRepSectionWrap"></div>
+        </details>
+
+        <details class="subsection-collapse" open>
+        <summary class="subsection-title">SP 미접수/접수 발송용 리스트 (담당자별)</summary>
+        <div id="spPendingSectionWrap"></div>
+        </details>
+
+        <details class="section-collapse" open>
+        <summary class="section-title">데이터 분포/이상치 분석 (EDA, 월정산금액 기준)</summary>
+        <div id="edaSectionWrap"></div>
+        </details>
+
+        <details class="section-collapse" open>
+        <summary class="section-title">관리고객 상세 (필터/검색 가능)</summary>
+        <button id="btnExportCSV" class="export-btn" title="현재 조건으로 필터링된 모든 데이터를 엑셀(CSV)로 다운로드합니다.">📥 필터링된 데이터 엑셀(CSV) 다운로드</button>
+        <div class="table-section" id="tableSection"></div>
+        </details>
+        </div>
+    </div>
+</div>
+
+<script type="application/json" id="embeddedData">{"db": {"columns": [], "rows": []}, "files": {"original": {"columns": [], "rows": []}, "facility": {"columns": [], "rows": []}, "patrol": {"columns": [], "rows": []}, "voc": {"columns": [], "rows": []}, "cancel": {"columns": [], "rows": []}, "cancelled_facility": {"columns": [], "rows": []}}, "matchingConfig": {"original": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "facility": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "patrol": [{"db_col": "서비스번호", "file_col": "고객번호", "enabled": true}], "voc": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "cancel": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "cancelled_facility": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}]}, "fileLabels": {"original": "2026년 관리고객원본", "facility": "시설현황", "patrol": "순찰 정기점검 내역", "voc": "VOC정보조회", "cancel": "해지 파이프라인", "cancelled_facility": "해지시설 내역"}, "dbKeyCandidates": ["계약번호", "서비스번호"], "fileKeyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "hqOrder": ["강북/강원", "강남/서부", "대구/경북", "부산/경남", "충남/충북", "전남/전북"], "branchOrder": ["중앙", "강북", "서대문", "고양", "의정부", "남양주", "강릉", "원주"], "zoneOwnerMap": {}}</script>
+<script type="application/json" id="uploadConfig">{"matchable": ["original", "facility", "patrol", "voc", "cancel", "cancelled_facility"], "keyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
 // ===== Lock screen =====
-const CORRECT_PWD = "__PASSWORD__";
-const ADMIN_PWD = "__ADMIN_PASSWORD__";
-const EXPIRY_DATE = new Date("__EXPIRY__T23:59:59");
+const CORRECT_PWD = "IJNlSWoJWYMVOxmhRIgwKdNZ";
+const ADMIN_PWD = "IJNlSWoJWYMVOxmhRIgwKdNZ";
+const EXPIRY_DATE = new Date("9999-12-31T23:59:59");
 let isAdminUnlocked = false;
 
 function checkPassword() {
@@ -1797,7 +782,7 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         for (const v of arr) { if (v !== undefined && v !== null && v !== '') return v; }
         return null;
     }
-    function keyOf(row, cols) { return cols.map(c => row[c]).join('\\u0001'); }
+    function keyOf(row, cols) { return cols.map(c => row[c]).join('\u0001'); }
 
     // ---- matching engine (mirrors handlers.py apply_matching) ----
     function activeConditions(conditions, dbCols, fileCols) {
@@ -1896,7 +881,7 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
     // Mirrors handlers.py _zone_key: '405', 405 and 405.0 all compare equal.
     function zoneKey(v) {
         if (v === null || v === undefined) return null;
-        let s = String(v).replace(/\\u00a0/g, ' ').trim();
+        let s = String(v).replace(/\u00a0/g, ' ').trim();
         if (s.endsWith('.0')) s = s.slice(0, -2);
         return s || null;
     }
@@ -3504,7 +2489,7 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
                 담당자: owner, count: items.length,
                 미접수_count: items.filter(it => it.상태 === '미접수').length,
                 접수_count: items.filter(it => it.상태 === '접수').length,
-                items, text: textLines.join('\\n'),
+                items, text: textLines.join('\n'),
             });
         }
         reps.sort((a, b) => b.count - a.count);
@@ -4105,13 +3090,13 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         const rows = applyGlobalFilter(latestMergedRows);
         if (!rows.length) { showToast('다운로드할 데이터가 없습니다'); return; }
         const headers = Object.keys(rows[0]);
-        let csv = '﻿' + headers.join(',') + '\\r\\n';
+        let csv = '﻿' + headers.join(',') + '\r\n';
         rows.forEach(row => {
             csv += headers.map(h => {
                 let v = row[h];
                 if (v === null || v === undefined) v = '';
                 return '"' + String(v).replace(/"/g, '""') + '"';
-            }).join(',') + '\\r\\n';
+            }).join(',') + '\r\n';
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
@@ -4265,224 +3250,145 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         });
     });
 })();
-"""
+</script>
+<script>
+// ===== 웹 업로드: 브라우저 안에서 파일을 읽어 리포트 엔진(window.DataIntelLoad)에 넘긴다 =====
+(function () {
+    const CFG = JSON.parse(document.getElementById('uploadConfig').textContent);
+    const picked = {};   // key -> File
+    const runBtn = document.getElementById('webRunBtn');
+    const progress = document.getElementById('webProgress');
+    const setStatus = (key, text, cls) => {
+        const el = document.querySelector('[data-status-for="' + key + '"]');
+        if (el) { el.textContent = text; el.className = 'web-slot-status' + (cls ? ' ' + cls : ''); }
+    };
 
+    document.querySelectorAll('.web-slot input[type=file]').forEach(input => {
+        input.addEventListener('change', () => {
+            const key = input.dataset.key;
+            if (input.files && input.files[0]) {
+                picked[key] = input.files[0];
+                setStatus(key, input.files[0].name, 'ok');
+            } else {
+                delete picked[key];
+                setStatus(key, '파일을 선택하세요');
+            }
+            runBtn.disabled = !picked.db;
+            progress.textContent = picked.db ? '준비 완료 -- 대시보드 만들기를 누르세요.' : '1. 총괄관리DB는 필수입니다.';
+        });
+    });
 
-def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
-                          cancelled_facility_df=None, raw_files=None, matching_config=None,
-                          password=None, admin_password=None, expiry_date=None, encrypt=True,
-                          eda_link=False):
-    """Generates the password-protected HTML dashboard report.
+    // ---- file -> {columns, rows} (mirrors handlers.py load_data) ----
+    function decodeCsv(buf) {
+        try { return new TextDecoder('utf-8', { fatal: true }).decode(buf).replace(/^﻿/, ''); }
+        catch (e) { return new TextDecoder('euc-kr').decode(buf); }  // 사내 CSV 내보내기는 대부분 cp949
+    }
+    function isoLocal(d) {
+        const p = n => String(n).padStart(2, '0');
+        return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+    }
+    function hasTitleRow(header) {
+        // handlers.py _has_title_row: 첫 줄이 제목 한 칸(나머지는 빈 칸)이면 실제 헤더는 다음 줄
+        if (header.length < 3) return false;
+        const blank = header.slice(1).filter(c => c === null || c === undefined || String(c).trim() === '').length;
+        return blank >= header.length - 2;
+    }
+    async function readTable(file) {
+        const buf = await file.arrayBuffer();
+        const wb = /\.csv$/i.test(file.name)
+            ? XLSX.read(decodeCsv(buf), { type: 'string', cellDates: true })
+            : XLSX.read(buf, { type: 'array', cellDates: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        let aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: false });
+        if (!aoa.length) return { columns: [], rows: [] };
+        if (hasTitleRow(aoa[0]) && aoa.length > 1) aoa = aoa.slice(1);
+        const width = aoa.reduce((m, r) => Math.max(m, r.length), 0);
+        const seen = {};
+        const columns = Array.from({ length: width }, (_, i) => {
+            const raw = aoa[0][i];
+            let name = (raw === null || raw === undefined || String(raw).trim() === '')
+                ? 'Unnamed: ' + i : String(raw).replace(/ /g, ' ').trim();
+            if (seen[name] !== undefined) { seen[name] += 1; name = name + '.' + seen[name]; } else { seen[name] = 0; }
+            return name;
+        });
+        const rows = aoa.slice(1).map(r => columns.map((_, i) => {
+            const v = r[i];
+            if (v === undefined || v === null) return null;
+            if (v instanceof Date) return isoLocal(v);
+            if (typeof v === 'string') { const t = v.replace(/ /g, ' '); return t.trim() === '' ? null : t; }
+            return v;
+        }));
+        return { columns, rows };
+    }
+    function pickColumns(table, wanted) {
+        const idx = wanted.map(c => table.columns.indexOf(c)).filter(i => i >= 0);
+        return { columns: idx.map(i => table.columns[i]), rows: table.rows.map(r => idx.map(i => r[i])) };
+    }
+    function zoneKey(v) {
+        if (v === null || v === undefined) return null;
+        let s = String(v).replace(/ /g, ' ').trim();
+        if (s.endsWith('.0')) s = s.slice(0, -2);
+        return s || null;
+    }
+    function buildZoneOwnerMap(table) {
+        // handlers.py build_zone_owner_map: 구역번호 -> 담당자명 (여러 명은 '/', 빈 이름은 '담당자없음')
+        const zi = table.columns.indexOf('구역번호'), ni = table.columns.indexOf('담당자명');
+        if (zi < 0 || ni < 0) return null;
+        const owners = new Map();
+        table.rows.forEach(r => {
+            const key = zoneKey(r[zi]);
+            if (!key) return;
+            const name = r[ni] === null || r[ni] === undefined ? '' : String(r[ni]).trim();
+            if (!owners.has(key)) owners.set(key, []);
+            if (name && !owners.get(key).includes(name)) owners.get(key).push(name);
+        });
+        const out = {};
+        owners.forEach((names, k) => { out[k] = names.join('/') || '담당자없음'; });
+        return out;
+    }
 
-    df: already-merged 총괄DB dataframe (server-rendered initial dashboard).
-    voc_df / patrol_df: raw detail files, used to scope the VOC/순찰 charts.
-    cancel_df: 해지 파이프라인 -- rendered as an independent section, never
-        joined onto `df`.
-    cancelled_facility_df: optional '해지시설내역' upload -- powers the
-        고액 미등록 알림 section when present.
-    raw_files: optional dict of PRE-merge raw dataframes {'db','original',
-        'facility','patrol','voc'} -- when given, an admin matching panel is
-        embedded so column matching can be reconfigured and the whole
-        dashboard re-computed client-side, in the browser.
-    matching_config: the config actually used to produce `df` -- becomes the
-        admin panel's starting state. Defaults to the persisted config.
-    password: fixed by default (DEFAULT_REPORT_PASSWORD) so the report can be
-        rebuilt without re-sharing a new password every time; pass an
-        explicit value to rotate it, or generate_random_password() for a
-        one-off random one.
-    admin_password: separate, higher-privilege password (DEFAULT_ADMIN_PASSWORD
-        by default). Entering `password` unlocks viewing only; entering this
-        additionally unlocks the 관리자: 컬럼 매칭 설정 panel -- mirrors the
-        Streamlit app's admin/user role split (see app/main.py).
-    encrypt: wrap the finished report with real AES encryption (see
-        secure_report.py) so the data can't be read without a password --
-        needed for anything hosted on the web. Blank passwords then become
-        strong random ones (the fixed DEFAULT_ADMIN_PASSWORD is public in
-        this repo, so it must never be a decryption key).
-    eda_link: show the '딥 다이브 EDA' button, which opens a sibling
-        Data_Intel_PRO_EDA.html. Only generate_report.py's CLI writes that
-        file (unencrypted, full data) -- the GUI and a deployed page never
-        have it, so the button would just be a dead link there.
-    """
-    if encrypt:
-        from .secure_report import generate_strong_password
-        if password is None:
-            password = generate_strong_password()
-        if admin_password is None:
-            admin_password = generate_strong_password()
-    if password is None:
-        import random
-        password = str(random.randint(1000, 9999))
-    if admin_password is None:
-        admin_password = DEFAULT_ADMIN_PASSWORD
-    if expiry_date is None:
-        expiry_date = get_end_of_month_iso()
-
-    dashboard = build_dashboard(df, voc_df=voc_df, patrol_df=patrol_df)
-    columns, rows = build_table(df)
-
-    stat_html = render_stat_tiles(dashboard['kpis'])
-    chart_grid_html = render_chart_grid(dashboard, MAIN_CHART_SPECS)
-    table_html = render_table(columns, rows)
-
-    progress_matrix = build_progress_matrix(df)
-    progress_table_html = render_progress_matrix(progress_matrix)
-    progress_chart_html = render_progress_bar_chart(progress_matrix)
-    progress_type_dashboard_html = render_progress_type_dashboard(build_progress_type_charts(progress_matrix))
-    branch_insights_html = render_branch_insights(build_branch_insights(progress_matrix))
-    zone_activity_html = render_zone_activity_section(build_zone_activity(df))
-    sp_rep_section_html = render_sp_rep_section(build_sp_rep_performance(df))
-    sp_pending_section_html = render_sp_pending_section(build_sp_pending_contact_list(df))
-    recontract_section_html = render_recontract_section(build_recontract_target_analysis(df))
-
-    eda_stats = build_eda_stats(df)
-    eda_section_html = render_eda_section_body(eda_stats)
-
-    cancel_section_html = render_cancel_section(cancel_df)
-    nudge_section_html = render_nudge_section(cancelled_facility_df, cancel_df)
-
-    admin_panel_html = ""
-    filter_bar_html = ""
-    embedded_script = ""
-    if raw_files is not None:
-        if matching_config is None:
-            matching_config = load_matching_config()
-        embedded = build_embedded_data(raw_files, matching_config)
-        if embedded is not None:
-            admin_panel_html = render_admin_panel_shell()
-            filter_bar_html = render_global_filter_bar(df)
-            embedded_json = json.dumps(embedded, ensure_ascii=False).replace('</script>', '<\\/script>')
-            embedded_script = f'<script type="application/json" id="embeddedData">{embedded_json}</script>'
-
-    generated_at = datetime.now().strftime('%Y-%m-%d %H:%M')
-    eda_button_html = """
-        <div class="eda-btn-wrap">
-            <a href="Data_Intel_PRO_EDA.html" target="_blank" class="eda-btn">🚀 딥 다이브 EDA 분석기 열기 (별도 창)</a>
-        </div>""" if eda_link else ""
-
-    script = (
-        APP_SCRIPT_TEMPLATE
-        .replace('__PASSWORD__', password)
-        .replace('__ADMIN_PASSWORD__', admin_password)
-        .replace('__EXPIRY__', expiry_date)
-    )
-
-    html_out = f"""<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Data Intel PRO Report</title>
-<style>{CSS}</style>
-</head>
-<body>
-
-<div class="fab-container">
-    <button id="btnTheme" class="fab-btn" title="다크 모드 변경">🌙</button>
-    <button id="btnTop" class="fab-btn" title="맨 위로 가기">⬆️</button>
-</div>
-
-<div id="lockScreen" class="lock-screen">
-    <h2>Data Intel PRO 보안 리포트</h2>
-    <p>만료일: {_e(expiry_date)}</p>
-    <input type="password" id="pwd" placeholder="비밀번호 입력" autocomplete="off">
-    <button onclick="checkPassword()">확인</button>
-    <div id="errorMsg" class="error"></div>
-</div>
-
-<div id="content">
-    <div class="topbar">
-        <div>
-            <h1>Data Intel PRO 관리고객 대시보드</h1>
-            <div class="meta" id="reportMeta">생성일시 {_e(generated_at)} · 관리계약 {len(rows):,}건 · 만료일 {_e(expiry_date)}</div>
-        </div>
-        <button class="theme-toggle" onclick="toggleTheme()">🌓 테마 전환</button>
-    </div>
-    <div class="container">
-        {admin_panel_html}
-        {filter_bar_html}
-
-        {eda_button_html}
-
-        <details class="section-collapse">
-        <summary class="section-title">🔄 재계약대상(SP)</summary>
-        <div id="recontractSectionWrap">
-            {recontract_section_html}
-        </div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">총괄DB 기준 대시보드</summary>
-        <div class="stat-grid" id="statGrid">{stat_html}</div>
-        <div class="chart-grid" id="chartGrid">{chart_grid_html}</div>
-
-        <div id="top10Section"></div>
-
-        <div id="treeSummarySection"></div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">지사별 활동 진척율 (SP/SE/SG)</summary>
-        <div id="progressInsightWrap">
-            {branch_insights_html}
-        </div>
-        <div id="progressTypeWrap">
-            {progress_type_dashboard_html}
-        </div>
-        <div class="table-section" id="progressSection">
-            {progress_table_html}
-            {progress_chart_html}
-        </div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">구역별 활동 현황 (SP 영업구역 · SE 기술구역 · SG 구역)</summary>
-        <div id="zoneActivityWrap">
-            {zone_activity_html}
-        </div>
-        </details>
-
-        <details class="subsection-collapse" open>
-        <summary class="subsection-title">SP 부진자 추가분석 (담당자 기준)</summary>
-        <div id="spRepSectionWrap">
-            {sp_rep_section_html}
-        </div>
-        </details>
-
-        <details class="subsection-collapse" open>
-        <summary class="subsection-title">SP 미접수/접수 발송용 리스트 (담당자별)</summary>
-        <div id="spPendingSectionWrap">
-            {sp_pending_section_html}
-        </div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">데이터 분포/이상치 분석 (EDA, 월정산금액 기준)</summary>
-        <div id="edaSectionWrap">
-            {eda_section_html}
-        </div>
-        </details>
-
-        <details class="section-collapse" open>
-        <summary class="section-title">관리고객 상세 (필터/검색 가능)</summary>
-        <button id="btnExportCSV" class="export-btn" title="현재 조건으로 필터링된 모든 데이터를 엑셀(CSV)로 다운로드합니다.">📥 필터링된 데이터 엑셀(CSV) 다운로드</button>
-        <div class="table-section" id="tableSection">
-            {table_html}
-        </div>
-        </details>
-
-        {cancel_section_html}
-        {nudge_section_html}
-    </div>
-</div>
-
-{embedded_script}
-<script>{script}</script>
+    runBtn.addEventListener('click', async () => {
+        if (!picked.db) return;
+        if (typeof XLSX === 'undefined') { progress.textContent = '엑셀 읽기 모듈을 불러오지 못했습니다. 인터넷 연결을 확인 후 새로고침하세요.'; return; }
+        runBtn.disabled = true;
+        const t0 = performance.now();
+        try {
+            const payload = { db: null, files: {}, zoneOwnerMap: {} };
+            for (const key of Object.keys(picked)) {
+                progress.textContent = picked[key].name + ' 읽는 중...';
+                setStatus(key, picked[key].name + ' -- 읽는 중...', 'ok');
+                await new Promise(r => setTimeout(r, 0));  // let the status paint before a long parse
+                const table = await readTable(picked[key]);
+                if (key === 'db') {
+                    payload.db = table;
+                } else if (key === 'zone_owner') {
+                    const map = buildZoneOwnerMap(table);
+                    if (!map) { setStatus(key, '구역번호/담당자명 컬럼이 없습니다', 'err'); continue; }
+                    payload.zoneOwnerMap = map;
+                } else if (CFG.matchable.includes(key)) {
+                    const wanted = Array.from(new Set(CFG.keyCandidates[key].concat(CFG.displayColumns[key])));
+                    payload.files[key] = pickColumns(table, wanted);
+                }
+                setStatus(key, picked[key].name + ' · ' + table.rows.length.toLocaleString('ko-KR') + '행', 'ok');
+            }
+            if (!payload.db.rows.length) throw new Error('총괄DB에 데이터 행이 없습니다.');
+            progress.textContent = '병합·집계 중...';
+            await new Promise(r => setTimeout(r, 0));
+            document.getElementById('webDashboard').hidden = false;
+            const adminWrap = document.getElementById('adminOnlyWrap');
+            if (adminWrap) adminWrap.style.display = '';
+            const res = window.DataIntelLoad(payload);
+            const secs = ((performance.now() - t0) / 1000).toFixed(1);
+            progress.textContent = '✅ 완료 -- 관리계약 ' + res.rows.toLocaleString('ko-KR') + '건 (' + secs + '초). 파일을 바꾸면 다시 만들 수 있습니다.';
+            document.getElementById('reportMeta').textContent = '관리계약 ' + res.rows.toLocaleString('ko-KR') + '건 · 이 브라우저에서 계산됨';
+        } catch (e) {
+            console.error(e);
+            progress.textContent = '⚠️ 처리 실패: ' + (e && e.message ? e.message : e);
+        } finally {
+            runBtn.disabled = !picked.db;
+        }
+    });
+})();
+</script>
 </body>
-</html>"""
-
-    if encrypt:
-        from .secure_report import encrypt_report
-        html_out = encrypt_report(html_out, [password, admin_password], expiry_date=expiry_date)
-
-    return html_out, password, expiry_date, admin_password
+</html>

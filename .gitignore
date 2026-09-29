@@ -6,6 +6,8 @@
 
 # Generated reports
 *.html
+# ...except the web version served by GitHub Pages (no data inside -- see build_web_app.py)
+!docs/index.html
 
 # Python cache
 __pycache__/
