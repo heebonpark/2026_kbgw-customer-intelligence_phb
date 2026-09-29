@@ -215,7 +215,10 @@ body {
 @media (max-width: 640px) { .dv-rank-row { grid-template-columns: 18px minmax(0, 1fr) 60px 48px; } .dv-rank-sub { display: none; } }
 .zone-seg.role-warning { color: #1f2937; }
 .zone-card[data-mode="zone_owner"] .zone-row { grid-template-columns: 190px 1fr 150px; }
-.zone-mode-row { margin: 8px 0 6px; }
+.zone-mode-row { margin: 8px 0 6px; align-items: center; }
+.zone-owner-pick { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
+.zone-owner-pick select { max-width: 240px; }
+.zone-owner-chip { font-size: 12px; color: var(--text-secondary); background: color-mix(in srgb, var(--brand) 10%, var(--surface-1)); border: 1px solid color-mix(in srgb, var(--brand) 35%, var(--border)); border-radius: 8px; padding: 6px 10px; margin: 2px 0 8px; }
 .zone-status-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 4px 0 14px; }
 .zone-status-label { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); }
 .filter-pill.ghost-pill { background: transparent; }
@@ -744,12 +747,12 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
 </div>
 
 <script type="application/json" id="embeddedData">{"db": {"columns": [], "rows": []}, "files": {"original": {"columns": [], "rows": []}, "facility": {"columns": [], "rows": []}, "patrol": {"columns": [], "rows": []}, "voc": {"columns": [], "rows": []}, "cancel": {"columns": [], "rows": []}, "cancelled_facility": {"columns": [], "rows": []}}, "matchingConfig": {"original": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "facility": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "patrol": [{"db_col": "서비스번호", "file_col": "고객번호", "enabled": true}], "voc": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "cancel": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "cancelled_facility": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}]}, "fileLabels": {"original": "2026년 관리고객원본", "facility": "시설현황", "patrol": "순찰 정기점검 내역", "voc": "VOC정보조회", "cancel": "해지 파이프라인", "cancelled_facility": "해지시설 내역"}, "dbKeyCandidates": ["계약번호", "서비스번호"], "fileKeyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "hqOrder": ["강북/강원", "강남/서부", "대구/경북", "부산/경남", "충남/충북", "전남/전북"], "branchOrder": ["중앙", "강북", "서대문", "고양", "의정부", "남양주", "강릉", "원주"], "zoneOwnerMap": {}}</script>
-<script type="application/json" id="uploadConfig">{"matchable": ["original", "facility", "patrol", "voc", "cancel", "cancelled_facility"], "keyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "sheetHints": {"db": ["활동대상구분", "담당채널"], "voc": ["VOC유형대", "계약번호"], "patrol": ["고객번호"], "original": ["계약번호"], "facility": ["계약번호"], "zone_owner": ["구역번호"]}, "fieldSpecs": {"db": [{"name": "활동대상구분", "aliases": ["활동대상구분", "담당채널"], "required": true}, {"name": "지사", "aliases": ["지사", "관리지사명", "관리지사"], "required": true}, {"name": "계약번호", "aliases": ["계약번호"]}, {"name": "서비스번호", "aliases": ["서비스번호"]}, {"name": "상호", "aliases": ["상호", "상호명", "고객명"]}, {"name": "설치주소", "aliases": ["설치주소", "주소"]}, {"name": "영업구역정보", "aliases": ["영업구역정보", "영업구역번호", "영업구역"]}, {"name": "기술구역정보", "aliases": ["기술구역정보", "기술구역번호", "기술구역"]}, {"name": "구역정보", "aliases": ["구역정보", "구역"]}, {"name": "활동유무", "aliases": ["활동유무", "활동유무(o,x)"], "prefix": "활동유무", "required": true}, {"name": "SP담당", "aliases": ["SP담당"]}], "zone_owner": [{"name": "구역번호", "aliases": ["구역번호", "영업구역번호"], "required": true}, {"name": "담당자명", "aliases": ["담당자명", "담당자", "사원명", "(신규)사원명"], "required": true}]}, "dbKeyCandidates": ["계약번호", "서비스번호"], "unlockTemplate": "\u003c!DOCTYPE html>\n\u003chtml lang=\"ko\">\n\u003chead>\n\u003cmeta charset=\"UTF-8\">\n\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n\u003cmeta name=\"robots\" content=\"noindex, nofollow\">\n\u003ctitle>__TITLE__\u003c/title>\n\u003cstyle>\n:root { --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; --brand: #2563eb; --error: #d03b3b; }\n@media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --muted: #94a3b8; --border: #334155; } }\n* { box-sizing: border-box; }\nbody { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--text);\n       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; padding: 16px; }\n.card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; text-align: center; }\nh1 { font-size: 20px; margin: 0 0 6px; }\n.exp, .hint { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }\ninput { width: 100%; font-size: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }\nbutton { width: 100%; margin-top: 12px; font-size: 15px; font-weight: 700; padding: 12px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; }\nbutton:disabled { opacity: .6; cursor: progress; }\n.err { min-height: 18px; margin-top: 10px; font-size: 13px; color: var(--error); }\n\u003c/style>\n\u003c/head>\n\u003cbody>\n\u003cform class=\"card\" id=\"unlockForm\" autocomplete=\"off\">\n    \u003ch1>🔒 __TITLE__\u003c/h1>\n    __EXPIRY__\n    \u003cp class=\"hint\">공유받은 비밀번호를 입력하세요. 데이터는 암호화되어 있습니다.\u003c/p>\n    \u003cinput type=\"password\" id=\"unlockPwd\" placeholder=\"비밀번호\" autofocus>\n    \u003cbutton type=\"submit\" id=\"unlockBtn\">열기\u003c/button>\n    \u003cdiv class=\"err\" id=\"unlockErr\">\u003c/div>\n\u003c/form>\n\u003cscript type=\"application/json\" id=\"encPayload\">__PAYLOAD__\u003c/script>\n\u003cscript>\n(function () {\n    const payload = JSON.parse(document.getElementById('encPayload').textContent);\n    const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));\n    const form = document.getElementById('unlockForm');\n    const btn = document.getElementById('unlockBtn');\n    const err = document.getElementById('unlockErr');\n\n    async function unwrapContentKey(pwd) {\n        const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);\n        for (const slot of payload.slots) {\n            const kek = await crypto.subtle.deriveKey(\n                { name: 'PBKDF2', salt: b64(slot.salt), iterations: payload.iter, hash: 'SHA-256' },\n                base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);\n            try {\n                return await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(slot.iv) }, kek, b64(slot.key));\n            } catch (e) { /* not this slot -- try the next password slot */ }\n        }\n        return null;\n    }\n\n    form.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        const pwd = document.getElementById('unlockPwd').value;\n        if (!pwd) return;\n        if (!window.crypto || !crypto.subtle) {\n            err.textContent = '이 브라우저에서는 열 수 없습니다 (https 주소 또는 최신 브라우저가 필요합니다).';\n            return;\n        }\n        btn.disabled = true; btn.textContent = '여는 중...'; err.textContent = '';\n        try {\n            const rawKey = await unwrapContentKey(pwd);\n            if (!rawKey) throw new Error('bad password');\n            const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);\n            const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(payload.iv) }, key, b64(payload.data));\n            const reportHtml = new TextDecoder().decode(plain);\n            document.open();\n            document.write(reportHtml);\n            document.close();\n            // Hand the same password to the report's own lock screen: it still\n            // enforces the expiry date and decides user vs admin view.\n            const unlock = () => {\n                const input = document.getElementById('pwd');\n                if (input && typeof window.checkPassword === 'function') { input.value = pwd; window.checkPassword(); }\n            };\n            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', unlock); else unlock();\n        } catch (ex) {\n            btn.disabled = false; btn.textContent = '열기';\n            err.textContent = '비밀번호가 올바르지 않습니다.';\n        }\n    });\n})();\n\u003c/script>\n\u003c/body>\n\u003c/html>", "lockScreenHtml": "\u003cdiv id=\"lockScreen\" class=\"lock-screen\">\n    \u003ch2>Data Intel PRO 보안 리포트\u003c/h2>\n    \u003cp>만료일: __EXPIRY_TEXT__\u003c/p>\n    \u003cinput type=\"password\" id=\"pwd\" placeholder=\"비밀번호 입력\" autocomplete=\"off\">\n    \u003cbutton onclick=\"checkPassword()\">확인\u003c/button>\n    \u003cdiv id=\"errorMsg\" class=\"error\">\u003c/div>\n\u003c/div>", "iterations": 310000, "filler": "nmLpTywxYmdtiYAKFZAheMGf"}</script>
+<script type="application/json" id="uploadConfig">{"matchable": ["original", "facility", "patrol", "voc", "cancel", "cancelled_facility"], "keyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "sheetHints": {"db": ["활동대상구분", "담당채널"], "voc": ["VOC유형대", "계약번호"], "patrol": ["고객번호"], "original": ["계약번호"], "facility": ["계약번호"], "zone_owner": ["구역번호"]}, "fieldSpecs": {"db": [{"name": "활동대상구분", "aliases": ["활동대상구분", "담당채널"], "required": true}, {"name": "지사", "aliases": ["지사", "관리지사명", "관리지사"], "required": true}, {"name": "계약번호", "aliases": ["계약번호"]}, {"name": "서비스번호", "aliases": ["서비스번호"]}, {"name": "상호", "aliases": ["상호", "상호명", "고객명"]}, {"name": "설치주소", "aliases": ["설치주소", "주소"]}, {"name": "영업구역정보", "aliases": ["영업구역정보", "영업구역번호", "영업구역"]}, {"name": "기술구역정보", "aliases": ["기술구역정보", "기술구역번호", "기술구역"]}, {"name": "구역정보", "aliases": ["구역정보", "구역"]}, {"name": "활동유무", "aliases": ["활동유무", "활동유무(o,x)"], "prefix": "활동유무", "required": true}, {"name": "SP담당", "aliases": ["SP담당"]}], "zone_owner": [{"name": "구역번호", "aliases": ["구역번호", "영업구역번호"], "required": true}, {"name": "담당자명", "aliases": ["담당자명", "담당자", "사원명", "(신규)사원명"], "required": true}]}, "dbKeyCandidates": ["계약번호", "서비스번호"], "unlockTemplate": "\u003c!DOCTYPE html>\n\u003chtml lang=\"ko\">\n\u003chead>\n\u003cmeta charset=\"UTF-8\">\n\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n\u003cmeta name=\"robots\" content=\"noindex, nofollow\">\n\u003ctitle>__TITLE__\u003c/title>\n\u003cstyle>\n:root { --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; --brand: #2563eb; --error: #d03b3b; }\n@media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --muted: #94a3b8; --border: #334155; } }\n* { box-sizing: border-box; }\nbody { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--text);\n       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; padding: 16px; }\n.card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; text-align: center; }\nh1 { font-size: 20px; margin: 0 0 6px; }\n.exp, .hint { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }\ninput { width: 100%; font-size: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }\nbutton { width: 100%; margin-top: 12px; font-size: 15px; font-weight: 700; padding: 12px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; }\nbutton:disabled { opacity: .6; cursor: progress; }\n.err { min-height: 18px; margin-top: 10px; font-size: 13px; color: var(--error); }\n\u003c/style>\n\u003c/head>\n\u003cbody>\n\u003cform class=\"card\" id=\"unlockForm\" autocomplete=\"off\">\n    \u003ch1>🔒 __TITLE__\u003c/h1>\n    __EXPIRY__\n    \u003cp class=\"hint\">공유받은 비밀번호를 입력하세요. 데이터는 암호화되어 있습니다.\u003c/p>\n    \u003cinput type=\"password\" id=\"unlockPwd\" placeholder=\"비밀번호\" autofocus>\n    \u003cbutton type=\"submit\" id=\"unlockBtn\">열기\u003c/button>\n    \u003cdiv class=\"err\" id=\"unlockErr\">\u003c/div>\n\u003c/form>\n\u003cscript type=\"application/json\" id=\"encPayload\">__PAYLOAD__\u003c/script>\n\u003cscript>\n(function () {\n    const payload = JSON.parse(document.getElementById('encPayload').textContent);\n    const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));\n    const form = document.getElementById('unlockForm');\n    const btn = document.getElementById('unlockBtn');\n    const err = document.getElementById('unlockErr');\n\n    async function unwrapContentKey(pwd) {\n        const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);\n        for (const slot of payload.slots) {\n            const kek = await crypto.subtle.deriveKey(\n                { name: 'PBKDF2', salt: b64(slot.salt), iterations: payload.iter, hash: 'SHA-256' },\n                base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);\n            try {\n                return await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(slot.iv) }, kek, b64(slot.key));\n            } catch (e) { /* not this slot -- try the next password slot */ }\n        }\n        return null;\n    }\n\n    form.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        const pwd = document.getElementById('unlockPwd').value;\n        if (!pwd) return;\n        if (!window.crypto || !crypto.subtle) {\n            err.textContent = '이 브라우저에서는 열 수 없습니다 (https 주소 또는 최신 브라우저가 필요합니다).';\n            return;\n        }\n        btn.disabled = true; btn.textContent = '여는 중...'; err.textContent = '';\n        try {\n            const rawKey = await unwrapContentKey(pwd);\n            if (!rawKey) throw new Error('bad password');\n            const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);\n            const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(payload.iv) }, key, b64(payload.data));\n            const reportHtml = new TextDecoder().decode(plain);\n            document.open();\n            document.write(reportHtml);\n            document.close();\n            // Hand the same password to the report's own lock screen: it still\n            // enforces the expiry date and decides user vs admin view.\n            const unlock = () => {\n                const input = document.getElementById('pwd');\n                if (input && typeof window.checkPassword === 'function') { input.value = pwd; window.checkPassword(); }\n            };\n            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', unlock); else unlock();\n        } catch (ex) {\n            btn.disabled = false; btn.textContent = '열기';\n            err.textContent = '비밀번호가 올바르지 않습니다.';\n        }\n    });\n})();\n\u003c/script>\n\u003c/body>\n\u003c/html>", "lockScreenHtml": "\u003cdiv id=\"lockScreen\" class=\"lock-screen\">\n    \u003ch2>Data Intel PRO 보안 리포트\u003c/h2>\n    \u003cp>만료일: __EXPIRY_TEXT__\u003c/p>\n    \u003cinput type=\"password\" id=\"pwd\" placeholder=\"비밀번호 입력\" autocomplete=\"off\">\n    \u003cbutton onclick=\"checkPassword()\">확인\u003c/button>\n    \u003cdiv id=\"errorMsg\" class=\"error\">\u003c/div>\n\u003c/div>", "iterations": 310000, "filler": "slLpTbatZTYoSWdbTIinyQZh"}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // ===== Lock screen =====
-const CORRECT_PWD = "nmLpTywxYmdtiYAKFZAheMGf";
-const ADMIN_PWD = "nmLpTywxYmdtiYAKFZAheMGf";
+const CORRECT_PWD = "slLpTbatZTYoSWdbTIinyQZh";
+const ADMIN_PWD = "slLpTbatZTYoSWdbTIinyQZh";
 const EXPIRY_DATE = new Date("9999-12-31T23:59:59");
 let isAdminUnlocked = false;
 
@@ -2009,6 +2012,18 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         const v = r['활동유무'];
         return v === '처리완료' || v === '접수' ? v : '미접수';
     }
+    // SP 담당자 선택 ('지사|담당자', ''=전체). SP 건만 거르고 SE/SG는 그대로 둔다.
+    let zoneOwnerSel = '';
+    const ownerClean = (v, missing) => (v === null || v === undefined || String(v).trim() === '') ? missing : String(v).trim();
+    const spOwnerKey = r => ownerClean(r['지사'], UNKNOWN_LABEL) + '|' + ownerClean(r['영업구역담당자'], '미매칭');
+    function spOwnerOptions(rows) {
+        // [{지사, 담당자, key, n}] -- 지사 조직 순서, 그 안에서 담당자 가나다
+        const counts = new Map();
+        rows.forEach(r => { if (r['활동대상구분'] === 'SP') { const k = spOwnerKey(r); counts.set(k, (counts.get(k) || 0) + 1); } });
+        const branchRank = b => { const i = DATA.branchOrder.indexOf(b); return i < 0 ? DATA.branchOrder.length : i; };
+        return Array.from(counts, ([key, n]) => { const [지사, 담당자] = key.split('|'); return { 지사, 담당자, key, n }; })
+            .sort((a, b) => (branchRank(a.지사) - branchRank(b.지사)) || (a.지사 < b.지사 ? -1 : a.지사 > b.지사 ? 1 : 0) || (a.담당자 < b.담당자 ? -1 : a.담당자 > b.담당자 ? 1 : 0));
+    }
     const zoneAllStatuses = () => zoneStatusSel.size === ZONE_STATUS_OPTIONS.length;
     const zonePass = r => zoneStatusSel.has(zoneStatusOf(r));
     function zoneCardEl(t, data) {
@@ -2041,7 +2056,30 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
                 btn.dataset.zoneMode = m;
                 pills.appendChild(btn);
             });
+            if (data.ownerOptions && data.ownerOptions.length) {
+                const lab = mkEl('label', 'zone-owner-pick');
+                lab.appendChild(mkEl('span', null, '담당자'));
+                const sel = mkEl('select', 'filter-select');
+                sel.dataset.zoneOwner = '1';
+                sel.appendChild(new Option('전체 담당자 (' + fmtInt(data.ownerOptions.length) + '명)', ''));
+                let group = null;
+                data.ownerOptions.forEach(o => {
+                    if (!group || group.label !== o.지사) { group = document.createElement('optgroup'); group.label = o.지사; sel.appendChild(group); }
+                    group.appendChild(new Option(o.담당자 + ' (' + fmtInt(o.n) + '건)', o.key));
+                });
+                sel.value = zoneOwnerSel;
+                lab.appendChild(sel);
+                pills.appendChild(lab);
+            }
             card.appendChild(pills);
+            if (zoneOwnerSel) {
+                const [b, o] = zoneOwnerSel.split('|');
+                const chip = mkEl('div', 'zone-owner-chip');
+                chip.appendChild(document.createTextNode('선택한 담당자: '));
+                chip.appendChild(mkEl('strong', null, b + ' · ' + o));
+                chip.appendChild(document.createTextNode(' -- SP 막대·표·요약·TOP 10·시설 조회에 적용 (SE/SG는 그대로)'));
+                card.appendChild(chip);
+            }
         }
 
         let summary = '대상 ' + fmtInt(total.대상) + '건 · 처리완료 ' + fmtInt(total.처리완료) + '건 · ';
@@ -2272,7 +2310,8 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         const labelSet = new Set(pts.filter(flagged).sort((a, b) => (a.처리율 - b.처리율) || (b.대상 - a.대상)).slice(0, 3).map(r => r.라벨));
         ordered.forEach(r => {
             const key = 'SP|' + r.라벨;
-            const g = el('g', { class: 'dv-pt' + (flagged(r) ? ' dv-pt-flag' : '') + (zoneFocus === key ? ' dv-pt-active' : ''), tabindex: 0 });
+            const picked = zoneOwnerSel && byOwner && r.라벨 === zoneOwnerSel.replace('|', '_');
+            const g = el('g', { class: 'dv-pt' + (flagged(r) ? ' dv-pt-flag' : '') + (zoneFocus === key || picked ? ' dv-pt-active' : ''), tabindex: 0 });
             g.dataset.zoneFocus = key;
             g.dataset.zoneFocusMode = byOwner ? 'owner' : 'zone';
             g.dataset.tip = [r.라벨, '대상 ' + fmtInt(r.대상) + '건 · 처리율 ' + r.처리율.toFixed(1) + '%', '처리완료 ' + fmtInt(r.처리완료) + ' · 미처리(접수) ' + fmtInt(r.접수) + ' · 미접수 ' + fmtInt(r.미접수)].join('||');
@@ -2334,7 +2373,7 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
     }
     function zoneFacilityListEl(zoneData) {
         const box = mkEl('div', 'table-section zone-facility');
-        const types = PROGRESS_TYPES.filter(t => zoneData[t]);
+        const types = PROGRESS_TYPES.filter(t => zoneData[t] && (!zoneOwnerSel || t === 'SP'));
         let groups = [];
         types.forEach(t => zoneData[t].rows.forEach(r => groups.push({ t, zoneCol: zoneData[t].zone_col, r })));
         if (zoneFocus) groups = groups.filter(g => g.t + '|' + g.r.라벨 === zoneFocus);
@@ -2586,9 +2625,14 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
     function rerenderZoneActivity() {
         const wrap = document.getElementById('zoneActivityWrap');
         if (!wrap) return;
-        const rows = applyGlobalFilter(latestMergedRows);
+        const allRows = applyGlobalFilter(latestMergedRows);
+        const hasOwner = allRows.some(r => r['영업구역담당자'] !== undefined && r['영업구역담당자'] !== null);
+        const options = hasOwner ? spOwnerOptions(allRows) : [];
+        if (zoneOwnerSel && !options.some(o => o.key === zoneOwnerSel)) zoneOwnerSel = '';  // 필터가 바뀌어 사라진 담당자
+        const rows = zoneOwnerSel ? allRows.filter(r => r['활동대상구분'] !== 'SP' || spOwnerKey(r) === zoneOwnerSel) : allRows;
         const zoneData = buildZoneActivityJS(rows, zoneSpMode);
-        const ownerData = zoneSpMode === 'owner' ? zoneData : buildZoneActivityJS(rows, 'owner');
+        if (zoneData && zoneData.SP) zoneData.SP.ownerOptions = options;
+        const ownerData = buildZoneActivityJS(allRows, 'owner');  // 산점도는 비교용으로 전체 유지
         renderZoneActivityEl(wrap, zoneData, ownerData);
     }
 
@@ -3321,6 +3365,7 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         zoneOwnerMap = payload.zoneOwnerMap || {};
         Object.keys(globalFilter).forEach(k => { globalFilter[k] = ''; });
         zoneFocus = null;
+        zoneOwnerSel = '';
         recomputeMerge();
         const barWrap = document.getElementById('globalFilterBarWrap');
         if (barWrap) buildGlobalFilterBarEl(barWrap, latestMergedRows);
@@ -3439,6 +3484,12 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
                 } else {
                     return;
                 }
+                rerenderZoneActivity();
+            });
+            zoneActivityWrap.addEventListener('change', (e) => {
+                if (!e.target.matches('[data-zone-owner]')) return;
+                zoneOwnerSel = e.target.value;
+                zoneFocus = null;
                 rerenderZoneActivity();
             });
             zoneActivityWrap.addEventListener('keydown', (e) => {

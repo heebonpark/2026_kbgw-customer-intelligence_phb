@@ -1392,7 +1392,10 @@ body {
 @media (max-width: 640px) { .dv-rank-row { grid-template-columns: 18px minmax(0, 1fr) 60px 48px; } .dv-rank-sub { display: none; } }
 .zone-seg.role-warning { color: #1f2937; }
 .zone-card[data-mode="zone_owner"] .zone-row { grid-template-columns: 190px 1fr 150px; }
-.zone-mode-row { margin: 8px 0 6px; }
+.zone-mode-row { margin: 8px 0 6px; align-items: center; }
+.zone-owner-pick { display: inline-flex; align-items: center; gap: 6px; margin-left: 8px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
+.zone-owner-pick select { max-width: 240px; }
+.zone-owner-chip { font-size: 12px; color: var(--text-secondary); background: color-mix(in srgb, var(--brand) 10%, var(--surface-1)); border: 1px solid color-mix(in srgb, var(--brand) 35%, var(--border)); border-radius: 8px; padding: 6px 10px; margin: 2px 0 8px; }
 .zone-status-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 4px 0 14px; }
 .zone-status-label { font-size: 12.5px; font-weight: 700; color: var(--text-secondary); }
 .filter-pill.ghost-pill { background: transparent; }
@@ -2903,6 +2906,18 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         const v = r['활동유무'];
         return v === '처리완료' || v === '접수' ? v : '미접수';
     }
+    // SP 담당자 선택 ('지사|담당자', ''=전체). SP 건만 거르고 SE/SG는 그대로 둔다.
+    let zoneOwnerSel = '';
+    const ownerClean = (v, missing) => (v === null || v === undefined || String(v).trim() === '') ? missing : String(v).trim();
+    const spOwnerKey = r => ownerClean(r['지사'], UNKNOWN_LABEL) + '|' + ownerClean(r['영업구역담당자'], '미매칭');
+    function spOwnerOptions(rows) {
+        // [{지사, 담당자, key, n}] -- 지사 조직 순서, 그 안에서 담당자 가나다
+        const counts = new Map();
+        rows.forEach(r => { if (r['활동대상구분'] === 'SP') { const k = spOwnerKey(r); counts.set(k, (counts.get(k) || 0) + 1); } });
+        const branchRank = b => { const i = DATA.branchOrder.indexOf(b); return i < 0 ? DATA.branchOrder.length : i; };
+        return Array.from(counts, ([key, n]) => { const [지사, 담당자] = key.split('|'); return { 지사, 담당자, key, n }; })
+            .sort((a, b) => (branchRank(a.지사) - branchRank(b.지사)) || (a.지사 < b.지사 ? -1 : a.지사 > b.지사 ? 1 : 0) || (a.담당자 < b.담당자 ? -1 : a.담당자 > b.담당자 ? 1 : 0));
+    }
     const zoneAllStatuses = () => zoneStatusSel.size === ZONE_STATUS_OPTIONS.length;
     const zonePass = r => zoneStatusSel.has(zoneStatusOf(r));
     function zoneCardEl(t, data) {
@@ -2935,7 +2950,30 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
                 btn.dataset.zoneMode = m;
                 pills.appendChild(btn);
             });
+            if (data.ownerOptions && data.ownerOptions.length) {
+                const lab = mkEl('label', 'zone-owner-pick');
+                lab.appendChild(mkEl('span', null, '담당자'));
+                const sel = mkEl('select', 'filter-select');
+                sel.dataset.zoneOwner = '1';
+                sel.appendChild(new Option('전체 담당자 (' + fmtInt(data.ownerOptions.length) + '명)', ''));
+                let group = null;
+                data.ownerOptions.forEach(o => {
+                    if (!group || group.label !== o.지사) { group = document.createElement('optgroup'); group.label = o.지사; sel.appendChild(group); }
+                    group.appendChild(new Option(o.담당자 + ' (' + fmtInt(o.n) + '건)', o.key));
+                });
+                sel.value = zoneOwnerSel;
+                lab.appendChild(sel);
+                pills.appendChild(lab);
+            }
             card.appendChild(pills);
+            if (zoneOwnerSel) {
+                const [b, o] = zoneOwnerSel.split('|');
+                const chip = mkEl('div', 'zone-owner-chip');
+                chip.appendChild(document.createTextNode('선택한 담당자: '));
+                chip.appendChild(mkEl('strong', null, b + ' · ' + o));
+                chip.appendChild(document.createTextNode(' -- SP 막대·표·요약·TOP 10·시설 조회에 적용 (SE/SG는 그대로)'));
+                card.appendChild(chip);
+            }
         }
 
         let summary = '대상 ' + fmtInt(total.대상) + '건 · 처리완료 ' + fmtInt(total.처리완료) + '건 · ';
@@ -3166,7 +3204,8 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         const labelSet = new Set(pts.filter(flagged).sort((a, b) => (a.처리율 - b.처리율) || (b.대상 - a.대상)).slice(0, 3).map(r => r.라벨));
         ordered.forEach(r => {
             const key = 'SP|' + r.라벨;
-            const g = el('g', { class: 'dv-pt' + (flagged(r) ? ' dv-pt-flag' : '') + (zoneFocus === key ? ' dv-pt-active' : ''), tabindex: 0 });
+            const picked = zoneOwnerSel && byOwner && r.라벨 === zoneOwnerSel.replace('|', '_');
+            const g = el('g', { class: 'dv-pt' + (flagged(r) ? ' dv-pt-flag' : '') + (zoneFocus === key || picked ? ' dv-pt-active' : ''), tabindex: 0 });
             g.dataset.zoneFocus = key;
             g.dataset.zoneFocusMode = byOwner ? 'owner' : 'zone';
             g.dataset.tip = [r.라벨, '대상 ' + fmtInt(r.대상) + '건 · 처리율 ' + r.처리율.toFixed(1) + '%', '처리완료 ' + fmtInt(r.처리완료) + ' · 미처리(접수) ' + fmtInt(r.접수) + ' · 미접수 ' + fmtInt(r.미접수)].join('||');
@@ -3228,7 +3267,7 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
     }
     function zoneFacilityListEl(zoneData) {
         const box = mkEl('div', 'table-section zone-facility');
-        const types = PROGRESS_TYPES.filter(t => zoneData[t]);
+        const types = PROGRESS_TYPES.filter(t => zoneData[t] && (!zoneOwnerSel || t === 'SP'));
         let groups = [];
         types.forEach(t => zoneData[t].rows.forEach(r => groups.push({ t, zoneCol: zoneData[t].zone_col, r })));
         if (zoneFocus) groups = groups.filter(g => g.t + '|' + g.r.라벨 === zoneFocus);
@@ -3480,9 +3519,14 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
     function rerenderZoneActivity() {
         const wrap = document.getElementById('zoneActivityWrap');
         if (!wrap) return;
-        const rows = applyGlobalFilter(latestMergedRows);
+        const allRows = applyGlobalFilter(latestMergedRows);
+        const hasOwner = allRows.some(r => r['영업구역담당자'] !== undefined && r['영업구역담당자'] !== null);
+        const options = hasOwner ? spOwnerOptions(allRows) : [];
+        if (zoneOwnerSel && !options.some(o => o.key === zoneOwnerSel)) zoneOwnerSel = '';  // 필터가 바뀌어 사라진 담당자
+        const rows = zoneOwnerSel ? allRows.filter(r => r['활동대상구분'] !== 'SP' || spOwnerKey(r) === zoneOwnerSel) : allRows;
         const zoneData = buildZoneActivityJS(rows, zoneSpMode);
-        const ownerData = zoneSpMode === 'owner' ? zoneData : buildZoneActivityJS(rows, 'owner');
+        if (zoneData && zoneData.SP) zoneData.SP.ownerOptions = options;
+        const ownerData = buildZoneActivityJS(allRows, 'owner');  // 산점도는 비교용으로 전체 유지
         renderZoneActivityEl(wrap, zoneData, ownerData);
     }
 
@@ -4215,6 +4259,7 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         zoneOwnerMap = payload.zoneOwnerMap || {};
         Object.keys(globalFilter).forEach(k => { globalFilter[k] = ''; });
         zoneFocus = null;
+        zoneOwnerSel = '';
         recomputeMerge();
         const barWrap = document.getElementById('globalFilterBarWrap');
         if (barWrap) buildGlobalFilterBarEl(barWrap, latestMergedRows);
@@ -4333,6 +4378,12 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
                 } else {
                     return;
                 }
+                rerenderZoneActivity();
+            });
+            zoneActivityWrap.addEventListener('change', (e) => {
+                if (!e.target.matches('[data-zone-owner]')) return;
+                zoneOwnerSel = e.target.value;
+                zoneFocus = null;
                 rerenderZoneActivity();
             });
             zoneActivityWrap.addEventListener('keydown', (e) => {
