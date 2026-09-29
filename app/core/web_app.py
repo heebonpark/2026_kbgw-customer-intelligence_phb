@@ -12,6 +12,9 @@ numbers for identical files.
 The page itself carries no customer data, so it needs no password; whoever
 opens it only ever sees the files they pick themselves.
 
+Excel files with several sheets get a sheet picker; the sheet whose header
+row has the column that slot needs (SHEET_HINT_COLUMNS) is pre-selected.
+
 Not covered here (desktop GUI only): 4. 해지 파이프라인 and 7. 해지시설
 내역 -- their sections are rendered server-side in Python only.
 """
@@ -29,6 +32,17 @@ from .report import CSS, APP_SCRIPT_TEMPLATE, render_admin_panel_shell
 
 SHEETJS_URL = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
 
+# A sheet whose first rows contain one of these columns is picked by default
+# when a workbook has several sheets.
+SHEET_HINT_COLUMNS = {
+    'db': ['활동대상구분', '담당채널'],
+    'voc': ['VOC유형대', '계약번호'],
+    'patrol': ['고객번호'],
+    'original': ['계약번호'],
+    'facility': ['계약번호'],
+    'zone_owner': ['구역번호'],
+}
+
 # (key, label, note) -- same numbering as the desktop GUI
 WEB_UPLOAD_SLOTS = [
     ('db', '1. 총괄관리DB', '필수'),
@@ -45,11 +59,12 @@ def _upload_slots_html():
     for key, label, note in WEB_UPLOAD_SLOTS:
         required = ' web-slot-required' if key == 'db' else ''
         cards.append(f"""
-        <label class="web-slot{required}" data-key="{key}">
+        <div class="web-slot{required}" data-key="{key}">
             <span class="web-slot-title">{label} <span class="web-slot-note">({note})</span></span>
             <input type="file" accept=".xlsx,.xls,.csv" data-key="{key}">
+            <select class="web-sheet" data-sheet-for="{key}" hidden title="시트 선택"></select>
             <span class="web-slot-status" data-status-for="{key}">파일을 선택하세요</span>
-        </label>""")
+        </div>""")
     return "".join(cards)
 
 
@@ -70,6 +85,7 @@ def generate_web_app_html():
         "matchable": MATCHABLE_FILES,
         "keyCandidates": FILE_KEY_CANDIDATES,
         "displayColumns": FILE_DISPLAY_COLUMNS,
+        "sheetHints": SHEET_HINT_COLUMNS,
     }
     # The report script's lock screen is never shown here (no data is embedded),
     # so its password constants are just unguessable filler.
@@ -103,13 +119,14 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
 .web-upload h2 { font-size: 17px; margin: 0 0 4px; color: var(--text-primary); }
 .web-upload .web-privacy { font-size: 12.5px; color: var(--text-secondary); margin: 0 0 16px; }
 .web-slots { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 10px; }
-.web-slot { display: flex; flex-direction: column; gap: 6px; border: 1px dashed var(--baseline); border-radius: 10px; padding: 12px 14px; cursor: pointer; background: var(--page-plane); }
+.web-slot { display: flex; flex-direction: column; gap: 6px; border: 1px dashed var(--baseline); border-radius: 10px; padding: 12px 14px; background: var(--page-plane); }
 .web-slot:hover { border-color: var(--brand); }
 .web-slot-required { border-style: solid; border-color: color-mix(in srgb, var(--brand) 55%, var(--border)); }
 .web-slot-title { font-size: 13px; font-weight: 700; color: var(--text-primary); }
 .web-slot-note { font-weight: 400; color: var(--text-muted); font-size: 11.5px; }
 .web-slot input[type=file] { font-size: 12px; color: var(--text-secondary); max-width: 100%; }
 .web-slot-status { font-size: 11.5px; color: var(--text-muted); }
+.web-sheet { font-size: 12.5px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text-primary); max-width: 100%; }
 .web-slot-status.ok { color: var(--good); font-weight: 600; }
 .web-slot-status.err { color: var(--critical); font-weight: 600; }
 .web-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
@@ -144,6 +161,7 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
                 <button type="button" class="web-run" id="webRunBtn" disabled>📊 대시보드 만들기</button>
                 <span class="web-progress" id="webProgress">1. 총괄관리DB는 필수입니다.</span>
             </div>
+            <p class="web-footnote">엑셀에서 열어 둔 파일도 선택할 수 있습니다 -- 단, <b>마지막으로 저장된 내용</b>을 읽으므로 수정 중이면 먼저 저장하세요. 시트가 여러 개면 필요한 컬럼이 있는 시트를 자동으로 고르고, 목록에서 바꿀 수 있습니다.</p>
             <p class="web-footnote">4. 해지파이프라인 · 7. 해지시설내역 섹션은 데스크톱 GUI 리포트에서 제공합니다.</p>
         </section>
 
@@ -208,7 +226,7 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
 // ===== 웹 업로드: 브라우저 안에서 파일을 읽어 리포트 엔진(window.DataIntelLoad)에 넘긴다 =====
 (function () {
     const CFG = JSON.parse(document.getElementById('uploadConfig').textContent);
-    const picked = {};   // key -> File
+    const picked = {};   // key -> { file, wb (parsed workbook), sheet }
     const runBtn = document.getElementById('webRunBtn');
     const progress = document.getElementById('webProgress');
     const setStatus = (key, text, cls) => {
@@ -216,18 +234,50 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
         if (el) { el.textContent = text; el.className = 'web-slot-status' + (cls ? ' ' + cls : ''); }
     };
 
+    const refreshRun = () => {
+        runBtn.disabled = !picked.db;
+        progress.textContent = picked.db ? '준비 완료 -- 대시보드 만들기를 누르세요.' : '1. 총괄관리DB는 필수입니다.';
+    };
+    const pickToken = {};  // key -> latest pick; a slower, older read must not overwrite a newer one
     document.querySelectorAll('.web-slot input[type=file]').forEach(input => {
-        input.addEventListener('change', () => {
+        input.addEventListener('change', async () => {
             const key = input.dataset.key;
-            if (input.files && input.files[0]) {
-                picked[key] = input.files[0];
-                setStatus(key, input.files[0].name, 'ok');
-            } else {
-                delete picked[key];
-                setStatus(key, '파일을 선택하세요');
+            const token = pickToken[key] = {};
+            const sel = document.querySelector('[data-sheet-for="' + key + '"]');
+            sel.hidden = true; sel.innerHTML = '';
+            delete picked[key];
+            const file = input.files && input.files[0];
+            if (!file) { setStatus(key, '파일을 선택하세요'); refreshRun(); return; }
+            setStatus(key, file.name + ' -- 여는 중...', 'ok');
+            runBtn.disabled = true;
+            await new Promise(r => setTimeout(r, 0));
+            try {
+                const wb = await readWorkbook(file);
+                if (pickToken[key] !== token) return;
+                sel.innerHTML = '';
+                const sheets = wb.SheetNames.map(name => ({ name, rows: sheetRowCount(wb.Sheets[name]) }));
+                const hinted = sheets.find(sh => sheetHasColumn(wb.Sheets[sh.name], CFG.sheetHints[key] || []));
+                const nonEmpty = sheets.find(sh => sh.rows > 0);
+                const chosen = (hinted || nonEmpty || sheets[0]).name;
+                picked[key] = { file, wb, sheet: chosen };
+                if (sheets.length > 1) {
+                    sheets.forEach(sh => sel.appendChild(new Option(sh.name + ' (' + sh.rows.toLocaleString('ko-KR') + '행)', sh.name)));
+                    sel.value = chosen;
+                    sel.hidden = false;
+                }
+                setStatus(key, file.name + (sheets.length > 1 ? ' · 시트 ' + sheets.length + '개' + (hinted ? ' (자동 선택: ' + chosen + ')' : '') : ''), 'ok');
+            } catch (e) {
+                console.error(e);
+                if (pickToken[key] !== token) return;
+                setStatus(key, '파일을 열 수 없습니다: ' + (e && e.message ? e.message : e), 'err');
             }
-            runBtn.disabled = !picked.db;
-            progress.textContent = picked.db ? '준비 완료 -- 대시보드 만들기를 누르세요.' : '1. 총괄관리DB는 필수입니다.';
+            refreshRun();
+        });
+    });
+    document.querySelectorAll('.web-sheet').forEach(sel => {
+        sel.addEventListener('change', () => {
+            const key = sel.dataset.sheetFor;
+            if (picked[key]) { picked[key].sheet = sel.value; setStatus(key, picked[key].file.name + ' · 시트: ' + sel.value, 'ok'); }
         });
     });
 
@@ -246,12 +296,31 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
         const blank = header.slice(1).filter(c => c === null || c === undefined || String(c).trim() === '').length;
         return blank >= header.length - 2;
     }
-    async function readTable(file) {
+    async function readWorkbook(file) {
         const buf = await file.arrayBuffer();
-        const wb = /\.csv$/i.test(file.name)
+        return /\.csv$/i.test(file.name)
             ? XLSX.read(decodeCsv(buf), { type: 'string', cellDates: true })
             : XLSX.read(buf, { type: 'array', cellDates: true });
-        const ws = wb.Sheets[wb.SheetNames[0]];
+    }
+    function sheetRowCount(ws) {
+        if (!ws || !ws['!ref']) return 0;
+        const r = XLSX.utils.decode_range(ws['!ref']);
+        return Math.max(0, r.e.r - r.s.r);  // 헤더 줄 제외
+    }
+    function sheetHasColumn(ws, names) {
+        // 첫 두 줄(제목 줄이 있는 경우 대비)에 원하는 컬럼명이 있는지만 본다 -- 시트 전체를 변환하지 않음
+        if (!ws || !ws['!ref'] || !names.length) return false;
+        const r = XLSX.utils.decode_range(ws['!ref']);
+        for (let row = r.s.r; row <= Math.min(r.s.r + 1, r.e.r); row++) {
+            for (let col = r.s.c; col <= r.e.c; col++) {
+                const cell = ws[XLSX.utils.encode_cell({ r: row, c: col })];
+                if (cell && cell.v != null && names.includes(String(cell.v).replace(/\u00a0/g, ' ').trim())) return true;
+            }
+        }
+        return false;
+    }
+    function readTable(wb, sheetName) {
+        const ws = wb.Sheets[sheetName];
         let aoa = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: null, blankrows: false });
         if (!aoa.length) return { columns: [], rows: [] };
         if (hasTitleRow(aoa[0]) && aoa.length > 1) aoa = aoa.slice(1);
@@ -308,23 +377,23 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
         try {
             const payload = { db: null, files: {}, zoneOwnerMap: {} };
             for (const key of Object.keys(picked)) {
-                progress.textContent = picked[key].name + ' 읽는 중...';
-                setStatus(key, picked[key].name + ' -- 읽는 중...', 'ok');
+                const p = picked[key];
+                progress.textContent = p.file.name + ' 읽는 중...';
                 await new Promise(r => setTimeout(r, 0));  // let the status paint before a long parse
-                const table = await readTable(picked[key]);
+                const table = readTable(p.wb, p.sheet);
                 if (key === 'db') {
                     payload.db = table;
                 } else if (key === 'zone_owner') {
                     const map = buildZoneOwnerMap(table);
-                    if (!map) { setStatus(key, '구역번호/담당자명 컬럼이 없습니다', 'err'); continue; }
+                    if (!map) { setStatus(key, '시트 "' + p.sheet + '"에 구역번호/담당자명 컬럼이 없습니다', 'err'); continue; }
                     payload.zoneOwnerMap = map;
                 } else if (CFG.matchable.includes(key)) {
                     const wanted = Array.from(new Set(CFG.keyCandidates[key].concat(CFG.displayColumns[key])));
                     payload.files[key] = pickColumns(table, wanted);
                 }
-                setStatus(key, picked[key].name + ' · ' + table.rows.length.toLocaleString('ko-KR') + '행', 'ok');
+                setStatus(key, p.file.name + (p.wb.SheetNames.length > 1 ? ' · 시트 ' + p.sheet : '') + ' · ' + table.rows.length.toLocaleString('ko-KR') + '행', 'ok');
             }
-            if (!payload.db.rows.length) throw new Error('총괄DB에 데이터 행이 없습니다.');
+            if (!payload.db.rows.length) throw new Error('총괄DB 시트 "' + picked.db.sheet + '"에 데이터 행이 없습니다.');
             progress.textContent = '병합·집계 중...';
             await new Promise(r => setTimeout(r, 0));
             document.getElementById('webDashboard').hidden = false;
