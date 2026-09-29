@@ -472,9 +472,6 @@ ZONE_SEGMENTS = {
     'SG': [('처리완료', 'role-good'), ('미처리', 'role-critical')],
 }
 ZONE_SEGMENT_LABELS = {'접수': '미처리(접수)'}
-# Segments narrower than this (% of track) skip their in-bar count label,
-# which would otherwise be clipped to an unreadable sliver.
-ZONE_SEG_LABEL_MIN_PCT = 4
 
 
 def _zone_table_columns(t):
@@ -502,8 +499,9 @@ def _zone_card_html(t, data):
             if not r[key]:
                 continue
             pct = r[key] / max_total * 100
-            text = f"{r[key]:,}" if pct >= ZONE_SEG_LABEL_MIN_PCT else ""
-            segs += f'<div class="zone-seg {role}" style="width:{pct:.2f}%">{text}</div>'
+            text = f"{r[key]:,}"
+            segs += (f'<div class="zone-seg {role}" style="width:{pct:.2f}%">'
+                     f'<span class="zl{min(len(text), 5)}">{text}</span></div>')
         tip = " · ".join(f"{ZONE_SEGMENT_LABELS.get(k, k)} {r[k]:,}" for k, _ in segments)
         bar_rows.append(f"""
         <div class="zone-row" tabindex="0" title="{_e(r['라벨'])}: 대상 {r['대상']:,}건 · {_e(tip)} · 처리율 {r['처리율']:.1f}%">
@@ -1315,8 +1313,65 @@ body {
 .zone-list { display: flex; flex-direction: column; gap: 6px; max-height: 560px; overflow-y: auto; padding-right: 4px; }
 .zone-row { display: grid; grid-template-columns: 130px 1fr 150px; align-items: center; gap: 10px; border-radius: 6px; }
 .zone-row:hover, .zone-row:focus { background: var(--page-plane); outline: none; }
-.zone-track { display: flex; gap: 1px; height: 18px; background: var(--grid-line); border-radius: 4px; overflow: hidden; }
+.zone-track { display: flex; gap: 2px; height: 18px; background: var(--grid-line); border-radius: 4px; overflow: hidden; }
 .zone-seg { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; color: #fff; overflow: hidden; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.zone-seg:last-child { border-radius: 0 4px 4px 0; }
+/* 조각 안 숫자는 들어갈 때만 표시 -- 잘린 숫자 대신 범례/툴팁/표가 값을 전달한다.
+   .zlN = 글자 수 N (쉼표 포함), 기준 = 글자당 약 7px + 좌우 여백 */
+.zone-seg { container-type: inline-size; }
+@container (max-width: 17px) { .zl1 { display: none; } }
+@container (max-width: 24px) { .zl2 { display: none; } }
+@container (max-width: 31px) { .zl3 { display: none; } }
+@container (max-width: 38px) { .zl4 { display: none; } }
+@container (max-width: 46px) { .zl5 { display: none; } }
+/* ---- 구역별 고급 시각화 ---- */
+.dv-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.dv-tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; }
+.dv-tile-lead { border-color: color-mix(in srgb, var(--brand) 45%, var(--border)); }
+.dv-tile-label { font-size: 12.5px; color: var(--text-secondary); font-weight: 600; }
+.dv-tile-value { font-size: 30px; font-weight: 700; color: var(--text-primary); margin: 4px 0 8px; letter-spacing: -0.5px; }
+.dv-tile-lead .dv-tile-value { font-size: 36px; }
+.dv-tile-status { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-secondary); margin-top: 8px; }
+.dv-tile-sub { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.dv-status-icon { font-size: 10px; }
+.dv-status-critical { color: var(--critical); } .dv-status-warning { color: var(--warning); } .dv-status-good { color: var(--good); }
+.dv-meter { height: 8px; border-radius: 4px; overflow: hidden; }
+.dv-meter-critical { background: color-mix(in srgb, var(--critical) 16%, var(--surface-1)); }
+.dv-meter-warning { background: color-mix(in srgb, var(--warning) 20%, var(--surface-1)); }
+.dv-meter-good { background: color-mix(in srgb, var(--good) 16%, var(--surface-1)); }
+.dv-meter-fill { height: 100%; border-radius: 0 4px 4px 0; }
+.dv-grid-2 { grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); margin-bottom: 16px; }
+.dv-card { display: flex; flex-direction: column; }
+.dv-rank { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.dv-rank-row { display: grid; grid-template-columns: 20px minmax(0, 1fr) 90px 52px 58px; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.dv-rank-row:hover, .dv-rank-row:focus { background: var(--page-plane); outline: none; }
+.dv-rank-no { color: var(--text-muted); font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.dv-rank-name { color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dv-type-badge { display: inline-block; font-size: 10px; font-weight: 700; color: var(--text-secondary); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; margin-right: 6px; }
+.dv-rank-value { text-align: right; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.dv-rank-sub { text-align: right; color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.dv-scatter-wrap { width: 100%; }
+.dv-scatter { width: 100%; height: auto; display: block; overflow: visible; }
+.dv-grid { stroke: var(--grid-line); stroke-width: 1; }
+.dv-axis { stroke: var(--baseline); stroke-width: 1; }
+.dv-tick { fill: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.dv-axis-title { fill: var(--text-muted); font-size: 11px; }
+.dv-ref { stroke: var(--text-muted); stroke-width: 1; opacity: 0.6; }
+.dv-ref-label { fill: var(--text-secondary); font-size: 11px; font-weight: 600; paint-order: stroke; stroke: var(--surface-1); stroke-width: 3px; }
+.dv-pt { cursor: pointer; outline: none; }
+.dv-hit { fill: transparent; }
+.dv-dot { fill: var(--s1); stroke: var(--surface-1); stroke-width: 2; }
+.dv-pt-flag .dv-dot { fill: var(--critical); }
+.dv-pt:hover .dv-dot, .dv-pt:focus .dv-dot { r: 7; }
+.dv-pt-active .dv-dot { stroke: var(--text-primary); }
+.dv-pt-label { fill: var(--text-primary); font-size: 11.5px; font-weight: 600; paint-order: stroke; stroke: var(--surface-1); stroke-width: 3px; }
+.dv-dot-key { width: 10px; height: 10px; border-radius: 50%; background: var(--s1); display: inline-block; }
+.dv-dot-key-flag { background: var(--critical); }
+.dv-tip { position: fixed; z-index: 9999; display: none; pointer-events: none; max-width: 320px; background: var(--surface-1); color: var(--text-primary);
+          border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
+.dv-tip-head { font-weight: 700; margin-bottom: 2px; }
+.dv-tip-line { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .dv-rank-row { grid-template-columns: 18px minmax(0, 1fr) 60px 48px; } .dv-rank-sub { display: none; } }
 .zone-seg.role-warning { color: #1f2937; }
 .zone-card[data-mode="zone_owner"] .zone-row { grid-template-columns: 190px 1fr 150px; }
 .zone-mode-row { margin: 8px 0 6px; }
@@ -2754,7 +2809,6 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         SG: [['처리완료', 'role-good'], ['미처리', 'role-critical']],
     };
     const ZONE_SEGMENT_LABELS = { 접수: '미처리(접수)' };
-    const ZONE_SEG_LABEL_MIN_PCT = 4;
     const zoneSegLabel = k => ZONE_SEGMENT_LABELS[k] || k;
 
     function zoneCounts(sub) {
@@ -2892,14 +2946,17 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
             row.dataset.zoneFocus = focusKey;
             row.tabIndex = 0;
             const tip = segments.map(([k]) => zoneSegLabel(k) + ' ' + fmtInt(r[k])).join(' · ');
-            row.title = r.라벨 + ': 대상 ' + fmtInt(r.대상) + '건 · ' + tip + ' · 처리율 ' + r.처리율.toFixed(1) + '%';
+            row.dataset.tip = [r.라벨, '대상 ' + fmtInt(r.대상) + '건 · 처리율 ' + r.처리율.toFixed(1) + '%', tip].join('||');
             row.appendChild(mkEl('span', 'bar-row-label', r.라벨));
             const track = mkEl('div', 'zone-track');
             segments.forEach(([key, role]) => {
                 const n = r._sel[key];
                 if (!n) return;
                 const pct = n / maxSel * 100;
-                const seg = mkEl('div', 'zone-seg ' + role, pct >= ZONE_SEG_LABEL_MIN_PCT ? fmtInt(n) : '');
+                const seg = mkEl('div', 'zone-seg ' + role);
+                const label = fmtInt(n);
+                // 숫자는 조각 너비에 들어갈 때만 보인다 (CSS container query, .zl1~.zl5)
+                seg.appendChild(mkEl('span', 'zl' + Math.min(label.length, 5), label));
                 seg.style.width = pct.toFixed(2) + '%';
                 track.appendChild(seg);
             });
@@ -2947,6 +3004,191 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         card.appendChild(details);
         return card;
     }
+    // ---- 고급 시각화: 요약 타일 / 집중관리 구역 TOP 10 / SP 담당자 분포 ----
+    // 처리율 상태색 기준은 진척율 표(progressCellStyle)와 같다: <30 위험, <55 주의, 그 이상 양호.
+    function rateRole(pct) { return pct < 30 ? 'critical' : pct < 55 ? 'warning' : 'good'; }
+    const RATE_ICON = { critical: '▼', warning: '■', good: '▲' };
+    const RATE_WORD = { critical: '위험', warning: '주의', good: '양호' };
+    const ZONE_FOCUS_MIN = 5; // TOP 10 표본 하한 -- 1건 중 0건(0%) 같은 구역이 목록을 채우지 않게
+
+    function zoneMeterEl(pct) {
+        const role = rateRole(pct);
+        const track = mkEl('div', 'dv-meter dv-meter-' + role);
+        const fill = mkEl('div', 'dv-meter-fill role-' + role);
+        fill.style.width = Math.max(0, Math.min(100, pct)).toFixed(1) + '%';
+        track.appendChild(fill);
+        return track;
+    }
+    function zoneKpiTilesEl(zoneData) {
+        const grid = mkEl('div', 'dv-tiles');
+        const types = PROGRESS_TYPES.filter(t => zoneData[t]);
+        const all = types.reduce((a, t) => {
+            const x = zoneData[t].total;
+            a.대상 += x.대상; a.처리완료 += x.처리완료; a.접수 += x.접수; a.미접수 += x.미접수;
+            return a;
+        }, { 대상: 0, 처리완료: 0, 접수: 0, 미접수: 0 });
+        all.미처리 = all.대상 - all.처리완료;
+        all.처리율 = all.대상 ? all.처리완료 / all.대상 * 100 : 0;
+        [['전체', all]].concat(types.map(t => [t + ' ' + ZONE_LABELS[t], zoneData[t].total])).forEach(([label, x], i) => {
+            const role = rateRole(x.처리율);
+            const tile = mkEl('div', 'dv-tile' + (i === 0 ? ' dv-tile-lead' : ''));
+            tile.appendChild(mkEl('div', 'dv-tile-label', label + ' 처리율'));
+            const v = mkEl('div', 'dv-tile-value', x.처리율.toFixed(1) + '%');
+            tile.appendChild(v);
+            tile.appendChild(zoneMeterEl(x.처리율));
+            const st = mkEl('div', 'dv-tile-status');
+            st.appendChild(mkEl('span', 'dv-status-icon dv-status-' + role, RATE_ICON[role]));
+            st.appendChild(document.createTextNode(RATE_WORD[role]));
+            tile.appendChild(st);
+            tile.appendChild(mkEl('div', 'dv-tile-sub',
+                '처리완료 ' + fmtInt(x.처리완료) + ' / 대상 ' + fmtInt(x.대상) + '건 · 미처리 ' + fmtInt(x.미처리) + '건'));
+            grid.appendChild(tile);
+        });
+        return grid;
+    }
+    function zoneFocusTop10El(zoneData) {
+        const card = mkEl('section', 'chart-card dv-card');
+        card.appendChild(mkEl('h3', 'chart-title', '집중관리 구역 TOP 10'));
+        card.appendChild(mkEl('p', 'chart-note', '대상 ' + ZONE_FOCUS_MIN + '건 이상 구역 중 처리율 낮은 순 (같으면 미처리 많은 순) · 클릭하면 아래 시설 조회'));
+        const cand = [];
+        PROGRESS_TYPES.forEach(t => {
+            if (!zoneData[t]) return;
+            zoneData[t].rows.forEach(r => { if (r.대상 >= ZONE_FOCUS_MIN) cand.push({ t, r }); });
+        });
+        cand.sort((a, b) => (a.r.처리율 - b.r.처리율) || (b.r.미처리 - a.r.미처리));
+        if (!cand.length) {
+            card.appendChild(mkEl('div', 'empty-card', '대상 ' + ZONE_FOCUS_MIN + '건 이상인 구역이 없습니다.'));
+            return card;
+        }
+        const list = mkEl('ol', 'dv-rank');
+        cand.slice(0, 10).forEach(({ t, r }, i) => {
+            const li = mkEl('li', 'dv-rank-row');
+            const key = t + '|' + r.라벨;
+            if (zoneFocus === key) li.classList.add('zone-row-active');
+            li.dataset.zoneFocus = key;
+            li.tabIndex = 0;
+            li.dataset.tip = [t + ' ' + r.라벨, '처리율 ' + r.처리율.toFixed(1) + '% (' + fmtInt(r.처리완료) + '/' + fmtInt(r.대상) + '건)', '미처리 ' + fmtInt(r.미처리) + '건'].join('||');
+            li.appendChild(mkEl('span', 'dv-rank-no', String(i + 1)));
+            const name = mkEl('span', 'dv-rank-name');
+            name.appendChild(mkEl('span', 'dv-type-badge', t));
+            name.appendChild(document.createTextNode(r.라벨));
+            li.appendChild(name);
+            li.appendChild(zoneMeterEl(r.처리율));
+            li.appendChild(mkEl('span', 'dv-rank-value', r.처리율.toFixed(1) + '%'));
+            li.appendChild(mkEl('span', 'dv-rank-sub', '미처리 ' + fmtInt(r.미처리)));
+            list.appendChild(li);
+        });
+        card.appendChild(list);
+        return card;
+    }
+    function niceStep(max, target) {
+        const raw = max / target;
+        const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+        const n = raw / mag;
+        return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag;
+    }
+    function ownerScatterEl(spData) {
+        const byOwner = spData && spData.mode;
+        const card = mkEl('section', 'chart-card dv-card');
+        card.appendChild(mkEl('h3', 'chart-title', byOwner ? 'SP 담당자 분포 -- 담당 물량 vs 처리율' : 'SP 영업구역 분포 -- 대상 건수 vs 처리율'));
+        const pts = spData ? spData.rows.filter(r => r.대상 > 0) : [];
+        if (pts.length < 2) {
+            card.appendChild(mkEl('div', 'empty-card', '분포를 그릴 SP 데이터가 부족합니다.'));
+            return card;
+        }
+        const avgRate = spData.total.처리율;
+        const avgLoad = spData.total.대상 / pts.length;
+        const flagged = r => r.처리율 < avgRate && r.대상 >= avgLoad;
+        card.appendChild(mkEl('p', 'chart-note', '점 하나 = ' + (byOwner ? '지사_담당자' : '지사_구역') + ' · 평균 처리율 ' + avgRate.toFixed(1) + '%, 평균 물량 ' + avgLoad.toFixed(1) + '건 · 점을 클릭하면 그 시설 조회'));
+
+        const legend = mkEl('div', 'legend-grid zone-legend');
+        [['dv-dot-key', (byOwner ? '담당자' : '구역')], ['dv-dot-key dv-dot-key-flag', '집중관리 (처리율 평균 미만 · 물량 평균 이상)']].forEach(([cls, text]) => {
+            const it = mkEl('div', 'legend-item');
+            it.appendChild(mkEl('span', cls));
+            it.appendChild(mkEl('span', 'legend-label', text));
+            legend.appendChild(it);
+        });
+        card.appendChild(legend);
+
+        const W = 720, H = 300, m = { l: 44, r: 16, t: 12, b: 34 };
+        const pw = W - m.l - m.r, ph = H - m.t - m.b;
+        const maxX = Math.max(...pts.map(r => r.대상));
+        const stepX = niceStep(maxX, 5);
+        const topX = Math.ceil(maxX / stepX) * stepX || 1;
+        const x = v => m.l + v / topX * pw;
+        const y = v => m.t + (1 - v / 100) * ph;
+        const NS = 'http://www.w3.org/2000/svg';
+        const el = (tag, attrs, text) => {
+            const e = document.createElementNS(NS, tag);
+            Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
+            if (text !== undefined) e.textContent = text;
+            return e;
+        };
+        const svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H, class: 'dv-scatter', role: 'img',
+            'aria-label': 'SP ' + (byOwner ? '담당자' : '구역') + '별 대상 건수와 처리율 산점도' });
+        [0, 25, 50, 75, 100].forEach(v => {
+            svg.appendChild(el('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), class: 'dv-grid' }));
+            svg.appendChild(el('text', { x: m.l - 8, y: y(v) + 4, class: 'dv-tick', 'text-anchor': 'end' }, v + '%'));
+        });
+        for (let v = 0; v <= topX + 1e-9; v += stepX) {
+            svg.appendChild(el('text', { x: x(v), y: H - m.b + 18, class: 'dv-tick', 'text-anchor': 'middle' }, fmtInt(v)));
+        }
+        svg.appendChild(el('line', { x1: m.l, x2: W - m.r, y1: y(0), y2: y(0), class: 'dv-axis' }));
+        svg.appendChild(el('text', { x: W - m.r, y: H - 2, class: 'dv-axis-title', 'text-anchor': 'end' }, '대상 건수 →'));
+        // 평균 기준선 (hairline) + 라벨
+        svg.appendChild(el('line', { x1: m.l, x2: W - m.r, y1: y(avgRate), y2: y(avgRate), class: 'dv-ref' }));
+        svg.appendChild(el('text', { x: m.l + 6, y: y(avgRate) - 5, class: 'dv-ref-label' }, '평균 처리율 ' + avgRate.toFixed(1) + '%'));
+        svg.appendChild(el('line', { x1: x(avgLoad), x2: x(avgLoad), y1: m.t, y2: y(0), class: 'dv-ref' }));
+        svg.appendChild(el('text', { x: x(avgLoad) + 5, y: m.t + 10, class: 'dv-ref-label' }, '평균 물량 ' + avgLoad.toFixed(1) + '건'));
+
+        // 집중관리 점은 위에 그린다 (겹칠 때 가려지지 않게). 라벨은 가장 급한 3명만.
+        const ordered = pts.slice().sort((a, b) => flagged(a) - flagged(b));
+        const labelSet = new Set(pts.filter(flagged).sort((a, b) => (a.처리율 - b.처리율) || (b.대상 - a.대상)).slice(0, 3).map(r => r.라벨));
+        ordered.forEach(r => {
+            const key = 'SP|' + r.라벨;
+            const g = el('g', { class: 'dv-pt' + (flagged(r) ? ' dv-pt-flag' : '') + (zoneFocus === key ? ' dv-pt-active' : ''), tabindex: 0 });
+            g.dataset.zoneFocus = key;
+            g.dataset.zoneFocusMode = byOwner ? 'owner' : 'zone';
+            g.dataset.tip = [r.라벨, '대상 ' + fmtInt(r.대상) + '건 · 처리율 ' + r.처리율.toFixed(1) + '%', '처리완료 ' + fmtInt(r.처리완료) + ' · 미처리(접수) ' + fmtInt(r.접수) + ' · 미접수 ' + fmtInt(r.미접수)].join('||');
+            g.appendChild(el('circle', { cx: x(r.대상), cy: y(r.처리율), r: 12, class: 'dv-hit' }));
+            g.appendChild(el('circle', { cx: x(r.대상), cy: y(r.처리율), r: 5, class: 'dv-dot' }));
+            svg.appendChild(g);
+            if (labelSet.has(r.라벨)) {
+                const nearRight = x(r.대상) > W - 160;
+                svg.appendChild(el('text', { x: x(r.대상) + (nearRight ? -9 : 9), y: y(r.처리율) + 4, class: 'dv-pt-label',
+                    'text-anchor': nearRight ? 'end' : 'start' }, r.라벨.split('_').slice(1).join('_')));
+            }
+        });
+        const wrap = mkEl('div', 'dv-scatter-wrap');
+        wrap.appendChild(svg);
+        card.appendChild(wrap);
+        return card;
+    }
+
+    // 공용 hover 툴팁 -- data-tip="줄1||줄2||줄3"
+    let dvTipEl = null;
+    function dvTip() {
+        if (!dvTipEl || !document.body.contains(dvTipEl)) {
+            dvTipEl = mkEl('div', 'dv-tip');
+            dvTipEl.setAttribute('role', 'tooltip');
+            document.body.appendChild(dvTipEl);
+        }
+        return dvTipEl;
+    }
+    function showDvTip(target, clientX, clientY) {
+        const tip = dvTip();
+        tip.innerHTML = '';
+        target.dataset.tip.split('||').forEach((line, i) => tip.appendChild(mkEl('div', i ? 'dv-tip-line' : 'dv-tip-head', line)));
+        tip.style.display = 'block';
+        const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight;
+        let left = clientX + pad, top = clientY + pad;
+        if (left + w > window.innerWidth - 8) left = clientX - w - pad;
+        if (top + h > window.innerHeight - 8) top = clientY - h - pad;
+        tip.style.left = Math.max(8, left) + 'px';
+        tip.style.top = Math.max(8, top) + 'px';
+    }
+    function hideDvTip() { if (dvTipEl) dvTipEl.style.display = 'none'; }
+
     function zoneStatusPillsEl() {
         const wrap = mkEl('div', 'zone-status-bar');
         wrap.appendChild(mkEl('span', 'zone-status-label', '활동유무 (복수 선택)'));
@@ -3068,7 +3310,7 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         a.href = url; a.download = '구역별_시설조회.csv'; a.click();
         URL.revokeObjectURL(url);
     }
-    function renderZoneActivityEl(containerEl, zoneData) {
+    function renderZoneActivityEl(containerEl, zoneData, ownerData) {
         // Keep whichever 건수 표 toggles the viewer had open across a re-render
         const openTables = new Set(Array.from(containerEl.querySelectorAll('.zone-card')).filter(c => {
             const d = c.querySelector('details.zone-table-toggle');
@@ -3083,6 +3325,11 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
             zoneFocus = null; // 필터/보기 기준이 바뀌어 그 구역이 사라졌으면 해제
         }
         containerEl.appendChild(zoneStatusPillsEl());
+        containerEl.appendChild(zoneKpiTilesEl(zoneData));
+        const dvGrid = mkEl('div', 'chart-grid dv-grid-2');
+        dvGrid.appendChild(zoneFocusTop10El(zoneData));
+        dvGrid.appendChild(ownerScatterEl(ownerData && ownerData.SP ? ownerData.SP : zoneData.SP));
+        containerEl.appendChild(dvGrid);
         PROGRESS_TYPES.forEach(t => {
             if (!zoneData[t]) return;
             const card = zoneCardEl(t, zoneData[t]);
@@ -3093,7 +3340,11 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
     }
     function rerenderZoneActivity() {
         const wrap = document.getElementById('zoneActivityWrap');
-        if (wrap) renderZoneActivityEl(wrap, buildZoneActivityJS(applyGlobalFilter(latestMergedRows), zoneSpMode));
+        if (!wrap) return;
+        const rows = applyGlobalFilter(latestMergedRows);
+        const zoneData = buildZoneActivityJS(rows, zoneSpMode);
+        const ownerData = zoneSpMode === 'owner' ? zoneData : buildZoneActivityJS(rows, 'owner');
+        renderZoneActivityEl(wrap, zoneData, ownerData);
     }
 
     // ---- SP 부진자 추가분석 (SP담당 컬럼 기준) -- mirrors analytics.py build_sp_rep_performance ----
@@ -3848,7 +4099,13 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
                     else if (zoneStatusSel.has(v)) zoneStatusSel.delete(v);
                     else zoneStatusSel.add(v);
                 } else if (focusRow) {
-                    zoneFocus = zoneFocus === focusRow.dataset.zoneFocus ? null : focusRow.dataset.zoneFocus;
+                    const nextMode = focusRow.dataset.zoneFocusMode;
+                    if (nextMode && nextMode !== zoneSpMode && ZONE_SP_MODES[nextMode]) {
+                        zoneSpMode = nextMode;  // 산점도 점: 그 점과 같은 기준(담당자별)으로 전환 후 조회
+                        zoneFocus = focusRow.dataset.zoneFocus;
+                    } else {
+                        zoneFocus = zoneFocus === focusRow.dataset.zoneFocus ? null : focusRow.dataset.zoneFocus;
+                    }
                 } else if (e.target.closest('[data-zone-focus-clear]')) {
                     zoneFocus = null;
                 } else if (e.target.closest('[data-zone-csv]')) {
@@ -3860,8 +4117,19 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
                 rerenderZoneActivity();
             });
             zoneActivityWrap.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && e.target.matches('[data-zone-focus]')) e.target.click();
+                const t = e.target.closest && e.target.closest('[data-zone-focus]');
+                if (e.key === 'Enter' && t) t.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             });
+            zoneActivityWrap.addEventListener('mousemove', (e) => {
+                const t = e.target.closest('[data-tip]');
+                if (t) showDvTip(t, e.clientX, e.clientY); else hideDvTip();
+            });
+            zoneActivityWrap.addEventListener('mouseleave', hideDvTip);
+            zoneActivityWrap.addEventListener('focusin', (e) => {
+                const t = e.target.closest('[data-tip]');
+                if (t) { const b = t.getBoundingClientRect(); showDvTip(t, b.left + b.width / 2, b.bottom); }
+            });
+            zoneActivityWrap.addEventListener('focusout', hideDvTip);
             rerenderZoneActivity(); // 서버 렌더 결과를 조회 기능이 붙은 화면으로 교체
         }
 
