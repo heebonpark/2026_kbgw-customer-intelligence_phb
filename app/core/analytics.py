@@ -294,6 +294,49 @@ def build_progress_type_charts(matrix):
     return charts
 
 
+# 활동대상구분별로 구역 기준 컬럼이 다르다 -- SP는 영업구역정보(F열), SE는
+# 기술구역정보(G열), SG는 구역정보(H열). 앞에 있는 이름이 우선.
+ZONE_COL_CANDIDATES = {
+    'SP': ['영업구역정보', '영업구역번호', '영업구역'],
+    'SE': ['기술구역정보', '기술구역번호', '기술구역'],
+    'SG': ['구역정보', '구역'],
+}
+ZONE_LABELS = {'SP': '영업구역', 'SE': '기술구역', 'SG': '구역'}
+
+
+def build_zone_activity(df):
+    """SP/SE/SG 각각을 해당 구역 컬럼별로 묶어 활동유무 건수를 센다.
+    처리율은 처리완료만 분자로 친다 (접수는 미처리). 구역 값이 비어 있는
+    건은 '미상'으로 모아 합계가 대상 건수와 항상 맞게 한다. 처리율이 낮은
+    구역이 먼저 오도록 정렬 (같으면 대상 건수가 많은 순)."""
+    if df is None or '활동대상구분' not in df.columns:
+        return None
+    status = df['활동유무'] if '활동유무' in df.columns else pd.Series(index=df.index, dtype=object)
+
+    def _counts(sub_status):
+        total = len(sub_status)
+        done = int((sub_status == '처리완료').sum())
+        received = int((sub_status == '접수').sum())
+        not_received = int((sub_status == '미접수').sum())
+        return {
+            "대상": total, "처리완료": done, "접수": received, "미접수": not_received,
+            "미처리": total - done, "처리율": (done / total * 100) if total else 0.0,
+        }
+
+    result = {}
+    for t in PROGRESS_TYPES:
+        zone_col = _first_matching_col(df, ZONE_COL_CANDIDATES[t])
+        mask = df['활동대상구분'] == t
+        if not zone_col or not mask.any():
+            continue
+        zones = df.loc[mask, zone_col].fillna(UNKNOWN_LABEL).astype(str).str.strip().replace('', UNKNOWN_LABEL)
+        sub_status = status[mask]
+        rows = [dict(구역=z, **_counts(sub_status[zones == z])) for z in zones.unique()]
+        rows.sort(key=lambda r: (r['처리율'], -r['대상'], r['구역']))
+        result[t] = {"zone_col": zone_col, "rows": rows, "total": _counts(sub_status)}
+    return result or None
+
+
 def build_branch_insights(matrix):
     """지사별 분석리포트 요약 -- 전체/유형별 최고·최저 지사를 문장으로 바로
     쓸 수 있는 형태로 요약. build_progress_matrix가 이미 계산한 진척율을

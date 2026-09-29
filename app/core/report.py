@@ -13,7 +13,7 @@ from .analytics import (
     find_unregistered_high_value_cancellations, build_progress_matrix, PROGRESS_TYPES,
     build_progress_type_charts, build_branch_insights, build_sp_rep_performance,
     build_sp_pending_contact_list, build_recontract_target_analysis, kakao_map_link,
-    _fmt_compact_won,
+    build_zone_activity, ZONE_LABELS, _fmt_compact_won,
 )
 from .handlers import HQ_ORDER, BRANCH_ORDER
 from .matching_config import (
@@ -461,6 +461,103 @@ def render_progress_type_dashboard(charts):
     if not parts:
         return ""
     return f'<div class="chart-grid">{"".join(parts)}</div>'
+
+
+# 구역별 활동유무 -- SP는 처리완료/접수/미접수, SE/SG는 처리완료/미처리로
+# 나눠 누적 막대로 그린다. 막대 길이는 가장 큰 구역의 대상 건수 대비라서
+# 구역 간 물량 차이도 함께 보인다.
+ZONE_SEGMENTS = {
+    'SP': [('처리완료', 'role-good'), ('접수', 'role-warning'), ('미접수', 'role-critical')],
+    'SE': [('처리완료', 'role-good'), ('미처리', 'role-critical')],
+    'SG': [('처리완료', 'role-good'), ('미처리', 'role-critical')],
+}
+ZONE_SEGMENT_LABELS = {'접수': '미처리(접수)'}
+# Segments narrower than this (% of track) skip their in-bar count label,
+# which would otherwise be clipped to an unreadable sliver.
+ZONE_SEG_LABEL_MIN_PCT = 4
+
+
+def _zone_table_columns(t):
+    if t == 'SP':
+        return ['대상', '처리완료', '접수', '미접수', '처리율']
+    return ['대상', '처리완료', '미처리', '처리율']
+
+
+def _zone_card_html(t, data):
+    rows = data['rows']
+    total = data['total']
+    max_total = max((r['대상'] for r in rows), default=0) or 1
+    segments = ZONE_SEGMENTS[t]
+
+    legend = "".join(
+        f'<div class="legend-item"><span class="legend-swatch {role}"></span>'
+        f'<span class="legend-label">{_e(ZONE_SEGMENT_LABELS.get(key, key))}</span></div>'
+        for key, role in segments
+    )
+
+    bar_rows = []
+    for r in rows:
+        segs = ""
+        for key, role in segments:
+            if not r[key]:
+                continue
+            pct = r[key] / max_total * 100
+            text = f"{r[key]:,}" if pct >= ZONE_SEG_LABEL_MIN_PCT else ""
+            segs += f'<div class="zone-seg {role}" style="width:{pct:.2f}%">{text}</div>'
+        tip = " · ".join(f"{ZONE_SEGMENT_LABELS.get(k, k)} {r[k]:,}" for k, _ in segments)
+        bar_rows.append(f"""
+        <div class="zone-row" tabindex="0" title="{_e(r['구역'])}: 대상 {r['대상']:,}건 · {_e(tip)} · 처리율 {r['처리율']:.1f}%">
+            <span class="bar-row-label">{_e(r['구역'])}</span>
+            <div class="zone-track">{segs}</div>
+            <span class="bar-row-value">{r['처리율']:.1f}% <span class="zone-sub">({r['처리완료']:,}/{r['대상']:,}건)</span></span>
+        </div>""")
+
+    columns = _zone_table_columns(t)
+    head = f"<th>{_e(ZONE_LABELS[t])}</th>" + "".join(
+        f"<th>{_e(ZONE_SEGMENT_LABELS.get(c, c))}</th>" for c in columns
+    )
+
+    def table_row(label, r, is_total=False):
+        cells = [f'<td class="progress-branch{" progress-total-label" if is_total else ""}">{_e(label)}</td>']
+        for c in columns:
+            if c == '처리율':
+                style, text_role = _progress_cell_style(r[c])
+                cells.append(f'<td class="cell-num progress-cell {text_role}" style="{style}">{r[c]:.1f}%</td>')
+            else:
+                cells.append(f'<td class="cell-num">{r[c]:,}</td>')
+        attrs = ' class="progress-total-row"' if is_total else ''
+        return f'<tr{attrs}>{"".join(cells)}</tr>'
+
+    body = "".join(table_row(r['구역'], r) for r in rows) + table_row('계', total, is_total=True)
+
+    summary = f"대상 {total['대상']:,}건 · 처리완료 {total['처리완료']:,}건 · "
+    if t == 'SP':
+        summary += f"미처리(접수) {total['접수']:,}건 · 미접수 {total['미접수']:,}건 · "
+    else:
+        summary += f"미처리 {total['미처리']:,}건 · "
+    summary += f"처리율 {total['처리율']:.1f}%"
+
+    return f"""
+    <section class="chart-card zone-card" id="zoneActivity{t}">
+        <h3 class="chart-title">{_e(t)} {_e(ZONE_LABELS[t])}별 활동유무 <span class="zone-sub">({_e(data['zone_col'])} 기준, {len(rows):,}개 구역, 처리율 낮은 순)</span></h3>
+        <p class="chart-note">{_e(summary)}</p>
+        <div class="legend-grid zone-legend">{legend}</div>
+        <div class="zone-list">{"".join(bar_rows)}</div>
+        <details class="zone-table-toggle">
+            <summary>{_e(ZONE_LABELS[t])}별 건수 표 보기</summary>
+            <div class="table-scroll"><table class="progress-table">
+                <thead><tr>{head}</tr></thead>
+                <tbody>{body}</tbody>
+            </table></div>
+        </details>
+    </section>"""
+
+
+def render_zone_activity_section(zone_data):
+    if not zone_data:
+        return ('<div class="empty-card">구역별로 집계할 데이터가 없습니다 '
+                '(영업구역정보/기술구역정보/구역정보 컬럼을 찾지 못했습니다).</div>')
+    return "".join(_zone_card_html(t, zone_data[t]) for t in PROGRESS_TYPES if t in zone_data)
 
 
 def render_branch_insights(insights, section_id="progressInsight"):
@@ -1194,6 +1291,19 @@ body {
 }
 .bar-group-header:first-child { margin-top: 0; }
 .bar-group-count { font-weight: 400; font-size: 11px; color: var(--text-muted); }
+
+.zone-card { margin-bottom: 16px; }
+.zone-sub { font-size: 11px; font-weight: 400; color: var(--text-muted); }
+.zone-legend { margin: 0 0 12px; }
+.zone-list { display: flex; flex-direction: column; gap: 6px; max-height: 560px; overflow-y: auto; padding-right: 4px; }
+.zone-row { display: grid; grid-template-columns: 96px 1fr 150px; align-items: center; gap: 10px; border-radius: 6px; }
+.zone-row:hover, .zone-row:focus { background: var(--page-plane); outline: none; }
+.zone-track { display: flex; gap: 1px; height: 18px; background: var(--grid-line); border-radius: 4px; overflow: hidden; }
+.zone-seg { height: 100%; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; color: #fff; overflow: hidden; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.zone-seg.role-warning { color: #1f2937; }
+.zone-table-toggle { margin-top: 14px; }
+.zone-table-toggle > summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
+@media (max-width: 640px) { .zone-row { grid-template-columns: 72px 1fr 110px; gap: 6px; } }
 
 .stack-bar { display: flex; height: 22px; border-radius: 6px; overflow: hidden; gap: 2px; background: var(--surface-1); }
 .stack-seg { height: 100%; min-width: 2px; }
@@ -2583,6 +2693,156 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         containerEl.appendChild(grid);
     }
 
+    // ---- 구역별 활동유무 -- mirrors analytics.py build_zone_activity / report.py render_zone_activity_section ----
+    const ZONE_COL_CANDIDATES = {
+        SP: ['영업구역정보', '영업구역번호', '영업구역'],
+        SE: ['기술구역정보', '기술구역번호', '기술구역'],
+        SG: ['구역정보', '구역'],
+    };
+    const ZONE_LABELS = { SP: '영업구역', SE: '기술구역', SG: '구역' };
+    const ZONE_SEGMENTS = {
+        SP: [['처리완료', 'role-good'], ['접수', 'role-warning'], ['미접수', 'role-critical']],
+        SE: [['처리완료', 'role-good'], ['미처리', 'role-critical']],
+        SG: [['처리완료', 'role-good'], ['미처리', 'role-critical']],
+    };
+    const ZONE_SEGMENT_LABELS = { 접수: '미처리(접수)' };
+    const ZONE_SEG_LABEL_MIN_PCT = 4;
+    const zoneSegLabel = k => ZONE_SEGMENT_LABELS[k] || k;
+
+    function zoneCounts(sub) {
+        const total = sub.length;
+        const done = sub.filter(r => r['활동유무'] === '처리완료').length;
+        const received = sub.filter(r => r['활동유무'] === '접수').length;
+        const notReceived = sub.filter(r => r['활동유무'] === '미접수').length;
+        return { 대상: total, 처리완료: done, 접수: received, 미접수: notReceived, 미처리: total - done, 처리율: total ? done / total * 100 : 0 };
+    }
+    function buildZoneActivityJS(rows) {
+        if (!rows.length) return null;
+        const cols = new Set();
+        rows.forEach(r => Object.keys(r).forEach(k => cols.add(k)));
+        const result = {};
+        PROGRESS_TYPES.forEach(t => {
+            const zoneCol = ZONE_COL_CANDIDATES[t].find(c => cols.has(c));
+            const sub = rows.filter(r => r['활동대상구분'] === t);
+            if (!zoneCol || !sub.length) return;
+            const groups = new Map();
+            sub.forEach(r => {
+                const v = r[zoneCol];
+                const z = (v === null || v === undefined || String(v).trim() === '') ? UNKNOWN_LABEL : String(v).trim();
+                if (!groups.has(z)) groups.set(z, []);
+                groups.get(z).push(r);
+            });
+            const zoneRows = Array.from(groups, ([z, g]) => Object.assign({ 구역: z }, zoneCounts(g)));
+            zoneRows.sort((a, b) => (a.처리율 - b.처리율) || (b.대상 - a.대상) || a.구역.localeCompare(b.구역));
+            result[t] = { zone_col: zoneCol, rows: zoneRows, total: zoneCounts(sub) };
+        });
+        return Object.keys(result).length ? result : null;
+    }
+    function zoneCardEl(t, data) {
+        const rows = data.rows, total = data.total;
+        const maxTotal = Math.max(1, ...rows.map(r => r.대상));
+        const segments = ZONE_SEGMENTS[t];
+        const card = mkEl('section', 'chart-card zone-card');
+        card.id = 'zoneActivity' + t;
+
+        const title = mkEl('h3', 'chart-title', t + ' ' + ZONE_LABELS[t] + '별 활동유무 ');
+        title.appendChild(mkEl('span', 'zone-sub', '(' + data.zone_col + ' 기준, ' + fmtInt(rows.length) + '개 구역, 처리율 낮은 순)'));
+        card.appendChild(title);
+
+        let summary = '대상 ' + fmtInt(total.대상) + '건 · 처리완료 ' + fmtInt(total.처리완료) + '건 · ';
+        summary += t === 'SP'
+            ? '미처리(접수) ' + fmtInt(total.접수) + '건 · 미접수 ' + fmtInt(total.미접수) + '건 · '
+            : '미처리 ' + fmtInt(total.미처리) + '건 · ';
+        summary += '처리율 ' + total.처리율.toFixed(1) + '%';
+        card.appendChild(mkEl('p', 'chart-note', summary));
+
+        const legend = mkEl('div', 'legend-grid zone-legend');
+        segments.forEach(([key, role]) => {
+            const item = mkEl('div', 'legend-item');
+            item.appendChild(mkEl('span', 'legend-swatch ' + role));
+            item.appendChild(mkEl('span', 'legend-label', zoneSegLabel(key)));
+            legend.appendChild(item);
+        });
+        card.appendChild(legend);
+
+        const list = mkEl('div', 'zone-list');
+        rows.forEach(r => {
+            const row = mkEl('div', 'zone-row');
+            row.tabIndex = 0;
+            const tip = segments.map(([k]) => zoneSegLabel(k) + ' ' + fmtInt(r[k])).join(' · ');
+            row.title = r.구역 + ': 대상 ' + fmtInt(r.대상) + '건 · ' + tip + ' · 처리율 ' + r.처리율.toFixed(1) + '%';
+            row.appendChild(mkEl('span', 'bar-row-label', r.구역));
+            const track = mkEl('div', 'zone-track');
+            segments.forEach(([key, role]) => {
+                if (!r[key]) return;
+                const pct = r[key] / maxTotal * 100;
+                const seg = mkEl('div', 'zone-seg ' + role, pct >= ZONE_SEG_LABEL_MIN_PCT ? fmtInt(r[key]) : '');
+                seg.style.width = pct.toFixed(2) + '%';
+                track.appendChild(seg);
+            });
+            row.appendChild(track);
+            const value = mkEl('span', 'bar-row-value', r.처리율.toFixed(1) + '% ');
+            value.appendChild(mkEl('span', 'zone-sub', '(' + fmtInt(r.처리완료) + '/' + fmtInt(r.대상) + '건)'));
+            row.appendChild(value);
+            list.appendChild(row);
+        });
+        card.appendChild(list);
+
+        const columns = t === 'SP' ? ['대상', '처리완료', '접수', '미접수', '처리율'] : ['대상', '처리완료', '미처리', '처리율'];
+        const details = mkEl('details', 'zone-table-toggle');
+        details.appendChild(mkEl('summary', null, ZONE_LABELS[t] + '별 건수 표 보기'));
+        const wrap = mkEl('div', 'table-scroll');
+        const table = mkEl('table', 'progress-table');
+        const thead = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        headRow.appendChild(mkEl('th', null, ZONE_LABELS[t]));
+        columns.forEach(c => headRow.appendChild(mkEl('th', null, zoneSegLabel(c))));
+        thead.appendChild(headRow);
+        table.appendChild(thead);
+        const tbody = document.createElement('tbody');
+        function tableRow(label, r, isTotal) {
+            const tr = document.createElement('tr');
+            if (isTotal) tr.className = 'progress-total-row';
+            tr.appendChild(mkEl('td', 'progress-branch' + (isTotal ? ' progress-total-label' : ''), label));
+            columns.forEach(c => {
+                if (c === '처리율') {
+                    const { bg, textRole } = progressCellStyle(r[c]);
+                    const td = mkEl('td', 'cell-num progress-cell ' + textRole, r[c].toFixed(1) + '%');
+                    td.setAttribute('style', bg);
+                    tr.appendChild(td);
+                } else {
+                    tr.appendChild(mkEl('td', 'cell-num', fmtInt(r[c])));
+                }
+            });
+            tbody.appendChild(tr);
+        }
+        rows.forEach(r => tableRow(r.구역, r, false));
+        tableRow('계', total, true);
+        table.appendChild(tbody);
+        wrap.appendChild(table);
+        details.appendChild(wrap);
+        card.appendChild(details);
+        return card;
+    }
+    function renderZoneActivityEl(containerEl, zoneData) {
+        // Keep whichever 건수 표 toggles the viewer had open across a filter change
+        const openTables = new Set(Array.from(containerEl.querySelectorAll('.zone-card')).filter(c => {
+            const d = c.querySelector('details.zone-table-toggle');
+            return d && d.open;
+        }).map(c => c.id));
+        containerEl.innerHTML = '';
+        if (!zoneData) {
+            containerEl.appendChild(mkEl('div', 'empty-card', '구역별로 집계할 데이터가 없습니다 (영업구역정보/기술구역정보/구역정보 컬럼을 찾지 못했습니다).'));
+            return;
+        }
+        PROGRESS_TYPES.forEach(t => {
+            if (!zoneData[t]) return;
+            const card = zoneCardEl(t, zoneData[t]);
+            if (openTables.has(card.id)) card.querySelector('details.zone-table-toggle').open = true;
+            containerEl.appendChild(card);
+        });
+    }
+
     // ---- SP 부진자 추가분석 (SP담당 컬럼 기준) -- mirrors analytics.py build_sp_rep_performance ----
     function modeOf(g, col) {
         const counts = new Map();
@@ -3213,6 +3473,9 @@ document.addEventListener('DOMContentLoaded', wireNudgeFilter);
         const progressTypeWrap = document.getElementById('progressTypeWrap');
         if (progressTypeWrap) renderProgressTypeDashboardEl(progressTypeWrap, buildProgressTypeChartsJS(progressMatrix));
 
+        const zoneActivityWrap = document.getElementById('zoneActivityWrap');
+        if (zoneActivityWrap) renderZoneActivityEl(zoneActivityWrap, buildZoneActivityJS(filtered));
+
         const spRepSectionWrap = document.getElementById('spRepSectionWrap');
         if (spRepSectionWrap) renderSpRepSectionEl(spRepSectionWrap, buildSpRepPerformanceJS(filtered));
 
@@ -3421,6 +3684,7 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
     progress_chart_html = render_progress_bar_chart(progress_matrix)
     progress_type_dashboard_html = render_progress_type_dashboard(build_progress_type_charts(progress_matrix))
     branch_insights_html = render_branch_insights(build_branch_insights(progress_matrix))
+    zone_activity_html = render_zone_activity_section(build_zone_activity(df))
     sp_rep_section_html = render_sp_rep_section(build_sp_rep_performance(df))
     sp_pending_section_html = render_sp_pending_section(build_sp_pending_contact_list(df))
     recontract_section_html = render_recontract_section(build_recontract_target_analysis(df))
@@ -3520,6 +3784,13 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
         <div class="table-section" id="progressSection">
             {progress_table_html}
             {progress_chart_html}
+        </div>
+        </details>
+
+        <details class="section-collapse" open>
+        <summary class="section-title">구역별 활동 현황 (SP 영업구역 · SE 기술구역 · SG 구역)</summary>
+        <div id="zoneActivityWrap">
+            {zone_activity_html}
         </div>
         </details>
 
