@@ -2014,6 +2014,22 @@ document.addEventListener('DOMContentLoaded', initDashNav);
     let zoneOwnerMap = DATA.zoneOwnerMap || {};
     const SP_ZONE_COL_CANDIDATES = ['영업구역정보', '영업구역번호', '영업구역'];
     const SP_OWNER_COL_CANDIDATES = ['SP담당', 'SP_담당', 'SP 담당', 'SP담당자', 'SP_담당자', 'SP 담당자'];  // handlers.py와 같게
+    // 구역 열 찾기 (handlers.py find_zone_col과 같게): 이름(정확 -> 비슷한 이름) + 값이 구역 코드 형태인지
+    const ZONE_FUZZY = { SP: [['영업구역'], []], SE: [['기술구역'], []], SG: [['출동구역', '구역정보'], ['영업', '기술']] };
+    const ZONE_CODE_RE = /^[A-Za-z]{0,4}\\d{2,}[A-Za-z0-9-]*$/;
+    function zoneLikeCol(rows, col) {
+        const vals = [];
+        for (let i = 0; i < rows.length && i < 20000 && vals.length < 300; i++) { const v = zoneKey(rows[i][col]); if (v) vals.push(v); }
+        if (!vals.length) return true;
+        return vals.filter(v => ZONE_CODE_RE.test(v)).length / vals.length >= 0.6;
+    }
+    function findZoneCol(rows, cols, kind, candidates) {
+        const exact = candidates.find(c => cols.includes(c) && zoneLikeCol(rows, c));
+        if (exact) return exact;
+        const [inc, exc] = ZONE_FUZZY[kind];
+        const norm = n => String(n).replace(/[\\s_()\\-·]/g, '');
+        return cols.find(c => { const n = norm(c); return inc.some(f => n.includes(f)) && !exc.some(x => n.includes(x)) && zoneLikeCol(rows, c); }) || null;
+    }
 
     const STATUS_RANK_JS = { 미접수: 0, 접수: 1, 처리완료: 2 };  // handlers.py STATUS_RANK
     const statusRank = v => (typeof v === 'string' && v in STATUS_RANK_JS ? STATUS_RANK_JS[v] : -1);
@@ -2048,7 +2064,7 @@ document.addEventListener('DOMContentLoaded', initDashNav);
             rows.forEach(r => { if ('활동유무' in r) r['활동유무_원래열'] = r['활동유무']; r['활동유무'] = r[statusColUsed]; });
         }
         rows.forEach(r => { r['활동유무'] = normalizeStatus(r['활동유무']); });
-        const spZoneCol = SP_ZONE_COL_CANDIDATES.find(c => dbColSet.has(c)) || null;
+        const spZoneCol = findZoneCol(dbRowsBase, Array.from(dbColSet), 'SP', SP_ZONE_COL_CANDIDATES);
         const useOwnerMap = Object.keys(zoneOwnerMap).length > 0 && !!spZoneCol;
         const spOwnerCol = SP_OWNER_COL_CANDIDATES.find(c => dbColSet.has(c)) || null;
         if (spOwnerCol && spOwnerCol !== 'SP담당') rows.forEach(r => { r['SP담당'] = r[spOwnerCol]; });
@@ -3001,7 +3017,7 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         const cmp = (x, y) => x < y ? -1 : x > y ? 1 : 0;
         const result = {};
         PROGRESS_TYPES.forEach(t => {
-            const zoneCol = ZONE_COL_CANDIDATES[t].find(c => cols.has(c));
+            const zoneCol = findZoneCol(rows, Array.from(cols), t, ZONE_COL_CANDIDATES[t]);
             const sub = rows.filter(r => r['활동대상구분'] === t);
             if (!zoneCol || !sub.length) return;
             let mode = null, keys = ['지사', '구역'];

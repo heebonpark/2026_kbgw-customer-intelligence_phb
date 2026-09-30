@@ -94,6 +94,41 @@ def _zone_key(v):
     return s or None
 
 
+# 구역 열 찾기 -- 이름(정확 -> 비슷한 이름) + 값 검사. 구역 값은 G230001 / T001 / Z01 같은
+# 코드여야 한다; '만기도래_신규' 같은 글자가 든 열(예: 재계약대상 구분)은 구역 열로 쓰지 않는다.
+# report.py findZoneCol()과 같은 규칙.
+ZONE_FUZZY = {
+    'SP': (['영업구역'], []),
+    'SE': (['기술구역'], []),
+    'SG': (['출동구역', '구역정보'], ['영업', '기술']),
+}
+_ZONE_CODE_RE = re.compile(r'^[A-Za-z]{0,4}\d{2,}[A-Za-z0-9-]*$')
+
+
+def zone_like(series, sample=300):
+    """값이 대부분(60% 이상) 구역 코드 형태인지. 값이 하나도 없으면 판단 보류(True)."""
+    vals = [v for v in (_zone_key(x) for x in series.head(20000)) if v][:sample]
+    if not vals:
+        return True
+    return sum(1 for v in vals if _ZONE_CODE_RE.match(v)) / len(vals) >= 0.6
+
+
+def _norm_header(name):
+    return re.sub(r'[\s_()\-·]', '', str(name))
+
+
+def find_zone_col(df, kind, candidates):
+    for c in candidates:
+        if c in df.columns and zone_like(df[c]):
+            return c
+    include, exclude = ZONE_FUZZY[kind]
+    for c in df.columns:
+        n = _norm_header(c)
+        if any(f in n for f in include) and not any(x in n for x in exclude) and zone_like(df[c]):
+            return c
+    return None
+
+
 def build_zone_owner_map(zone_owner_df):
     """{구역번호: 담당자명}. A zone listed under several names keeps all of
     them joined with '/' (in file order) rather than silently picking one; a
@@ -422,7 +457,7 @@ def process_and_merge(files_dict, matching_config):
     if sp_owner_col and sp_owner_col != 'SP담당':
         merged_df['SP담당'] = merged_df[sp_owner_col]  # 기존 SP담당 기반 섹션(부진자·발송 리스트·재계약)도 읽도록
     zone_owner_map = build_zone_owner_map(files_dict.get('zone_owner'))
-    sp_zone_col = _first_matching_col(merged_df, SP_ZONE_COL_CANDIDATES)
+    sp_zone_col = find_zone_col(merged_df, 'SP', SP_ZONE_COL_CANDIDATES)
     use_map = bool(zone_owner_map and sp_zone_col)
     if (use_map or sp_owner_col) and '활동대상구분' in merged_df.columns:
         is_sp = merged_df['활동대상구분'] == 'SP'

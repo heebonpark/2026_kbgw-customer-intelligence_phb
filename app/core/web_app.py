@@ -81,9 +81,10 @@ FIELD_SPECS = {
         {'name': '서비스번호', 'aliases': ['서비스번호']},
         {'name': '상호', 'aliases': ['상호', '상호명', '고객명']},
         {'name': '설치주소', 'aliases': ['설치주소', '주소']},
-        {'name': '영업구역정보', 'aliases': ['영업구역정보', '영업구역번호', '영업구역']},
-        {'name': '기술구역정보', 'aliases': ['기술구역정보', '기술구역번호', '기술구역']},
-        {'name': '구역정보', 'aliases': ['구역정보', '구역']},
+        # zone: 값이 구역 코드(G230001 / T001 / Z01) 형태인 열만 자동 선택 -- 재계약대상 구분 같은 글자 열 제외
+        {'name': '영업구역정보', 'aliases': ['영업구역정보', '영업구역번호', '영업구역'], 'zone': True, 'fuzzy': ['영업구역']},
+        {'name': '기술구역정보', 'aliases': ['기술구역정보', '기술구역번호', '기술구역'], 'zone': True, 'fuzzy': ['기술구역']},
+        {'name': '구역정보', 'aliases': ['구역정보', '구역'], 'zone': True, 'fuzzy': ['출동구역', '구역정보'], 'fuzzyExclude': ['영업', '기술']},
         {'name': '활동유무', 'aliases': ['활동유무', '활동유무(o,x)'], 'prefix': '활동유무', 'required': True},
         {'name': 'SP담당', 'aliases': ['SP담당', 'SP_담당', 'SP 담당', 'SP담당자', 'SP_담당자', 'SP 담당자']},
     ],
@@ -385,24 +386,42 @@ __DASH_SECTIONS__
         const blank = first.slice(1).filter(n => !n).length;
         return (first.length >= 3 && blank >= first.length - 2) ? r.s.r + 2 : r.s.r + 1;
     }
-    function autoMap(key, cells, saved) {
-        // 저장된 설정(헤더 이름 -> 열 위치 순) -> 이름 자동 매칭 순으로 각 표준 컬럼의 열을 정한다
+    // 구역 값 검사 (엔진 findZoneCol과 같은 규칙): 대부분 G230001 / T001 / Z01 같은 코드여야 구역 열
+    const ZONE_CODE_RE = /^[A-Za-z]{0,4}\d{2,}[A-Za-z0-9-]*$/;
+    function zoneSample(ws, headerRow, idx, limit) {
+        const r = sheetRange(ws);
+        const vals = [];
+        if (!r) return vals;
+        for (let rr = headerRow; rr <= r.e.r && vals.length < (limit || 300); rr++) {
+            const cell = ws[XLSX.utils.encode_cell({ r: rr, c: r.s.c + idx })];
+            if (!cell || cell.v === null || cell.v === undefined) continue;
+            let v = String(cell.v).replace(/ /g, ' ').trim();
+            if (v.endsWith('.0')) v = v.slice(0, -2);
+            if (v) vals.push(v);
+        }
+        return vals;
+    }
+    function zoneLike(ws, headerRow, idx) {
+        const vals = zoneSample(ws, headerRow, idx);
+        if (!vals.length) return true;
+        return vals.filter(v => ZONE_CODE_RE.test(v)).length / vals.length >= 0.6;
+    }
+    const normHeader = n => String(n).replace(/[\s_()\-·]/g, '');
+    function autoMap(key, cells, saved, ws, headerRow) {
+        // 헤더 이름으로만 찾는다 (예전처럼 'G열' 같은 위치로 기억하면, 양식이 바뀐 파일에서 엉뚱한 열이 잡힌다)
         const map = {};
         (CFG.fieldSpecs[key] || []).forEach(spec => {
             const sv = saved && saved.fields ? saved.fields[spec.name] : undefined;
             if (sv === '') { map[spec.name] = -1; return; }  // 사용자가 '(없음)'으로 둔 항목
-            let idx = -1;
-            if (sv) {
-                const byName = sv.header ? cells.find(c => c.name === sv.header) : null;
-                const byLetter = cells.find(c => c.letter === sv.letter);
-                idx = byName ? byName.idx : byLetter ? byLetter.idx : -1;
-            }
-            if (idx < 0) {
-                const exact = spec.aliases.map(a => cells.find(c => c.name === a)).find(Boolean);
-                const pref = spec.prefix ? cells.find(c => c.name.startsWith(spec.prefix)) : null;
-                idx = exact ? exact.idx : pref ? pref.idx : -1;
-            }
-            map[spec.name] = idx;
+            const ok = c => !spec.zone || !ws || zoneLike(ws, headerRow, c.idx);
+            let hit = sv && sv.header ? cells.find(c => c.name === sv.header && ok(c)) : null;
+            if (!hit) hit = spec.aliases.map(a => cells.find(c => c.name === a && ok(c))).find(Boolean);
+            if (!hit && spec.prefix) hit = cells.find(c => c.name.startsWith(spec.prefix) && ok(c));
+            if (!hit && spec.fuzzy) hit = cells.find(c => {
+                const n = normHeader(c.name);
+                return spec.fuzzy.some(f => n.includes(f)) && !(spec.fuzzyExclude || []).some(x => n.includes(x)) && ok(c);
+            });
+            map[spec.name] = hit ? hit.idx : -1;
         });
         return map;
     }
@@ -440,7 +459,7 @@ __DASH_SECTIONS__
         const ws = p.wb.Sheets[sheet];
         p.headerRow = headerRow || detectHeaderRow(ws, key);
         const cells = headerCells(ws, p.headerRow);
-        p.map = autoMap(key, cells, saved);
+        p.map = autoMap(key, cells, saved, ws, p.headerRow);
         if (key === 'db') {
             // 활동유무: 이름으로 잡은 열에 상태값이 하나도 없을 때만, 상태값이 가장 많은 열로 (예: 상태 열).
             // 활동유무 열에 상태값이 있으면 그대로 둔다 -- 엔진 detectStatusCol과 같은 규칙.
@@ -483,7 +502,7 @@ __DASH_SECTIONS__
         hr.type = 'number'; hr.min = '1'; hr.value = p.headerRow; hr.dataset.headerFor = key;
         hr.addEventListener('change', () => {
             p.headerRow = Math.max(1, parseInt(hr.value, 10) || 1);
-            p.map = autoMap(key, headerCells(ws, p.headerRow), null);
+            p.map = autoMap(key, headerCells(ws, p.headerRow), null, ws, p.headerRow);
             saveSettings(key); renderMapBox(key); refreshRun();
         });
         hrLabel.appendChild(hr);
@@ -515,6 +534,11 @@ __DASH_SECTIONS__
             box.appendChild(grid);
             const miss = missingRequired(key);
             if (miss.length) box.appendChild(mk('div', 'web-map-warn', '필수 컬럼을 찾지 못했습니다: ' + miss.join(', ') + ' -- 드롭다운에서 열을 지정하세요.'));
+            specs.filter(sp => sp.zone && p.map[sp.name] >= 0 && !zoneLike(ws, p.headerRow, p.map[sp.name])).forEach(sp => {
+                const c = cells.find(x => x.idx === p.map[sp.name]);
+                const ex = zoneSample(ws, p.headerRow, p.map[sp.name], 3).join(', ');
+                box.appendChild(mk('div', 'web-map-warn', sp.name + '(' + c.letter + '열 · ' + (c.name || '빈 헤더') + ')의 값이 구역번호 형태가 아닙니다 (예: ' + ex + ') -- 다른 열을 지정하세요.'));
+            });
         }
         // 미리보기: 지정한 컬럼(매핑이 없는 파일은 앞 6개 열) 기준 데이터 앞 3행
         const shown = specs.length

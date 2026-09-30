@@ -18,7 +18,7 @@ import pandas as pd
 from .handlers import (
     HQ_ORDER, BRANCH_ORDER, normalize_hq, normalize_branch,
     to_numeric_amount, _first_matching_col,
-    SP_ZONE_COL_CANDIDATES, ZONE_OWNER_OUTPUT_COL, _zone_key,
+    SP_ZONE_COL_CANDIDATES, ZONE_OWNER_OUTPUT_COL, _zone_key, find_zone_col,
 )
 
 UNKNOWN_LABEL = "미상"
@@ -341,7 +341,7 @@ def build_zone_activity(df, sp_mode='zone_owner'):
     has_owner = ZONE_OWNER_OUTPUT_COL in df.columns
     result = {}
     for t in PROGRESS_TYPES:
-        zone_col = _first_matching_col(df, ZONE_COL_CANDIDATES[t])
+        zone_col = find_zone_col(df, t, ZONE_COL_CANDIDATES[t])
         mask = df['활동대상구분'] == t
         if not zone_col or not mask.any():
             continue
