@@ -38,6 +38,7 @@ _make_streams_safe()
 # when Pandas tries to print warnings containing \xa0 to sys.stderr on Windows
 warnings.filterwarnings("ignore")
 
+import re
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter import ttk
@@ -62,6 +63,17 @@ ACCENT = "#2563eb"
 ACCENT_DARK = "#1d4ed8"
 TEXT_MUTED = "#64748b"
 TEXT_DARK = "#0f172a"
+
+
+# Tk 8.6 on recent macOS kills the whole Python process (SIGBUS in CoreText's
+# CopyEmojiImage) the moment a widget draws a color emoji. Leave those out of
+# labels/buttons there; Windows and Tk 9 keep them. Text symbols like ★ are fine.
+_STRIP_EMOJI = sys.platform == 'darwin' and float(tk.TkVersion) < 9.0
+_COLOR_EMOJI = re.compile('[\U0001F300-\U0001FAFF\u2699\uFE0F]')
+
+
+def ui(text):
+    return _COLOR_EMOJI.sub('', text).strip() if _STRIP_EMOJI else text
 
 
 def load_file_notes():
@@ -122,7 +134,7 @@ class DataIntelGUI:
         header = tk.Frame(self.root, bg=ACCENT, height=70)
         header.pack(fill=tk.X)
         header.pack_propagate(False)
-        tk.Label(header, text="📊 Data Intel PRO", bg=ACCENT, fg="white",
+        tk.Label(header, text=ui("📊 Data Intel PRO"), bg=ACCENT, fg="white",
                  font=("Helvetica", 18, "bold")).pack(side=tk.LEFT, padx=(20, 8), pady=14)
         tk.Label(header, text="데이터 병합 및 리포트 생성기", bg=ACCENT, fg="#dbeafe",
                  font=("Helvetica", 11)).pack(side=tk.LEFT, pady=14)
@@ -173,7 +185,7 @@ class DataIntelGUI:
         # ---- password / expiry ----
         opts_card = self._card(body)
         opts_card.pack(fill=tk.X, pady=(14, 0))
-        tk.Label(opts_card, text="⚙️ 리포트 옵션", bg=CARD_BG, fg=TEXT_DARK,
+        tk.Label(opts_card, text=ui("⚙️ 리포트 옵션"), bg=CARD_BG, fg=TEXT_DARK,
                  font=("Helvetica", 11, "bold")).pack(anchor="w", padx=14, pady=(10, 6))
 
         pwd_row = tk.Frame(opts_card, bg=CARD_BG)
@@ -203,12 +215,12 @@ class DataIntelGUI:
         # ---- actions ----
         action_row = tk.Frame(body, bg=BG)
         action_row.pack(fill=tk.X, pady=14)
-        ttk.Button(action_row, text="💾 설명 저장", style="Ghost.TButton",
+        ttk.Button(action_row, text=ui("💾 설명 저장"), style="Ghost.TButton",
                    command=self.save_notes).pack(side=tk.LEFT)
-        self.run_btn = ttk.Button(action_row, text="🚀 데이터 병합 및 리포트 생성 실행",
+        self.run_btn = ttk.Button(action_row, text=ui("🚀 데이터 병합 및 리포트 생성 실행"),
                                    style="Action.TButton", command=self.run_process)
         self.run_btn.pack(side=tk.RIGHT)
-        self.deploy_btn = ttk.Button(action_row, text="🌐 GitHub Pages 배포", style="Ghost.TButton",
+        self.deploy_btn = ttk.Button(action_row, text=ui("🌐 GitHub Pages 배포"), style="Ghost.TButton",
                                      command=self.deploy_report, state=tk.DISABLED)
         self.deploy_btn.pack(side=tk.RIGHT, padx=(0, 8))
 
@@ -243,7 +255,7 @@ class DataIntelGUI:
 
         row3 = tk.Frame(card, bg=CARD_BG)
         row3.pack(fill=tk.X, padx=12, pady=(0, 10))
-        tk.Label(row3, text="📝 설명:", bg=CARD_BG, fg=TEXT_MUTED, font=("Helvetica", 9)).pack(side=tk.LEFT)
+        tk.Label(row3, text=ui("📝 설명:"), bg=CARD_BG, fg=TEXT_MUTED, font=("Helvetica", 9)).pack(side=tk.LEFT)
         note_ent = tk.Entry(row3, textvariable=self.file_notes[key], font=("Helvetica", 9), fg="#334155")
         note_ent.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(6, 0))
         self._bind_autocorrect(note_ent, self.file_notes[key], strip_quotes=False)
