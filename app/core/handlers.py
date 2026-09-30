@@ -381,7 +381,8 @@ def process_and_merge(files_dict, matching_config):
     # 실적 집계는 전부 '활동유무'(처리완료/접수/미접수)를 읽는다. 그 값이 든 열을 값으로
     # 찾아 '활동유무'로 맞춘다 -- 예: 상태 열에 있고 활동유무(o,x)에는 방문상담/재계약인 총괄DB.
     status_col = detect_status_col(merged_df)
-    match_report['status_col'] = status_col
+    # match_report 값은 모두 [{db_col, file_col}] 목록 (generate_report.py / main.py가 그렇게 읽음)
+    match_report['status'] = [{'db_col': status_col, 'file_col': '(실적 기준 열)'}] if status_col else []
     if status_col and status_col != '활동유무':
         if '활동유무' in merged_df.columns:
             merged_df['활동유무_원래열'] = merged_df['활동유무']

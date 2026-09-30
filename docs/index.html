@@ -818,12 +818,12 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
 </div>
 
 <script type="application/json" id="embeddedData">{"db": {"columns": [], "rows": []}, "files": {"original": {"columns": [], "rows": []}, "facility": {"columns": [], "rows": []}, "patrol": {"columns": [], "rows": []}, "voc": {"columns": [], "rows": []}, "cancel": {"columns": [], "rows": []}, "cancelled_facility": {"columns": [], "rows": []}}, "matchingConfig": {"original": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "facility": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "patrol": [{"db_col": "서비스번호", "file_col": "고객번호", "enabled": true}], "voc": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "cancel": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "cancelled_facility": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}]}, "fileLabels": {"original": "2026년 관리고객원본", "facility": "시설현황", "patrol": "순찰 정기점검 내역", "voc": "VOC정보조회", "cancel": "해지 파이프라인", "cancelled_facility": "해지시설 내역"}, "dbKeyCandidates": ["계약번호", "서비스번호"], "fileKeyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "hqOrder": ["강북/강원", "강남/서부", "대구/경북", "부산/경남", "충남/충북", "전남/전북"], "branchOrder": ["중앙", "강북", "서대문", "고양", "의정부", "남양주", "강릉", "원주"], "zoneOwnerMap": {}}</script>
-<script type="application/json" id="uploadConfig">{"matchable": ["original", "facility", "patrol", "voc", "cancel", "cancelled_facility"], "keyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "sheetHints": {"db": ["활동대상구분", "담당채널"], "voc": ["VOC유형대", "계약번호"], "patrol": ["고객번호"], "original": ["계약번호"], "facility": ["계약번호"], "zone_owner": ["구역번호"]}, "fieldSpecs": {"db": [{"name": "활동대상구분", "aliases": ["활동대상구분", "담당채널"], "required": true}, {"name": "지사", "aliases": ["지사", "관리지사명", "관리지사"], "required": true}, {"name": "계약번호", "aliases": ["계약번호"]}, {"name": "서비스번호", "aliases": ["서비스번호"]}, {"name": "상호", "aliases": ["상호", "상호명", "고객명"]}, {"name": "설치주소", "aliases": ["설치주소", "주소"]}, {"name": "영업구역정보", "aliases": ["영업구역정보", "영업구역번호", "영업구역"], "zone": true, "fuzzy": ["영업구역"]}, {"name": "기술구역정보", "aliases": ["기술구역정보", "기술구역번호", "기술구역"], "zone": true, "fuzzy": ["기술구역"]}, {"name": "구역정보", "aliases": ["구역정보", "구역"], "zone": true, "fuzzy": ["출동구역", "구역정보"], "fuzzyExclude": ["영업", "기술"]}, {"name": "활동유무", "aliases": ["활동유무", "활동유무(o,x)"], "prefix": "활동유무", "required": true}, {"name": "SP담당", "aliases": ["SP담당", "SP_담당", "SP 담당", "SP담당자", "SP_담당자", "SP 담당자"]}], "zone_owner": [{"name": "구역번호", "aliases": ["구역번호", "영업구역번호"], "required": true}, {"name": "담당자명", "aliases": ["담당자명", "담당자", "사원명", "(신규)사원명"], "required": true}]}, "dbKeyCandidates": ["계약번호", "서비스번호"], "unlockTemplate": "\u003c!DOCTYPE html>\n\u003chtml lang=\"ko\">\n\u003chead>\n\u003cmeta charset=\"UTF-8\">\n\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n\u003cmeta name=\"robots\" content=\"noindex, nofollow\">\n\u003ctitle>__TITLE__\u003c/title>\n\u003cstyle>\n:root { --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; --brand: #2563eb; --error: #d03b3b; }\n@media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --muted: #94a3b8; --border: #334155; } }\n* { box-sizing: border-box; }\nbody { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--text);\n       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; padding: 16px; }\n.card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; text-align: center; }\nh1 { font-size: 20px; margin: 0 0 6px; }\n.exp, .hint { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }\ninput { width: 100%; font-size: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }\nbutton { width: 100%; margin-top: 12px; font-size: 15px; font-weight: 700; padding: 12px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; }\nbutton:disabled { opacity: .6; cursor: progress; }\n.err { min-height: 18px; margin-top: 10px; font-size: 13px; color: var(--error); }\n\u003c/style>\n\u003c/head>\n\u003cbody>\n\u003cform class=\"card\" id=\"unlockForm\" autocomplete=\"off\">\n    \u003ch1>🔒 __TITLE__\u003c/h1>\n    __EXPIRY__\n    \u003cp class=\"hint\">공유받은 비밀번호를 입력하세요. 데이터는 암호화되어 있습니다.\u003c/p>\n    \u003cinput type=\"password\" id=\"unlockPwd\" placeholder=\"비밀번호\" autofocus>\n    \u003cbutton type=\"submit\" id=\"unlockBtn\">열기\u003c/button>\n    \u003cdiv class=\"err\" id=\"unlockErr\">\u003c/div>\n\u003c/form>\n\u003cscript type=\"application/json\" id=\"encPayload\">__PAYLOAD__\u003c/script>\n\u003cscript>\n(function () {\n    const payload = JSON.parse(document.getElementById('encPayload').textContent);\n    const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));\n    const form = document.getElementById('unlockForm');\n    const btn = document.getElementById('unlockBtn');\n    const err = document.getElementById('unlockErr');\n\n    async function unwrapContentKey(pwd) {\n        const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);\n        for (const slot of payload.slots) {\n            const kek = await crypto.subtle.deriveKey(\n                { name: 'PBKDF2', salt: b64(slot.salt), iterations: payload.iter, hash: 'SHA-256' },\n                base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);\n            try {\n                return await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(slot.iv) }, kek, b64(slot.key));\n            } catch (e) { /* not this slot -- try the next password slot */ }\n        }\n        return null;\n    }\n\n    form.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        const pwd = document.getElementById('unlockPwd').value;\n        if (!pwd) return;\n        if (!window.crypto || !crypto.subtle) {\n            err.textContent = '이 브라우저에서는 열 수 없습니다 (https 주소 또는 최신 브라우저가 필요합니다).';\n            return;\n        }\n        btn.disabled = true; btn.textContent = '여는 중...'; err.textContent = '';\n        try {\n            const rawKey = await unwrapContentKey(pwd);\n            if (!rawKey) throw new Error('bad password');\n            const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);\n            const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(payload.iv) }, key, b64(payload.data));\n            const reportHtml = new TextDecoder().decode(plain);\n            document.open();\n            document.write(reportHtml);\n            document.close();\n            // Hand the same password to the report's own lock screen: it still\n            // enforces the expiry date and decides user vs admin view.\n            const unlock = () => {\n                const input = document.getElementById('pwd');\n                if (input && typeof window.checkPassword === 'function') { input.value = pwd; window.checkPassword(); }\n            };\n            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', unlock); else unlock();\n        } catch (ex) {\n            btn.disabled = false; btn.textContent = '열기';\n            err.textContent = '비밀번호가 올바르지 않습니다.';\n        }\n    });\n})();\n\u003c/script>\n\u003c/body>\n\u003c/html>", "lockScreenHtml": "\u003cdiv id=\"lockScreen\" class=\"lock-screen\">\n    \u003ch2>Data Intel PRO 보안 리포트\u003c/h2>\n    \u003cp>만료일: __EXPIRY_TEXT__\u003c/p>\n    \u003cinput type=\"password\" id=\"pwd\" placeholder=\"비밀번호 입력\" autocomplete=\"off\">\n    \u003cbutton onclick=\"checkPassword()\">확인\u003c/button>\n    \u003cdiv id=\"errorMsg\" class=\"error\">\u003c/div>\n\u003c/div>", "iterations": 310000, "filler": "NvDJDOiLYxIkDzVptDVnBkKD"}</script>
+<script type="application/json" id="uploadConfig">{"matchable": ["original", "facility", "patrol", "voc", "cancel", "cancelled_facility"], "keyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "sheetHints": {"db": ["활동대상구분", "담당채널"], "voc": ["VOC유형대", "계약번호"], "patrol": ["고객번호"], "original": ["계약번호"], "facility": ["계약번호"], "zone_owner": ["구역번호"]}, "fieldSpecs": {"db": [{"name": "활동대상구분", "aliases": ["활동대상구분", "담당채널"], "required": true}, {"name": "지사", "aliases": ["지사", "관리지사명", "관리지사"], "required": true}, {"name": "계약번호", "aliases": ["계약번호"]}, {"name": "서비스번호", "aliases": ["서비스번호"]}, {"name": "상호", "aliases": ["상호", "상호명", "고객명"]}, {"name": "설치주소", "aliases": ["설치주소", "주소"]}, {"name": "영업구역정보", "aliases": ["영업구역정보", "영업구역번호", "영업구역"], "zone": true, "fuzzy": ["영업구역"]}, {"name": "기술구역정보", "aliases": ["기술구역정보", "기술구역번호", "기술구역"], "zone": true, "fuzzy": ["기술구역"]}, {"name": "구역정보", "aliases": ["구역정보", "구역"], "zone": true, "fuzzy": ["출동구역", "구역정보"], "fuzzyExclude": ["영업", "기술"]}, {"name": "활동유무", "aliases": ["활동유무", "활동유무(o,x)"], "prefix": "활동유무", "required": true}, {"name": "SP담당", "aliases": ["SP담당", "SP_담당", "SP 담당", "SP담당자", "SP_담당자", "SP 담당자"]}], "zone_owner": [{"name": "구역번호", "aliases": ["구역번호", "영업구역번호"], "required": true}, {"name": "담당자명", "aliases": ["담당자명", "담당자", "사원명", "(신규)사원명"], "required": true}]}, "dbKeyCandidates": ["계약번호", "서비스번호"], "unlockTemplate": "\u003c!DOCTYPE html>\n\u003chtml lang=\"ko\">\n\u003chead>\n\u003cmeta charset=\"UTF-8\">\n\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n\u003cmeta name=\"robots\" content=\"noindex, nofollow\">\n\u003ctitle>__TITLE__\u003c/title>\n\u003cstyle>\n:root { --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; --brand: #2563eb; --error: #d03b3b; }\n@media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --muted: #94a3b8; --border: #334155; } }\n* { box-sizing: border-box; }\nbody { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--text);\n       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; padding: 16px; }\n.card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; text-align: center; }\nh1 { font-size: 20px; margin: 0 0 6px; }\n.exp, .hint { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }\ninput { width: 100%; font-size: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }\nbutton { width: 100%; margin-top: 12px; font-size: 15px; font-weight: 700; padding: 12px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; }\nbutton:disabled { opacity: .6; cursor: progress; }\n.err { min-height: 18px; margin-top: 10px; font-size: 13px; color: var(--error); }\n\u003c/style>\n\u003c/head>\n\u003cbody>\n\u003cform class=\"card\" id=\"unlockForm\" autocomplete=\"off\">\n    \u003ch1>🔒 __TITLE__\u003c/h1>\n    __EXPIRY__\n    \u003cp class=\"hint\">공유받은 비밀번호를 입력하세요. 데이터는 암호화되어 있습니다.\u003c/p>\n    \u003cinput type=\"password\" id=\"unlockPwd\" placeholder=\"비밀번호\" autofocus>\n    \u003cbutton type=\"submit\" id=\"unlockBtn\">열기\u003c/button>\n    \u003cdiv class=\"err\" id=\"unlockErr\">\u003c/div>\n\u003c/form>\n\u003cscript type=\"application/json\" id=\"encPayload\">__PAYLOAD__\u003c/script>\n\u003cscript>\n(function () {\n    const payload = JSON.parse(document.getElementById('encPayload').textContent);\n    const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));\n    const form = document.getElementById('unlockForm');\n    const btn = document.getElementById('unlockBtn');\n    const err = document.getElementById('unlockErr');\n\n    async function unwrapContentKey(pwd) {\n        const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);\n        for (const slot of payload.slots) {\n            const kek = await crypto.subtle.deriveKey(\n                { name: 'PBKDF2', salt: b64(slot.salt), iterations: payload.iter, hash: 'SHA-256' },\n                base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);\n            try {\n                return await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(slot.iv) }, kek, b64(slot.key));\n            } catch (e) { /* not this slot -- try the next password slot */ }\n        }\n        return null;\n    }\n\n    form.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        const pwd = document.getElementById('unlockPwd').value;\n        if (!pwd) return;\n        if (!window.crypto || !crypto.subtle) {\n            err.textContent = '이 브라우저에서는 열 수 없습니다 (https 주소 또는 최신 브라우저가 필요합니다).';\n            return;\n        }\n        btn.disabled = true; btn.textContent = '여는 중...'; err.textContent = '';\n        try {\n            const rawKey = await unwrapContentKey(pwd);\n            if (!rawKey) throw new Error('bad password');\n            const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);\n            const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(payload.iv) }, key, b64(payload.data));\n            const reportHtml = new TextDecoder().decode(plain);\n            document.open();\n            document.write(reportHtml);\n            document.close();\n            // Hand the same password to the report's own lock screen: it still\n            // enforces the expiry date and decides user vs admin view.\n            const unlock = () => {\n                const input = document.getElementById('pwd');\n                if (input && typeof window.checkPassword === 'function') { input.value = pwd; window.checkPassword(); }\n            };\n            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', unlock); else unlock();\n        } catch (ex) {\n            btn.disabled = false; btn.textContent = '열기';\n            err.textContent = '비밀번호가 올바르지 않습니다.';\n        }\n    });\n})();\n\u003c/script>\n\u003c/body>\n\u003c/html>", "lockScreenHtml": "\u003cdiv id=\"lockScreen\" class=\"lock-screen\">\n    \u003ch2>Data Intel PRO 보안 리포트\u003c/h2>\n    \u003cp>만료일: __EXPIRY_TEXT__\u003c/p>\n    \u003cinput type=\"password\" id=\"pwd\" placeholder=\"비밀번호 입력\" autocomplete=\"off\">\n    \u003cbutton onclick=\"checkPassword()\">확인\u003c/button>\n    \u003cdiv id=\"errorMsg\" class=\"error\">\u003c/div>\n\u003c/div>", "iterations": 310000, "filler": "zKtEKkXyfVtOPRqSvRSDmWaQ"}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // ===== Lock screen =====
-const CORRECT_PWD = "NvDJDOiLYxIkDzVptDVnBkKD";
-const ADMIN_PWD = "NvDJDOiLYxIkDzVptDVnBkKD";
+const CORRECT_PWD = "zKtEKkXyfVtOPRqSvRSDmWaQ";
+const ADMIN_PWD = "zKtEKkXyfVtOPRqSvRSDmWaQ";
 const EXPIRY_DATE = new Date("9999-12-31T23:59:59");
 let isAdminUnlocked = false;
 
@@ -2792,25 +2792,134 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         wrap.appendChild(grid);
     }
     // 실적현황표 3개를 한 장짜리 HTML로 (스크롤 없이, A4 가로 인쇄용 스타일 포함)
+    // 한 화면 캡처용 배치: 긴 표(보통 영업사원)는 지사 묶음 단위로 끊어 여러 열로 나눈다 --
+    // 표 높이와 전체 폭이 지금 창 비율에 맞도록 열 수를 고른다 (지사 병합칸·소계는 끊지 않음).
+    function perfCaptureLayout(grid) {
+        const ROW_H = 16, HEAD_H = 60, GAP = 12;
+        const availW = Math.max(900, window.innerWidth - 40), availH = Math.max(480, window.innerHeight - 70);
+        const tables = Array.from(grid.querySelectorAll('.perf-card')).map(card => {
+            const groups = [];
+            let total = null;
+            card.querySelectorAll('tbody tr').forEach(tr => {
+                if (tr.classList.contains('perf-total')) { total = tr; return; }
+                if (tr.querySelector('td.perf-branch') || !groups.length) groups.push([]);
+                groups[groups.length - 1].push(tr);
+            });
+            const cols = card.querySelectorAll('thead th').length;
+            return { card, groups, total, width: cols > 5 ? 345 : 245 };
+        });
+        const pack = (groups, limit) => {
+            const chunks = [];
+            let cur = [], n = 0;
+            groups.forEach(g => {
+                if (cur.length && n + g.length > limit) { chunks.push(cur); cur = []; n = 0; }
+                cur = cur.concat(g); n += g.length;
+            });
+            if (cur.length) chunks.push(cur);
+            return chunks;
+        };
+        const withRows = tables.filter(t => t.groups.length);
+        const maxGroup = Math.max(1, ...withRows.map(t => Math.max(...t.groups.map(g => g.length))));
+        const maxRows = Math.max(1, ...withRows.map(t => t.groups.reduce((n, g) => n + g.length, 0)));
+        let best = null;
+        for (let limit = maxGroup; limit <= maxRows; limit++) {
+            let width = 0, count = 0;
+            withRows.forEach(t => { const k = pack(t.groups, limit).length; width += k * t.width; count += k; });
+            width += GAP * Math.max(0, count - 1);
+            const scale = Math.min(1, availH / (HEAD_H + (limit + 1) * ROW_H), availW / width);
+            if (!best || scale >= best.scale - 0.001) best = { limit, scale, count };  // 같은 배율이면 덜 쪼갠(열이 적은) 배치
+        }
+        const out = document.createElement('div');
+        out.className = 'perf-grid';
+        let columns = 0;
+        tables.forEach(t => {
+            let chunks = t.groups.length ? pack(t.groups, best.limit) : [[]];
+            if (chunks.length > 1) {
+                // 같은 열 수로 나누되 높이가 고르게: 가장 작은 한도부터 올려 같은 개수가 되는 첫 한도
+                const rowsTotal = t.groups.reduce((n, g) => n + g.length, 0);
+                for (let lim = Math.ceil(rowsTotal / chunks.length); lim <= best.limit; lim++) {
+                    const c = pack(t.groups, lim);
+                    if (c.length <= chunks.length) { chunks = c; break; }
+                }
+            }
+            chunks.forEach((rows, i) => {
+                const card = t.card.cloneNode(false);
+                const band = t.card.querySelector('.perf-band');
+                if (band) {
+                    const b = band.cloneNode(true);
+                    b.querySelectorAll('.perf-copy').forEach(x => x.remove());
+                    if (chunks.length > 1) { const title = b.querySelector('span'); if (title) title.textContent += ' · ' + (i + 1) + '/' + chunks.length; }
+                    card.appendChild(b);
+                }
+                const srcTable = t.card.querySelector('table');
+                if (srcTable) {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'table-scroll perf-scroll';
+                    const table = srcTable.cloneNode(false);
+                    table.appendChild(srcTable.querySelector('thead').cloneNode(true));
+                    const tbody = document.createElement('tbody');
+                    rows.forEach(tr => tbody.appendChild(tr.cloneNode(true)));
+                    if (i === chunks.length - 1 && t.total) tbody.appendChild(t.total.cloneNode(true));
+                    table.appendChild(tbody);
+                    wrap.appendChild(table);
+                    card.appendChild(wrap);
+                } else {
+                    Array.from(t.card.children).slice(1).forEach(c => card.appendChild(c.cloneNode(true)));
+                }
+                out.appendChild(card);
+                columns++;
+            });
+        });
+        out.style.gridTemplateColumns = 'repeat(' + columns + ', max-content)';
+        return out;
+    }
     function perfStandaloneHtml() {
         const grid = document.querySelector('#perfReportWrap .perf-grid');
         if (!grid) return null;
-        const clone = grid.cloneNode(true);
-        clone.querySelectorAll('.perf-copy').forEach(b => b.remove());
+        const layout = perfCaptureLayout(grid);
         const css = Array.from(document.querySelectorAll('style')).map(st => st.textContent).join('\n');
         const escHtml = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const filter = (document.getElementById('navFilterSummary') || {}).textContent || '';
         const stamp = new Date().toLocaleString('ko-KR');
-        const extra = 'body{background:#fff;padding:20px 24px;margin:0;}'
-            + '.perf-grid{grid-template-columns:repeat(3,minmax(0,1fr));}'
-            + '@media (max-width:1100px){.perf-grid{grid-template-columns:1fr;}}'
-            + '@media print{@page{size:A4 landscape;margin:8mm}body{padding:0}.perf-table{font-size:9.5px}.perf-table td,.perf-table th{padding:2px 4px}.perf-card{break-inside:avoid}}';
+        // 한 화면 캡처용: 표는 내용 폭만큼(가로로 늘어나지 않게) 나란히, 행 높이 압축,
+        // 열면 창 크기에 맞춰 전체를 축소(zoom) -- '원래 크기'로 되돌릴 수 있다.
+        const extra = [
+            'html,body{background:#fff;margin:0;}',
+            'body{padding:10px 14px;}',
+            '.cap-head{display:flex;align-items:baseline;gap:12px;margin:0 0 8px;flex-wrap:wrap;}',
+            '.cap-head h1{font-size:16px;margin:0;color:#0b0b0b;}',
+            '.cap-head p{margin:0;color:#52514e;font-size:11.5px;}',
+            '.cap-tools{margin-left:auto;display:flex;gap:6px;}',
+            '.cap-tools button{font-size:11.5px;padding:3px 10px;border:1px solid #c3c2b7;border-radius:6px;background:#fff;color:#0b0b0b;cursor:pointer;}',
+            '.cap-tools button.on{background:#2563eb;color:#fff;border-color:#2563eb;}',
+            '#capArea{width:max-content;}',
+            '.perf-grid{display:grid;align-items:start;gap:12px;margin:0;}',
+            '.perf-card{border-radius:8px;}',
+            '.perf-band{padding:4px 10px;font-size:12.5px;}',
+            '.table-scroll.perf-scroll{overflow:visible;border:none;border-radius:0;}',
+            '.perf-table{width:auto;font-size:11px;line-height:1.2;}',
+            '.perf-table th{position:static;padding:3px 8px;font-size:11px;}',
+            '.perf-table td{padding:1px 8px;height:15px;}',
+            '.perf-table td.perf-name{min-width:62px;}',
+            '.perf-table td.perf-branch{min-width:44px;}',
+            '@media print{@page{size:A4 landscape;margin:6mm}.cap-tools{display:none}body{padding:0}}'
+        ].join('');
+        // 맞춤: zoom을 준 뒤 실제 크기를 재서 넘치면 다시 줄이기를 몇 번 반복 (글자 반올림 오차 보정)
+        const fitScript = '<script>(function(){var a=document.getElementById("capArea"),mode="fit";'
+            + 'function mark(){document.querySelectorAll("[data-cap]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-cap")===mode);});}'
+            + 'function apply(){var s=1;a.style.zoom="1";if(mode==="fit"){for(var i=0;i<5;i++){var r=a.getBoundingClientRect();'
+            + 'var f=Math.min((window.innerHeight-r.top-8)/r.height,(window.innerWidth-r.left-14)/r.width);'
+            + 'if(f>=0.999&&(s>=1||i>0))break;s=Math.max(0.3,Math.min(1,s*f));a.style.zoom=String(s);}}mark();}'
+            + 'document.addEventListener("click",function(e){var b=e.target.closest("[data-cap]");if(!b)return;'
+            + 'if(b.getAttribute("data-cap")==="print"){window.print();return;}mode=b.getAttribute("data-cap");apply();});'
+            + 'window.addEventListener("resize",apply);window.addEventListener("load",apply);apply();})();<\/script>';
         return '<!DOCTYPE html><html lang="ko" data-theme="light"><head><meta charset="UTF-8">'
             + '<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>실적현황표</title>'
             + '<style>' + css + '</style><style>' + extra + '</style></head><body>'
-            + '<h1 style="font-size:18px;margin:0 0 4px">유지고객 이탈방지 실적현황</h1>'
-            + '<p style="margin:0 0 14px;color:#52514e;font-size:12px">' + escHtml(stamp) + ' 기준 · ' + escHtml(filter) + '</p>'
-            + clone.outerHTML + '</body></html>';
+            + '<div class="cap-head"><h1>유지고객 이탈방지 실적현황</h1><p>' + escHtml(stamp) + ' 기준 · ' + escHtml(filter) + '</p>'
+            + '<div class="cap-tools"><button type="button" data-cap="fit">한 화면에 맞춤</button>'
+            + '<button type="button" data-cap="full">원래 크기</button><button type="button" data-cap="print">🖨 인쇄</button></div></div>'
+            + '<div id="capArea">' + layout.outerHTML + '</div>' + fitScript + '</body></html>';
     }
     function perfHtmlExport(mode) {
         const html = perfStandaloneHtml();

@@ -3674,25 +3674,134 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         wrap.appendChild(grid);
     }
     // 실적현황표 3개를 한 장짜리 HTML로 (스크롤 없이, A4 가로 인쇄용 스타일 포함)
+    // 한 화면 캡처용 배치: 긴 표(보통 영업사원)는 지사 묶음 단위로 끊어 여러 열로 나눈다 --
+    // 표 높이와 전체 폭이 지금 창 비율에 맞도록 열 수를 고른다 (지사 병합칸·소계는 끊지 않음).
+    function perfCaptureLayout(grid) {
+        const ROW_H = 16, HEAD_H = 60, GAP = 12;
+        const availW = Math.max(900, window.innerWidth - 40), availH = Math.max(480, window.innerHeight - 70);
+        const tables = Array.from(grid.querySelectorAll('.perf-card')).map(card => {
+            const groups = [];
+            let total = null;
+            card.querySelectorAll('tbody tr').forEach(tr => {
+                if (tr.classList.contains('perf-total')) { total = tr; return; }
+                if (tr.querySelector('td.perf-branch') || !groups.length) groups.push([]);
+                groups[groups.length - 1].push(tr);
+            });
+            const cols = card.querySelectorAll('thead th').length;
+            return { card, groups, total, width: cols > 5 ? 345 : 245 };
+        });
+        const pack = (groups, limit) => {
+            const chunks = [];
+            let cur = [], n = 0;
+            groups.forEach(g => {
+                if (cur.length && n + g.length > limit) { chunks.push(cur); cur = []; n = 0; }
+                cur = cur.concat(g); n += g.length;
+            });
+            if (cur.length) chunks.push(cur);
+            return chunks;
+        };
+        const withRows = tables.filter(t => t.groups.length);
+        const maxGroup = Math.max(1, ...withRows.map(t => Math.max(...t.groups.map(g => g.length))));
+        const maxRows = Math.max(1, ...withRows.map(t => t.groups.reduce((n, g) => n + g.length, 0)));
+        let best = null;
+        for (let limit = maxGroup; limit <= maxRows; limit++) {
+            let width = 0, count = 0;
+            withRows.forEach(t => { const k = pack(t.groups, limit).length; width += k * t.width; count += k; });
+            width += GAP * Math.max(0, count - 1);
+            const scale = Math.min(1, availH / (HEAD_H + (limit + 1) * ROW_H), availW / width);
+            if (!best || scale >= best.scale - 0.001) best = { limit, scale, count };  // 같은 배율이면 덜 쪼갠(열이 적은) 배치
+        }
+        const out = document.createElement('div');
+        out.className = 'perf-grid';
+        let columns = 0;
+        tables.forEach(t => {
+            let chunks = t.groups.length ? pack(t.groups, best.limit) : [[]];
+            if (chunks.length > 1) {
+                // 같은 열 수로 나누되 높이가 고르게: 가장 작은 한도부터 올려 같은 개수가 되는 첫 한도
+                const rowsTotal = t.groups.reduce((n, g) => n + g.length, 0);
+                for (let lim = Math.ceil(rowsTotal / chunks.length); lim <= best.limit; lim++) {
+                    const c = pack(t.groups, lim);
+                    if (c.length <= chunks.length) { chunks = c; break; }
+                }
+            }
+            chunks.forEach((rows, i) => {
+                const card = t.card.cloneNode(false);
+                const band = t.card.querySelector('.perf-band');
+                if (band) {
+                    const b = band.cloneNode(true);
+                    b.querySelectorAll('.perf-copy').forEach(x => x.remove());
+                    if (chunks.length > 1) { const title = b.querySelector('span'); if (title) title.textContent += ' · ' + (i + 1) + '/' + chunks.length; }
+                    card.appendChild(b);
+                }
+                const srcTable = t.card.querySelector('table');
+                if (srcTable) {
+                    const wrap = document.createElement('div');
+                    wrap.className = 'table-scroll perf-scroll';
+                    const table = srcTable.cloneNode(false);
+                    table.appendChild(srcTable.querySelector('thead').cloneNode(true));
+                    const tbody = document.createElement('tbody');
+                    rows.forEach(tr => tbody.appendChild(tr.cloneNode(true)));
+                    if (i === chunks.length - 1 && t.total) tbody.appendChild(t.total.cloneNode(true));
+                    table.appendChild(tbody);
+                    wrap.appendChild(table);
+                    card.appendChild(wrap);
+                } else {
+                    Array.from(t.card.children).slice(1).forEach(c => card.appendChild(c.cloneNode(true)));
+                }
+                out.appendChild(card);
+                columns++;
+            });
+        });
+        out.style.gridTemplateColumns = 'repeat(' + columns + ', max-content)';
+        return out;
+    }
     function perfStandaloneHtml() {
         const grid = document.querySelector('#perfReportWrap .perf-grid');
         if (!grid) return null;
-        const clone = grid.cloneNode(true);
-        clone.querySelectorAll('.perf-copy').forEach(b => b.remove());
+        const layout = perfCaptureLayout(grid);
         const css = Array.from(document.querySelectorAll('style')).map(st => st.textContent).join('\\n');
         const escHtml = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const filter = (document.getElementById('navFilterSummary') || {}).textContent || '';
         const stamp = new Date().toLocaleString('ko-KR');
-        const extra = 'body{background:#fff;padding:20px 24px;margin:0;}'
-            + '.perf-grid{grid-template-columns:repeat(3,minmax(0,1fr));}'
-            + '@media (max-width:1100px){.perf-grid{grid-template-columns:1fr;}}'
-            + '@media print{@page{size:A4 landscape;margin:8mm}body{padding:0}.perf-table{font-size:9.5px}.perf-table td,.perf-table th{padding:2px 4px}.perf-card{break-inside:avoid}}';
+        // 한 화면 캡처용: 표는 내용 폭만큼(가로로 늘어나지 않게) 나란히, 행 높이 압축,
+        // 열면 창 크기에 맞춰 전체를 축소(zoom) -- '원래 크기'로 되돌릴 수 있다.
+        const extra = [
+            'html,body{background:#fff;margin:0;}',
+            'body{padding:10px 14px;}',
+            '.cap-head{display:flex;align-items:baseline;gap:12px;margin:0 0 8px;flex-wrap:wrap;}',
+            '.cap-head h1{font-size:16px;margin:0;color:#0b0b0b;}',
+            '.cap-head p{margin:0;color:#52514e;font-size:11.5px;}',
+            '.cap-tools{margin-left:auto;display:flex;gap:6px;}',
+            '.cap-tools button{font-size:11.5px;padding:3px 10px;border:1px solid #c3c2b7;border-radius:6px;background:#fff;color:#0b0b0b;cursor:pointer;}',
+            '.cap-tools button.on{background:#2563eb;color:#fff;border-color:#2563eb;}',
+            '#capArea{width:max-content;}',
+            '.perf-grid{display:grid;align-items:start;gap:12px;margin:0;}',
+            '.perf-card{border-radius:8px;}',
+            '.perf-band{padding:4px 10px;font-size:12.5px;}',
+            '.table-scroll.perf-scroll{overflow:visible;border:none;border-radius:0;}',
+            '.perf-table{width:auto;font-size:11px;line-height:1.2;}',
+            '.perf-table th{position:static;padding:3px 8px;font-size:11px;}',
+            '.perf-table td{padding:1px 8px;height:15px;}',
+            '.perf-table td.perf-name{min-width:62px;}',
+            '.perf-table td.perf-branch{min-width:44px;}',
+            '@media print{@page{size:A4 landscape;margin:6mm}.cap-tools{display:none}body{padding:0}}'
+        ].join('');
+        // 맞춤: zoom을 준 뒤 실제 크기를 재서 넘치면 다시 줄이기를 몇 번 반복 (글자 반올림 오차 보정)
+        const fitScript = '<script>(function(){var a=document.getElementById("capArea"),mode="fit";'
+            + 'function mark(){document.querySelectorAll("[data-cap]").forEach(function(b){b.classList.toggle("on",b.getAttribute("data-cap")===mode);});}'
+            + 'function apply(){var s=1;a.style.zoom="1";if(mode==="fit"){for(var i=0;i<5;i++){var r=a.getBoundingClientRect();'
+            + 'var f=Math.min((window.innerHeight-r.top-8)/r.height,(window.innerWidth-r.left-14)/r.width);'
+            + 'if(f>=0.999&&(s>=1||i>0))break;s=Math.max(0.3,Math.min(1,s*f));a.style.zoom=String(s);}}mark();}'
+            + 'document.addEventListener("click",function(e){var b=e.target.closest("[data-cap]");if(!b)return;'
+            + 'if(b.getAttribute("data-cap")==="print"){window.print();return;}mode=b.getAttribute("data-cap");apply();});'
+            + 'window.addEventListener("resize",apply);window.addEventListener("load",apply);apply();})();<\\/script>';
         return '<!DOCTYPE html><html lang="ko" data-theme="light"><head><meta charset="UTF-8">'
             + '<meta name="viewport" content="width=device-width, initial-scale=1.0"><title>실적현황표</title>'
             + '<style>' + css + '</style><style>' + extra + '</style></head><body>'
-            + '<h1 style="font-size:18px;margin:0 0 4px">유지고객 이탈방지 실적현황</h1>'
-            + '<p style="margin:0 0 14px;color:#52514e;font-size:12px">' + escHtml(stamp) + ' 기준 · ' + escHtml(filter) + '</p>'
-            + clone.outerHTML + '</body></html>';
+            + '<div class="cap-head"><h1>유지고객 이탈방지 실적현황</h1><p>' + escHtml(stamp) + ' 기준 · ' + escHtml(filter) + '</p>'
+            + '<div class="cap-tools"><button type="button" data-cap="fit">한 화면에 맞춤</button>'
+            + '<button type="button" data-cap="full">원래 크기</button><button type="button" data-cap="print">🖨 인쇄</button></div></div>'
+            + '<div id="capArea">' + layout.outerHTML + '</div>' + fitScript + '</body></html>';
     }
     function perfHtmlExport(mode) {
         const html = perfStandaloneHtml();
