@@ -85,7 +85,7 @@ FIELD_SPECS = {
         {'name': '기술구역정보', 'aliases': ['기술구역정보', '기술구역번호', '기술구역']},
         {'name': '구역정보', 'aliases': ['구역정보', '구역']},
         {'name': '활동유무', 'aliases': ['활동유무', '활동유무(o,x)'], 'prefix': '활동유무', 'required': True},
-        {'name': 'SP담당', 'aliases': ['SP담당']},
+        {'name': 'SP담당', 'aliases': ['SP담당', 'SP_담당', 'SP 담당', 'SP담당자', 'SP_담당자', 'SP 담당자']},
     ],
     'zone_owner': [
         {'name': '구역번호', 'aliases': ['구역번호', '영업구역번호'], 'required': True},

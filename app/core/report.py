@@ -2013,6 +2013,7 @@ document.addEventListener('DOMContentLoaded', initDashNav);
     }
     let zoneOwnerMap = DATA.zoneOwnerMap || {};
     const SP_ZONE_COL_CANDIDATES = ['영업구역정보', '영업구역번호', '영업구역'];
+    const SP_OWNER_COL_CANDIDATES = ['SP담당', 'SP_담당', 'SP 담당', 'SP담당자', 'SP_담당자', 'SP 담당자'];  // handlers.py와 같게
 
     const STATUS_RANK_JS = { 미접수: 0, 접수: 1, 처리완료: 2 };  // handlers.py STATUS_RANK
     const statusRank = v => (typeof v === 'string' && v in STATUS_RANK_JS ? STATUS_RANK_JS[v] : -1);
@@ -2047,7 +2048,10 @@ document.addEventListener('DOMContentLoaded', initDashNav);
             rows.forEach(r => { if ('활동유무' in r) r['활동유무_원래열'] = r['활동유무']; r['활동유무'] = r[statusColUsed]; });
         }
         rows.forEach(r => { r['활동유무'] = normalizeStatus(r['활동유무']); });
-        const spZoneCol = Object.keys(zoneOwnerMap).length ? SP_ZONE_COL_CANDIDATES.find(c => dbColSet.has(c)) : null;
+        const spZoneCol = SP_ZONE_COL_CANDIDATES.find(c => dbColSet.has(c)) || null;
+        const useOwnerMap = Object.keys(zoneOwnerMap).length > 0 && !!spZoneCol;
+        const spOwnerCol = SP_OWNER_COL_CANDIDATES.find(c => dbColSet.has(c)) || null;
+        if (spOwnerCol && spOwnerCol !== 'SP담당') rows.forEach(r => { r['SP담당'] = r[spOwnerCol]; });
 
         const originRes = applyMatching(rows, fileRowsByKey.original, config.original, DATA.displayColumns.original, 'origin', false);
         rows = originRes.rows;
@@ -2104,8 +2108,17 @@ document.addEventListener('DOMContentLoaded', initDashNav);
             out['sp 담당자 상태값'] = writeback;
 
             // 8. 영업구역담당자 -- SP 건만 영업구역정보 = 구역번호 (handlers.py process_and_merge와 같게)
-            if (spZoneCol) {
-                out['영업구역담당자'] = out['활동대상구분'] === 'SP' ? (zoneOwnerMap[zoneKey(out[spZoneCol])] || null) : null;
+            // SP 담당자: 총괄DB SP담당 값 우선, 비어 있으면 8번 영업구역담당자 (handlers.py와 같게)
+            if (useOwnerMap || spOwnerCol) {
+                out['영업구역담당자'] = null; out['영업구역담당자_출처'] = null;
+                if (out['활동대상구분'] === 'SP') {
+                    const own = spOwnerCol && out['SP담당'] != null ? String(out['SP담당']).trim() : '';
+                    if (own) { out['영업구역담당자'] = own; out['영업구역담당자_출처'] = '총괄DB SP담당'; }
+                    else if (useOwnerMap) {
+                        const mapped = zoneOwnerMap[zoneKey(out[spZoneCol])] || null;
+                        out['영업구역담당자'] = mapped; out['영업구역담당자_출처'] = mapped ? '8번 영업구역담당자' : null;
+                    }
+                }
             }
 
             return out;
@@ -3710,6 +3723,13 @@ document.addEventListener('DOMContentLoaded', initDashNav);
             tiles.appendChild(mkEl('p', 'section-desc status-diag',
                 '상태 기준 열: ' + (statusColUsed || '(찾지 못함)')
                 + (DATA.db && DATA.db.renamed && DATA.db.renamed[statusColUsed] ? ' (파일의 ' + DATA.db.renamed[statusColUsed] + ' 열)' : '') + ' -- ' + (known.length ? known.join(' · ') : '처리완료/접수/미접수 값 없음') + otherText));
+            const spRows = allRows.filter(r => r['활동대상구분'] === 'SP');
+            if (spRows.some(r => '영업구역담당자_출처' in r)) {
+                const fromDb = spRows.filter(r => r['영업구역담당자_출처'] === '총괄DB SP담당').length;
+                const fromMap = spRows.filter(r => r['영업구역담당자_출처'] === '8번 영업구역담당자').length;
+                tiles.appendChild(mkEl('p', 'section-desc', 'SP 담당자: 총괄DB SP담당 우선 ' + fmtInt(fromDb) + '건 · 8번 영업구역담당자 ' + fmtInt(fromMap)
+                    + '건 · 담당자 없음(미매칭) ' + fmtInt(spRows.length - fromDb - fromMap) + '건'));
+            }
             tiles.appendChild(mkEl('p', 'section-desc', '실적 기준: 총괄DB 활동유무만 (2번 VOC · 3번 순찰 · 7번 해지 결과는 실적에 더하지 않고 상세 데이터의 sp 담당자 상태값 열에 표시)'));
         }
     }

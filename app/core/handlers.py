@@ -76,6 +76,8 @@ SP_ZONE_COL_CANDIDATES = ['영업구역정보', '영업구역번호', '영업구
 ZONE_OWNER_KEY_COL = '구역번호'
 ZONE_OWNER_NAME_COL = '담당자명'
 ZONE_OWNER_OUTPUT_COL = '영업구역담당자'
+# 총괄DB의 SP 담당자 열 (내보내기마다 표기가 조금씩 다름 -> 'SP담당'으로 맞춘다)
+SP_OWNER_COL_CANDIDATES = ['SP담당', 'SP_담당', 'SP 담당', 'SP담당자', 'SP_담당자', 'SP 담당자']
 # 파일에 구역번호는 있는데 담당자명이 비어 있는 구역 (파일에 아예 없는 구역은
 # 집계 단계에서 '미매칭'으로 표시되어 둘이 구분된다).
 NO_OWNER_LABEL = '담당자없음'
@@ -414,15 +416,32 @@ def process_and_merge(files_dict, matching_config):
     )
 
     # 8. 영업구역담당자: SP 건만, 영업구역정보 = 구역번호로 담당자명을 붙인다.
+    # SP 담당자: 총괄DB의 SP담당 값이 있으면 그 값이 우선, 비어 있으면 8. 영업구역담당자
+    # (영업구역정보 = 구역번호). report.py rebuildMerged()와 같은 규칙.
+    sp_owner_col = _first_matching_col(merged_df, SP_OWNER_COL_CANDIDATES)
+    if sp_owner_col and sp_owner_col != 'SP담당':
+        merged_df['SP담당'] = merged_df[sp_owner_col]  # 기존 SP담당 기반 섹션(부진자·발송 리스트·재계약)도 읽도록
     zone_owner_map = build_zone_owner_map(files_dict.get('zone_owner'))
     sp_zone_col = _first_matching_col(merged_df, SP_ZONE_COL_CANDIDATES)
-    if zone_owner_map and sp_zone_col and '활동대상구분' in merged_df.columns:
+    use_map = bool(zone_owner_map and sp_zone_col)
+    if (use_map or sp_owner_col) and '활동대상구분' in merged_df.columns:
         is_sp = merged_df['활동대상구분'] == 'SP'
-        merged_df[ZONE_OWNER_OUTPUT_COL] = [
-            zone_owner_map.get(_zone_key(z)) if sp else None
-            for z, sp in zip(merged_df[sp_zone_col], is_sp)
-        ]
-        match_report['zone_owner'] = [{'db_col': sp_zone_col, 'file_col': ZONE_OWNER_KEY_COL}]
+        db_owner = merged_df['SP담당'] if sp_owner_col else pd.Series([None] * len(merged_df), index=merged_df.index)
+        zones = merged_df[sp_zone_col] if sp_zone_col else pd.Series([None] * len(merged_df), index=merged_df.index)
+        owners, sources = [], []
+        for sp, own, z in zip(is_sp, db_owner, zones):
+            name = None if own is None or (isinstance(own, float) and pd.isna(own)) else str(own).strip()
+            if not sp:
+                owners.append(None); sources.append(None)
+            elif name:
+                owners.append(name); sources.append('총괄DB SP담당')
+            else:
+                mapped = zone_owner_map.get(_zone_key(z)) if use_map else None
+                owners.append(mapped); sources.append('8번 영업구역담당자' if mapped else None)
+        merged_df[ZONE_OWNER_OUTPUT_COL] = owners
+        merged_df['영업구역담당자_출처'] = sources
+        match_report['zone_owner'] = ([{'db_col': sp_zone_col, 'file_col': ZONE_OWNER_KEY_COL}] if use_map else []) \
+            + ([{'db_col': sp_owner_col, 'file_col': '(총괄DB SP담당 우선)'}] if sp_owner_col else [])
     else:
         match_report['zone_owner'] = []
 
