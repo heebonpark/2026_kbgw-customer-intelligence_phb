@@ -1428,6 +1428,48 @@ body {
 #coreSectionWrap { scroll-margin-top: calc(var(--stick-top, 64px) + 58px); }
 .cust-map[hidden] { display: none; }
 .cust-cluster-wrap { background: none; border: 0; }
+/* 지도 공통: 지도 칸 + 도구 줄 + 안내 + 가까운 곳 + 로드뷰 (DataIntelMapLib) */
+.dim-map { position: relative; }
+.dim-map-canvas { position: absolute; inset: 0; }
+.dim-map-bar { position: absolute; top: 10px; left: 10px; right: 56px; z-index: 1000; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+.dim-map-tool { pointer-events: auto; border: 1px solid rgba(0,0,0,0.18); background: #fff; color: #222; font: inherit; font-size: 12px; font-weight: 600;
+                padding: 6px 10px; border-radius: 8px; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.25); white-space: nowrap; }
+.dim-map-tool:hover { background: #f1f5f9; }
+.dim-map-tool.on { background: #2563eb; color: #fff; border-color: #2563eb; }
+.dim-map-tool:disabled { opacity: 0.6; cursor: progress; }
+.dim-map-msg { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 1001; background: rgba(17,24,39,0.92); color: #fff;
+               font-size: 12.5px; padding: 8px 14px; border-radius: 999px; max-width: calc(100% - 40px); text-align: center; }
+.dim-map-msg[hidden] { display: none; }
+.dim-map-near { position: absolute; left: 10px; bottom: 34px; z-index: 1000; width: 240px; max-width: calc(100% - 20px); background: #fff; color: #222;
+                border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); padding: 8px; font-size: 12px; }
+.dim-map-near-head { position: relative; font-weight: 700; padding: 2px 22px 6px 4px; }
+.dim-map-near-item { display: flex; justify-content: space-between; gap: 8px; width: 100%; border: 0; background: none; font: inherit; color: inherit;
+                     text-align: left; padding: 5px 4px; border-radius: 6px; cursor: pointer; }
+.dim-map-near-item:hover, .dim-map-near-item:focus-visible { background: #f1f5f9; outline: none; }
+.dim-map-near-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dim-map-near-dist { color: #1d4ed8; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dim-pop-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.dim-pop-actions button.pending-map-link { background: #fff; font-family: inherit; cursor: pointer; }
+.dim-pop-actions button.pending-map-link:hover { background: var(--brand); }
+.dim-pop-dist { font-size: 11.5px; color: #1d4ed8; font-weight: 700; margin-right: 2px; }
+.dim-me { width: 16px; height: 16px; border-radius: 50%; background: #2563eb; border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(37,99,235,0.45), 0 1px 4px rgba(0,0,0,0.4); }
+.dim-rv { position: absolute; top: 0; right: 0; bottom: 0; width: 50%; z-index: 1002; background: #111; display: flex; flex-direction: column; }
+.dim-rv[hidden] { display: none; }
+.dim-rv-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #fff; color: #222; font-size: 12.5px; font-weight: 700; }
+.dim-rv-head .dim-map-tool { box-shadow: none; }
+.dim-rv-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dim-rv-view { flex: 1; min-height: 0; }
+.dim-rv-open .dim-map-canvas { right: 50%; }
+.dim-rv-open .dim-map-bar { right: calc(50% + 56px); }
+.dim-rv-dot { width: 18px; height: 18px; border-radius: 50%; background: #f97316; border: 3px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,0.5); }
+.dim-map-full { position: fixed !important; inset: 0; z-index: 10000; height: auto !important; min-height: 0 !important; border-radius: 0 !important; margin: 0 !important; }
+.dim-map-lock, .dim-map-lock body { overflow: hidden; }
+@media (max-width: 700px) {
+    .dim-rv { top: 50%; width: 100%; }
+    .dim-rv-open .dim-map-canvas { right: 0; bottom: 50%; }
+    .dim-rv-open .dim-map-bar { right: 56px; }
+    .dim-map-tool { padding: 7px 9px; }
+}
 /* 카카오맵용 마커·풍선 (Leaflet은 자체 스타일) */
 .dim-kmarker { border-radius: 50%; box-sizing: border-box; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.45); opacity: 0.94; }
 .dim-kpop { cursor: default; }
@@ -1977,11 +2019,14 @@ document.addEventListener('DOMContentLoaded', initDashNav);
 // 배경 지도는 두 가지: 카카오맵(리포트에 JavaScript 키가 실려 있고, 카카오에 등록한 도메인에서 열었을 때)
 // 또는 Leaflet + Esri 거리지도(키 없음 / PC에서 파일로 직접 열었을 때 / 카카오 로딩 실패). 화면 쪽 코드는
 // open()이 돌려주는 같은 모양의 객체(setMarkers / fit / focus / resize / destroy)만 쓴다.
+// 지도 위 도구(현위치·전체 보기·크게 보기, 카카오맵이면 스카이뷰·교통·로드뷰)와 풍선의 로드뷰/길찾기도 여기서 붙인다.
 const DataIntelMapLib = (function () {
     const BASE = 'https://cdnjs.cloudflare.com/ajax/libs/';
     const DEFAULT_CENTER = [37.6, 127.2];
     const pending = {};
+    let lastHere = null;  // 한 번 잡은 현위치 -- 조건을 바꿔 지도를 새로 그려도 표시와 '가까운 곳'을 유지한다
     const config = (function () { const e = document.getElementById('mapConfig'); if (!e) return {}; try { return JSON.parse(e.textContent) || {}; } catch (err) { return {}; } })();
+    const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; };
     function css(href) {
         if (document.querySelector('link[href="' + href + '"]')) return;
         const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; document.head.appendChild(l);
@@ -2018,23 +2063,123 @@ const DataIntelMapLib = (function () {
         return { counts, rows, size: rows >= 300 ? 54 : rows >= 50 ? 46 : 38 };
     }
     function clusterEl(sum, ringOf) {
-        const d = document.createElement('div');
-        d.className = 'cust-cluster';
+        const d = mk('div', 'cust-cluster');
         d.style.background = (ringOf && ringOf(sum.counts)) || '#898781';
         d.style.width = sum.size + 'px'; d.style.height = sum.size + 'px';
-        const s = document.createElement('span'); s.textContent = sum.rows.toLocaleString('ko-KR');
-        d.appendChild(s);
+        d.appendChild(mk('span', null, sum.rows.toLocaleString('ko-KR')));
         return d;
     }
+
+    // ---- 두 지도가 같이 쓰는 부품 ----
+    // holder 안: 지도 칸(.dim-map-canvas) + 도구 줄 + 안내 문구 + (필요할 때) 가까운 곳 목록·로드뷰
+    function shell(holder) {
+        holder.textContent = '';
+        holder.classList.add('dim-map');
+        const ui = { holder, canvas: mk('div', 'dim-map-canvas'), bar: mk('div', 'dim-map-bar'), msg: mk('div', 'dim-map-msg'), near: null, timer: null };
+        ui.msg.hidden = true;
+        ui.msg.setAttribute('role', 'status');
+        holder.appendChild(ui.canvas); holder.appendChild(ui.bar); holder.appendChild(ui.msg);
+        return ui;
+    }
+    function say(ui, text) {
+        ui.msg.textContent = text; ui.msg.hidden = false;
+        clearTimeout(ui.timer);
+        ui.timer = setTimeout(() => { ui.msg.hidden = true; }, 4200);
+    }
+    function tool(ui, label, title, onClick) {
+        const b = mk('button', 'dim-map-tool', label);
+        b.type = 'button'; b.title = title; b.setAttribute('aria-label', title);
+        b.addEventListener('click', e => { e.stopPropagation(); onClick(b); });
+        ui.bar.appendChild(b);
+        return b;
+    }
+    const press = (b, on) => { b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); };
+    // 두 좌표 사이 거리(km)
+    function km(a, b, c, d) {
+        const R = 6371, rad = x => x * Math.PI / 180, p = rad(c - a), q = rad(d - b);
+        const h = Math.sin(p / 2) * Math.sin(p / 2) + Math.cos(rad(a)) * Math.cos(rad(c)) * Math.sin(q / 2) * Math.sin(q / 2);
+        return 2 * R * Math.asin(Math.sqrt(h));
+    }
+    const distText = d => d < 1 ? Math.round(d * 1000) + 'm' : (d < 10 ? d.toFixed(1) : Math.round(d)) + 'km';
+    function locate() {
+        return new Promise((resolve, reject) => {
+            if (!navigator.geolocation) { reject('이 브라우저는 현위치를 지원하지 않습니다'); return; }
+            navigator.geolocation.getCurrentPosition(
+                p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy || 0 }),
+                e => reject(e.code === 1 ? '위치 권한이 꺼져 있습니다 -- 브라우저 주소창의 자물쇠에서 위치를 허용하세요' : '현위치를 찾지 못했습니다 (GPS·네트워크 확인)'),
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
+        });
+    }
+    // 현위치에서 가까운 순 5곳 -- 누르면 그 마커로 간다
+    function nearPanel(ui, items, here, focus) {
+        if (ui.near) ui.near.remove();
+        const ranked = items.map((it, i) => ({ it, i, d: km(here.lat, here.lng, it.lat, it.lng) })).sort((a, b) => a.d - b.d).slice(0, 5);
+        if (!ranked.length) return;
+        const box = mk('div', 'dim-map-near');
+        const head = mk('div', 'dim-map-near-head', '현위치에서 가까운 곳');
+        const x = mk('button', 'dim-kpop-close', '×'); x.type = 'button'; x.setAttribute('aria-label', '닫기');
+        x.addEventListener('click', () => { box.remove(); ui.near = null; });
+        head.appendChild(x); box.appendChild(head);
+        ranked.forEach(r => {
+            const b = mk('button', 'dim-map-near-item'); b.type = 'button';
+            b.appendChild(mk('span', 'dim-map-near-name', r.it.name || r.it.tip || '(이름 없음)'));
+            b.appendChild(mk('span', 'dim-map-near-dist', distText(r.d)));
+            b.addEventListener('click', () => focus(r.i));
+            box.appendChild(b);
+        });
+        ui.holder.appendChild(box);
+        ui.near = box;
+    }
+    // 풍선 내용 = 화면 쪽이 만든 내용 + (현위치를 잡았으면 거리) + 로드뷰 / 길찾기
+    function popupContent(it, here, onRoadview) {
+        const box = it.popup();
+        const row = mk('div', 'dim-pop-actions');
+        if (here) row.appendChild(mk('span', 'dim-pop-dist', '현위치에서 ' + distText(km(here.lat, here.lng, it.lat, it.lng))));
+        if (onRoadview) {
+            const b = mk('button', 'pending-map-link', '👁 로드뷰'); b.type = 'button';
+            b.addEventListener('click', e => { e.stopPropagation(); onRoadview(it); });
+            row.appendChild(b);
+        } else {
+            const a = mk('a', 'pending-map-link', '👁 로드뷰'); a.href = 'https://map.kakao.com/link/roadview/' + it.lat + ',' + it.lng; a.target = '_blank'; a.rel = 'noopener';
+            row.appendChild(a);
+        }
+        const to = mk('a', 'pending-map-link', '🚗 길찾기');
+        to.href = 'https://map.kakao.com/link/to/' + encodeURIComponent((it.name || '목적지').split(',').join(' ')) + ',' + it.lat + ',' + it.lng; to.target = '_blank'; to.rel = 'noopener';
+        row.appendChild(to);
+        box.appendChild(row);
+        return box;
+    }
+    // 크게 보기: 화면 전체를 덮는다 (전체화면 API가 없는 아이폰에서도 되게 CSS로). Esc로 닫힘.
+    function bigTool(ui, onChange) {
+        const b = tool(ui, '⛶ 크게', '지도를 화면 가득 크게 보기 (Esc로 닫기)', () => set(!ui.holder.classList.contains('dim-map-full')));
+        function set(on) {
+            ui.holder.classList.toggle('dim-map-full', on);
+            document.documentElement.classList.toggle('dim-map-lock', on);
+            press(b, on); b.textContent = on ? '✕ 닫기' : '⛶ 크게';
+            onChange(on);
+        }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && ui.holder.classList.contains('dim-map-full') && document.body.contains(ui.holder)) set(false); });
+        return { close: () => { if (ui.holder.classList.contains('dim-map-full')) set(false); } };
+    }
+    const isTouch = () => ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
 
     // ---- Leaflet + Esri (키 없이, 파일로 열어도 보인다) ----
     function leafletMap(holder, opts, note) {
         return (opts.cluster ? cluster().catch(() => leaflet()) : leaflet()).then(() => {
-            holder.textContent = '';
-            const map = L.map(holder, { scrollWheelZoom: false, preferCanvas: !!opts.cluster });
+            const ui = shell(holder);
+            const map = L.map(ui.canvas, { scrollWheelZoom: false, preferCanvas: !!opts.cluster, zoomControl: false });
+            L.control.zoom({ position: 'topright' }).addTo(map);
             L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Tiles &copy; Esri' }).addTo(map);
             const clustered = !!opts.cluster && typeof L.markerClusterGroup === 'function';
-            let ringOf = null, handles = [], waiting = null;
+            let ringOf = null, handles = [], items = [], waiting = null, lastZoom = 14, here = null, me = null;
+            function showMe(p, move) {
+                here = lastHere = p;
+                if (me) me.forEach(x => x.remove());
+                me = [L.circle([p.lat, p.lng], { radius: Math.min(p.acc, 2000), weight: 1, color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.12, interactive: false }).addTo(map),
+                      L.circleMarker([p.lat, p.lng], { radius: 7, weight: 3, color: '#fff', fillColor: '#2563eb', fillOpacity: 1, interactive: false }).addTo(map)];
+                if (move) map.setView([p.lat, p.lng], Math.max(map.getZoom(), 12));
+                nearPanel(ui, items, here, api.focus);
+            }
             const layer = clustered ? L.markerClusterGroup({ maxClusterRadius: 46, showCoverageOnHover: false, disableClusteringAtZoom: 15,
                 iconCreateFunction: c => {
                     const sum = sumItems(c.getAllChildMarkers().map(m => m.options.item));
@@ -2044,19 +2189,22 @@ const DataIntelMapLib = (function () {
             map.setView(DEFAULT_CENTER, 8);
             const api = {
                 kind: 'leaflet', note: note || '',
-                setMarkers(items, o) {
+                setMarkers(list, o) {
                     ringOf = (o && o.ringOf) || null;
+                    items = list;
                     layer.clearLayers();
-                    handles = items.map(it => {
+                    handles = list.map(it => {
                         const m = L.circleMarker([it.lat, it.lng], { radius: it.r, weight: it.ringW || 2, color: it.ring, fillColor: it.fill, fillOpacity: 0.9, item: it });
-                        m.bindPopup(() => it.popup(), { maxWidth: 340 });
+                        m.bindPopup(() => popupContent(it, here, null), { maxWidth: 340 });
                         if (it.tip) m.bindTooltip(it.tip, { direction: 'top', offset: [0, -6] });
                         if (it.onClick) m.on('click', it.onClick);
                         return m;
                     });
                     if (clustered) layer.addLayers(handles); else handles.forEach(m => m.addTo(layer));
+                    if (here) nearPanel(ui, items, here, api.focus);
                 },
                 fit(maxZoom) {
+                    lastZoom = maxZoom;
                     if (!handles.length) { map.setView(DEFAULT_CENTER, 8); return; }
                     if (!holder.offsetWidth) { waiting = maxZoom; return; }  // 잠금 화면 뒤(크기 0): 보이게 되면 맞춘다
                     waiting = null;
@@ -2067,12 +2215,20 @@ const DataIntelMapLib = (function () {
                     const m = handles[i];
                     if (!m) return;
                     if (clustered && layer.zoomToShowLayer) { layer.zoomToShowLayer(m, () => m.openPopup()); return; }
-                    map.setView(m.getLatLng(), Math.max(map.getZoom(), minZoom));
+                    map.setView(m.getLatLng(), Math.max(map.getZoom(), minZoom || 13));
                     m.openPopup();
                 },
                 resize() { map.invalidateSize(); },
-                destroy() { try { map.remove(); } catch (e) { /* 이미 치워짐 */ } },
+                destroy() { big.close(); try { map.remove(); } catch (e) { /* 이미 치워짐 */ } },
             };
+            tool(ui, '📍 현위치', '내 위치로 이동하고 가까운 곳을 보여줍니다', b => {
+                b.disabled = true;
+                locate().then(p => showMe(p, true), m => say(ui, m)).then(() => { b.disabled = false; });
+            });
+            tool(ui, '🧭 전체', '표시된 곳이 모두 보이게 맞춥니다', () => api.fit(lastZoom));
+            const big = bigTool(ui, on => { if (on) map.scrollWheelZoom.enable(); else map.scrollWheelZoom.disable(); setTimeout(() => map.invalidateSize(), 60); });
+            L.DomEvent.disableClickPropagation(ui.bar);
+            if (lastHere) showMe(lastHere, false);
             if (window.ResizeObserver) new ResizeObserver(() => { if (!holder.offsetWidth) return; map.invalidateSize(); if (waiting != null) api.fit(waiting); }).observe(holder);
             return api;
         });
@@ -2082,13 +2238,24 @@ const DataIntelMapLib = (function () {
     // 확대 단계가 반대다: 카카오 level 1 = 가장 가까움. Leaflet zoom z ~ 카카오 level (20 - z).
     function kakaoMap(holder, opts) {
         const K = window.kakao.maps;
-        holder.textContent = '';
-        const map = new K.Map(holder, { center: new K.LatLng(DEFAULT_CENTER[0], DEFAULT_CENTER[1]), level: 11 });
-        map.setZoomable(false);  // 휠로 페이지를 내리다 지도가 확대되지 않게 -- 확대는 오른쪽 +/- 와 묶음 클릭으로
+        const ui = shell(holder);
+        const map = new K.Map(ui.canvas, { center: new K.LatLng(DEFAULT_CENTER[0], DEFAULT_CENTER[1]), level: 11 });
+        // 마우스 휠은 페이지 스크롤과 겹치니 '크게 보기'에서만 확대에 쓴다. 손가락 확대(터치 기기)는 항상 켠다.
+        map.setZoomable(isTouch());
         map.addControl(new K.ZoomControl(), K.ControlPosition.RIGHT);
-        let ringOf = null, handles = [], waiting = null, popup = null;
+        let ringOf = null, handles = [], items = [], waiting = null, lastZoom = 14, popup = null, here = null, me = null;
+        let rvMode = false, rvPanel = null, rv = null, rvDot = null;
         const closePopup = () => { if (popup) { popup.setMap(null); popup = null; } };
-        K.event.addListener(map, 'click', closePopup);
+        function showMe(p, move) {
+            here = lastHere = p;
+            const pos = new K.LatLng(p.lat, p.lng);
+            if (me) me.forEach(x => x.setMap(null));
+            me = [new K.Circle({ center: pos, radius: Math.min(p.acc, 2000), strokeWeight: 1, strokeColor: '#2563eb', strokeOpacity: 0.6, fillColor: '#2563eb', fillOpacity: 0.12 }),
+                  new K.CustomOverlay({ position: pos, content: mk('div', 'dim-me'), xAnchor: 0.5, yAnchor: 0.5, zIndex: 45 })];
+            me.forEach(x => x.setMap(map));
+            if (move) { if (map.getLevel() > 8) map.setLevel(8); map.setCenter(pos); }
+            nearPanel(ui, items, here, api.focus);
+        }
         let clusterer = null;
         if (opts.cluster && K.MarkerClusterer) {
             try {
@@ -2101,33 +2268,75 @@ const DataIntelMapLib = (function () {
                 }));
             } catch (e) { clusterer = null; }
         }
+
+        // 로드뷰: 지도 옆(좁은 화면은 아래)에 연다. 보는 위치는 지도에 주황 점으로 따라온다.
+        function closeRoadview() {
+            if (rvPanel) rvPanel.hidden = true;
+            if (rvDot) rvDot.setMap(null);
+            holder.classList.remove('dim-rv-open');
+            map.relayout();
+        }
+        function openRoadview(pos, label) {
+            if (!K.Roadview || !K.RoadviewClient) { say(ui, '로드뷰를 불러오지 못했습니다'); return; }
+            new K.RoadviewClient().getNearestPanoId(pos, 80, id => {
+                if (id === null) { say(ui, '이 위치 근처(80m)에는 로드뷰가 없습니다'); return; }
+                if (!rvPanel) {
+                    rvPanel = mk('div', 'dim-rv');
+                    const head = mk('div', 'dim-rv-head');
+                    head.appendChild(mk('span', 'dim-rv-title'));
+                    const x = mk('button', 'dim-map-tool', '✕ 로드뷰 닫기'); x.type = 'button';
+                    x.addEventListener('click', closeRoadview);
+                    head.appendChild(x);
+                    rvPanel.appendChild(head); rvPanel.appendChild(mk('div', 'dim-rv-view'));
+                    holder.appendChild(rvPanel);
+                }
+                rvPanel.hidden = false;
+                rvPanel.querySelector('.dim-rv-title').textContent = label || '로드뷰';
+                holder.classList.add('dim-rv-open');
+                map.relayout();
+                if (!rv) {
+                    rv = new K.Roadview(rvPanel.querySelector('.dim-rv-view'));
+                    K.event.addListener(rv, 'position_changed', () => { if (rvDot) rvDot.setPosition(rv.getPosition()); });
+                } else rv.relayout();
+                rv.setPanoId(id, pos);
+                if (!rvDot) rvDot = new K.CustomOverlay({ content: mk('div', 'dim-rv-dot'), xAnchor: 0.5, yAnchor: 0.5, zIndex: 40 });
+                rvDot.setPosition(pos); rvDot.setMap(map);
+                map.setCenter(pos);
+            });
+        }
+        K.event.addListener(map, 'click', e => {
+            closePopup();
+            if (rvMode && e && e.latLng) openRoadview(e.latLng, '로드뷰');
+        });
+
         function openPopup(h) {
             closePopup();
             const it = h.dimItem;
-            const wrap = document.createElement('div'); wrap.className = 'dim-kpop';
+            const wrap = mk('div', 'dim-kpop');
             wrap.style.paddingBottom = (it.r + 10) + 'px';
-            const box = document.createElement('div'); box.className = 'dim-kpop-box';
-            const x = document.createElement('button'); x.type = 'button'; x.className = 'dim-kpop-close'; x.textContent = '×'; x.setAttribute('aria-label', '닫기');
+            const box = mk('div', 'dim-kpop-box');
+            const x = mk('button', 'dim-kpop-close', '×'); x.type = 'button'; x.setAttribute('aria-label', '닫기');
             x.addEventListener('click', closePopup);
-            box.appendChild(x); box.appendChild(it.popup());
+            box.appendChild(x);
+            box.appendChild(popupContent(it, here, () => { closePopup(); openRoadview(h.getPosition(), it.name || '로드뷰'); }));
             wrap.appendChild(box);
             popup = new K.CustomOverlay({ position: h.getPosition(), content: wrap, xAnchor: 0.5, yAnchor: 1, zIndex: 50, clickable: true });
             popup.setMap(map);
-            try {  // 풍선이 지도 안에 들어오도록 마커를 화면 아래쪽 1/3 지점으로
+            try {  // 풍선이 지도 안에 들어오도록 마커를 화면 아래쪽으로
                 const proj = map.getProjection(), pt = proj.containerPointFromCoords(h.getPosition());
-                pt.y -= Math.round(holder.offsetHeight * 0.22);
+                pt.y -= Math.round(ui.canvas.offsetHeight * 0.22);
                 map.setCenter(proj.coordsFromContainerPoint(pt));
             } catch (e) { map.setCenter(h.getPosition()); }
         }
         const api = {
             kind: 'kakao', note: '',
-            setMarkers(items, o) {
+            setMarkers(list, o) {
                 ringOf = (o && o.ringOf) || null;
+                items = list;
                 closePopup();
                 if (clusterer) clusterer.clear(); else handles.forEach(h => h.setMap(null));
-                handles = items.map(it => {
-                    const d = document.createElement('div');
-                    d.className = 'dim-kmarker';
+                handles = list.map(it => {
+                    const d = mk('div', 'dim-kmarker');
                     d.style.width = d.style.height = (it.r * 2) + 'px';
                     d.style.background = it.fill;
                     d.style.border = (it.ringW || 2) + 'px solid ' + it.ring;
@@ -2137,12 +2346,14 @@ const DataIntelMapLib = (function () {
                     d.addEventListener('click', () => { if (it.onClick) it.onClick(); openPopup(h); });
                     return h;
                 });
+                if (here) nearPanel(ui, items, here, api.focus);
                 if (clusterer) {
                     try { clusterer.addMarkers(handles); return; } catch (e) { clusterer = null; }  // 묶음이 안 되면 그냥 다 찍는다
                 }
                 handles.forEach(h => h.setMap(map));
             },
             fit(maxZoom) {
+                lastZoom = maxZoom;
                 if (!handles.length) { map.setCenter(new K.LatLng(DEFAULT_CENTER[0], DEFAULT_CENTER[1])); map.setLevel(11); return; }
                 if (!holder.offsetWidth) { waiting = maxZoom; return; }
                 waiting = null;
@@ -2156,15 +2367,39 @@ const DataIntelMapLib = (function () {
             focus(i, minZoom) {
                 const h = handles[i];
                 if (!h) return;
-                const level = 20 - minZoom;
+                const level = 20 - (minZoom || 13);
                 if (map.getLevel() > level) map.setLevel(clusterer ? Math.min(level, 5) : level, { anchor: h.getPosition() });
                 map.setCenter(h.getPosition());
                 openPopup(h);
             },
-            resize() { map.relayout(); },
-            destroy() { closePopup(); if (clusterer) { try { clusterer.clear(); } catch (e) { /* ignore */ } } handles.forEach(h => h.setMap(null)); holder.textContent = ''; },
+            resize() { map.relayout(); if (rv && rvPanel && !rvPanel.hidden) rv.relayout(); },
+            destroy() { big.close(); closePopup(); if (clusterer) { try { clusterer.clear(); } catch (e) { /* ignore */ } } handles.forEach(h => h.setMap(null)); holder.textContent = ''; holder.classList.remove('dim-rv-open'); },
         };
-        if (window.ResizeObserver) new ResizeObserver(() => { if (!holder.offsetWidth) return; map.relayout(); if (waiting != null) api.fit(waiting); }).observe(holder);
+
+        tool(ui, '📍 현위치', '내 위치로 이동하고 가까운 곳을 보여줍니다', b => {
+            b.disabled = true;
+            locate().then(p => showMe(p, true), m => say(ui, m)).then(() => { b.disabled = false; });
+        });
+        tool(ui, '🧭 전체', '표시된 곳이 모두 보이게 맞춥니다', () => { closePopup(); api.fit(lastZoom); });
+        tool(ui, '🛰 스카이뷰', '항공사진으로 보기', b => {
+            const on = !b.classList.contains('on');
+            map.setMapTypeId(on ? K.MapTypeId.HYBRID : K.MapTypeId.ROADMAP);
+            press(b, on);
+        });
+        tool(ui, '🚦 교통', '실시간 교통정보 표시', b => {
+            const on = !b.classList.contains('on');
+            if (on) map.addOverlayMapTypeId(K.MapTypeId.TRAFFIC); else map.removeOverlayMapTypeId(K.MapTypeId.TRAFFIC);
+            press(b, on);
+        });
+        tool(ui, '👁 로드뷰', '로드뷰가 있는 길(파란 선)을 표시 -- 길이나 마커 풍선의 로드뷰를 누르면 거리 사진이 열립니다', b => {
+            rvMode = !rvMode;
+            if (rvMode) { map.addOverlayMapTypeId(K.MapTypeId.ROADVIEW); say(ui, '파란 길을 누르면 그 위치의 로드뷰가 열립니다'); }
+            else { map.removeOverlayMapTypeId(K.MapTypeId.ROADVIEW); closeRoadview(); }
+            press(b, rvMode);
+        });
+        const big = bigTool(ui, on => { map.setZoomable(on || isTouch()); setTimeout(() => api.resize(), 60); });
+        if (lastHere) showMe(lastHere, false);
+        if (window.ResizeObserver) new ResizeObserver(() => { if (!holder.offsetWidth) return; api.resize(); if (waiting != null) api.fit(waiting); }).observe(holder);
         return api;
     }
 
@@ -2563,7 +2798,7 @@ const DataIntelMapLib = (function () {
                 return { lat: r.lat, lng: r.lng, r: Math.round(6 + 7 * Math.sqrt((r.월정료 || 0) / maxFee)),
                     fill: byState ? (cssVar(STATE_VAR[r.활동상태]) || '#888') : (owners[r.관리주체] || cssVar('--baseline') || '#888'),
                     ring: !byState && sign ? danger : ring, ringW: !byState && sign ? 3 : 2,
-                    tip: (r.관리고객명 || '') + ' · ' + r.활동상태, popup: () => popupEl(r), onClick: () => openRow(r._i, 'map') };
+                    name: r.관리고객명 || '', tip: (r.관리고객명 || '') + ' · ' + r.활동상태, popup: () => popupEl(r), onClick: () => openRow(r._i, 'map') };
             }));
             if (fit) M.fit(14);
         };
@@ -5575,6 +5810,7 @@ const DataIntelMapLib = (function () {
             M.setMarkers(gs.map(g => ({
                 lat: g.lat, lng: g.lng, r: Math.round(6 + Math.min(7, 2 * Math.sqrt(g.rows.length - 1))), ring,
                 fill: (byStatus ? mapCssVar(MAP_STATUS_VAR[g.status]) : (mapCssVar(MAP_TYPE_VAR[g.type]) || mapCssVar('--text-muted'))) || '#888',
+                name: mapName(g.rows[0]) + (g.rows.length > 1 ? ' 외 ' + (g.rows.length - 1) + '건' : ''),
                 tip: mapName(g.rows[0]) + (g.rows.length > 1 ? ' 외 ' + (g.rows.length - 1) + '건' : '') + ' · ' + g.status,
                 popup: () => mapPopupEl(g), counts: byStatus ? g.statusCounts : g.typeCounts, rows: g.rows.length,
             })), { ringOf });
