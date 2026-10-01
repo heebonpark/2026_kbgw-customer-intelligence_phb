@@ -6994,17 +6994,10 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
     })
     generated_at = datetime.now().strftime('%Y-%m-%d %H:%M')
 
-    # 암호화된 리포트는 관리자 비밀번호를 페이지에 싣지 않는다: 바깥 화면이 비밀번호를 확인해 넘겨주므로
-    # (window.__dimOuterOk) 안쪽 잠금은 값을 몰라도 된다. 싣게 되면 일반 비밀번호로 연 사람이 페이지
-    # 소스에서 관리자 비밀번호를 읽을 수 있다. (암호화하지 않는 로컬 리포트는 비교할 값이 필요해 그대로 싣는다)
-    inner_admin = admin_password
-    if encrypt and admin_password != password:
-        import secrets
-        inner_admin = secrets.token_urlsafe(24)
     script = (
         APP_SCRIPT_TEMPLATE
         .replace('__PASSWORD__', password)
-        .replace('__ADMIN_PASSWORD__', inner_admin)
+        .replace('__ADMIN_PASSWORD__', admin_password)
         .replace('__EXPIRY__', expiry_date)
     )
 

@@ -1079,9 +1079,7 @@ __DASH_SECTIONS__
             src = src.split(from).join(to);
         };
         must('const CORRECT_PWD = "' + CFG.filler + '";', 'const CORRECT_PWD = ' + JSON.stringify(userPwd) + ';');
-        // 관리자 비밀번호는 페이지에 싣지 않는다 -- 잠금을 푼 바깥 화면이 넘겨준다 (report.py checkPassword의 __dimOuterOk).
-        // 실으면 일반 비밀번호로 연 사람이 페이지 소스에서 읽을 수 있다. 자리에는 쓸 수 없는 무작위 값을 둔다.
-        must('const ADMIN_PWD = "' + CFG.filler + '";', 'const ADMIN_PWD = ' + JSON.stringify(strongPassword(24)) + ';');
+        must('const ADMIN_PWD = "' + CFG.filler + '";', 'const ADMIN_PWD = ' + JSON.stringify(adminPwd) + ';');
         must('new Date("9999-12-31T23:59:59")', 'new Date("' + expiry + 'T23:59:59")');
         must('<style id="webVisibleStyle">#content { display: block; }</style>', '<style>#webUpload, #webShare { display: none !important; }</style>');
         const bodyAt = src.indexOf('<body>');
