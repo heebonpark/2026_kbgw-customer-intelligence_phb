@@ -16,7 +16,7 @@ for _stream in (sys.stdout, sys.stderr):
 sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
 
 from core.handlers import process_and_merge, load_data
-from core.report import generate_html_report
+from core.report import generate_html_report, generate_core_report
 from core.matching_config import load_matching_config
 from core.source_files import find_source_path, is_csv_path, SOURCE_FILES
 
@@ -87,6 +87,20 @@ def build_report(base_dir, matching_config=None, password=None, expiry_date=None
     return html_content, pwd, expiry, full_msg, merged_df, admin_pwd
 
 
+def build_core_report(base_dir, password=None, expiry_date=None, admin_password=None):
+    """9. 코어고객(+ 9-1 VOC매칭) 파일만으로 코어고객 활동현황 리포트를 만든다 (총괄DB 불필요).
+    Returns (html, password, expiry_date, admin_password, message); html is None on failure."""
+    core_df = _load(base_dir, 'core')
+    if core_df is None:
+        return None, None, None, None, f"코어고객 파일을 찾을 수 없습니다 ({SOURCE_FILES['core']['stem']}.*)"
+    try:
+        html_content, pwd, expiry, admin_pwd, count = generate_core_report(
+            core_df, _load(base_dir, 'core_voc'), password=password, admin_password=admin_password, expiry_date=expiry_date)
+    except ValueError as e:
+        return None, None, None, None, str(e)
+    return html_content, pwd, expiry, admin_pwd, f"코어고객 {count:,}곳"
+
+
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Data Intel PRO Report Generator")
@@ -94,9 +108,26 @@ def main():
     parser.add_argument("--admin-password", type=str, default=None,
                         help="관리자 비밀번호 (지정하지 않으면 이 PC에 저장된 값, 없으면 랜덤)")
     parser.add_argument("--expiry", type=str, help="리포트 만료일 (YYYY-MM-DD, 지정하지 않으면 월말)", default=None)
+    parser.add_argument("--core-only", action="store_true",
+                        help="9. 코어고객(+9-1) 파일만으로 코어고객 활동현황 리포트 생성 (총괄DB 불필요)")
     args = parser.parse_args()
 
     base_dir = "/Users/heebonpark/Downloads/관리고객통합솔루션"
+
+    if args.core_only:
+        html_content, pwd, expiry, admin_pwd, msg = build_core_report(
+            base_dir, password=args.password, expiry_date=args.expiry, admin_password=args.admin_password)
+        if html_content is None:
+            print(f"오류 발생: {msg}")
+            return
+        output_path = os.path.join(base_dir, "Core_Customer_Report.html")
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(html_content)
+        print(f"코어고객 리포트 생성 완료 ({msg})")
+        print(f"저장 위치: {output_path}")
+        print(f"리포트 만료일: {expiry}")
+        print(f"리포트 비밀번호: {pwd}")
+        return
 
     print("파일 로딩 및 병합 중...")
     html_content, pwd, expiry, msg, merged_df, admin_pwd = build_report(

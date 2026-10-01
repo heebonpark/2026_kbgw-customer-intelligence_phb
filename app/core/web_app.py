@@ -98,13 +98,13 @@ FIELD_SPECS = {
 
 # (key, label, note) -- same numbering as the desktop GUI
 WEB_UPLOAD_SLOTS = [
-    ('db', '1. 총괄관리DB', '필수'),
+    ('db', '1. 총괄관리DB', '필수 · 코어고객 현황만 만들 때는 생략'),
     ('voc', '2. 월/일일 SP관리활동 (VOC)', '선택'),
     ('patrol', '3. 월/일일 SE,SG 정기점검', '선택'),
     ('original', '5. 2026년 관리고객원본', '선택'),
     ('facility', '6. 시설현황', '선택'),
     ('zone_owner', '8. 영업구역담당자', '선택 · SP 구역번호→담당자명'),
-    ('core', '9. 코어고객 활동관리', '선택 · 독립 섹션·지도'),
+    ('core', '9. 코어고객 활동관리', '선택 · 이 파일만 올려도 코어고객 현황 생성'),
     ('core_voc', '9-1. 코어고객 VOC매칭', '선택 · 9번과 계약번호로 연결'),
 ]
 
@@ -278,10 +278,10 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
             <div class="web-actions">
                 <button type="button" class="web-run" id="webRunBtn" disabled>📊 대시보드 만들기</button>
                 <button type="button" class="web-btn2" id="webReloadAll" hidden title="엑셀에서 저장(Ctrl+S)한 최신 내용으로 모든 파일을 다시 읽고 대시보드를 새로 만듭니다">🔄 모두 다시 불러오고 대시보드 갱신</button>
-                <span class="web-progress" id="webProgress">1. 총괄관리DB는 필수입니다.</span>
+                <span class="web-progress" id="webProgress">1. 총괄관리DB(종합 대시보드) 또는 9. 코어고객(코어고객 현황만)을 선택하세요.</span>
             </div>
             <p class="web-footnote">엑셀에서 열어 둔 파일도 선택할 수 있습니다 -- 단, <b>마지막으로 저장된 내용</b>을 읽으므로 수정 중이면 먼저 저장하세요. 한 번 고른 파일은 <b>🔄 다시 불러오기</b>로 다시 고르지 않고 최신 저장본을 읽습니다 (Chrome·Edge). 저장 안 한 내용까지 쓰려면 <b>📋 엑셀에서 붙여넣기</b>를 쓰세요. 파일을 고르면 <b>시트 · 헤더 행 · 컬럼(열 위치)</b>을 자동으로 맞추고 미리보기를 보여줍니다 -- 다르면 드롭다운에서 바꾸세요. 설정은 이 브라우저에 기억되어 다음에 같은 양식이면 자동 적용됩니다.</p>
-            <p class="web-footnote">4. 해지파이프라인 · 7. 해지시설내역 섹션은 데스크톱 GUI 리포트에서 제공합니다.</p>
+            <p class="web-footnote"><b>9. 코어고객</b>(+9-1)만 올리면 총괄DB 없이 <b>코어고객 현황</b>만 만들고 공유할 수 있습니다 (설치주소 지도는 데스크톱 GUI 리포트에서). 4. 해지파이프라인 · 7. 해지시설내역 섹션도 데스크톱 GUI 리포트에서 제공합니다.</p>
         </details>
         <div class="web-quickbar" id="webQuickbar" hidden>
             <button type="button" class="web-btn2" id="webQuickReload" hidden>🔄 모두 다시 불러오고 갱신</button>
@@ -299,6 +299,7 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
                     <input type="password" id="shareAdminPwd" autocomplete="new-password" placeholder="예: GUI와 같은 관리자 비밀번호"></label>
                 <label class="web-field">만료일 <small>이 날짜가 지나면 열리지 않음</small>
                     <input type="date" id="shareExpiry"></label>
+                <label class="web-field web-remember" id="shareCoreOnlyWrap" hidden><input type="checkbox" id="shareCoreOnly"> 코어고객 현황만 공유 <small>총괄DB 내용은 넣지 않음</small></label>
             </div>
             <div class="web-actions">
                 <button type="button" class="web-run" id="shareDownloadBtn">📥 암호화 HTML 다운로드</button>
@@ -347,11 +348,16 @@ __DASH_SECTIONS__
         if (el) { el.textContent = text; el.className = 'web-slot-status' + (cls ? ' ' + cls : ''); }
     };
 
+    // 총괄DB가 있으면 종합 대시보드, 없이 9. 코어고객만 올리면 코어고객 현황만 만든다
+    const canRun = () => picked.db ? !missingRequired('db').length : !!picked.core;
     const refreshRun = (keepMessage) => {
         const dbMissing = picked.db ? missingRequired('db') : [];
-        runBtn.disabled = !picked.db || dbMissing.length > 0;
+        const coreOnly = !picked.db && !!picked.core;
+        runBtn.disabled = !canRun();
+        runBtn.textContent = coreOnly ? '💎 코어고객 현황 만들기' : '📊 대시보드 만들기';
         if (keepMessage) return;  // 실행 결과(완료/실패) 문구는 그대로 둔다
-        progress.textContent = !picked.db ? '1. 총괄관리DB는 필수입니다.'
+        progress.textContent = coreOnly ? '준비 완료 -- 총괄DB 없이 코어고객 현황만 만듭니다.'
+            : !picked.db ? '1. 총괄관리DB(종합 대시보드) 또는 9. 코어고객(코어고객 현황만)을 선택하세요.'
             : dbMissing.length ? '총괄관리DB의 필수 컬럼을 지정하세요: ' + dbMissing.join(', ')
             : '준비 완료 -- 대시보드 만들기를 누르세요.';
     };
@@ -692,7 +698,7 @@ __DASH_SECTIONS__
         btn.disabled = true;
         try {
             for (const key of Object.keys(handles)) await readHandle(key);
-            if (picked.db && !missingRequired('db').length) runBtn.click();
+            if (canRun()) runBtn.click();
         } finally { btn.disabled = false; }
     });
 
@@ -757,7 +763,12 @@ __DASH_SECTIONS__
         방문일자: ['방문일자'], '3Q방문일자': ['1회 방문일자'], '2회방문일자': ['2회 방문일자'], 방문대상: ['방문대상'], 방문자: ['방문자'],
         해지징후: ['해지징후'], 불만요구: ['불만사항/요구사항/추가영업기회'], 요약정리: ['요약정리'], 약정여부: ['약정여부'],
         해지건수: ['해지건수'], 해지월정료: ['해지월정료'],
+        '3Q징후': ['해지징후 및 불만 여부'], '2회징후': ['해지징후 및 불만 여부.1'],
+        '3Q불만': ['불만사항/요구사항/추가영업기회 (구체적으로 작성)'], '2회불만': ['불만사항/요구사항/추가영업기회 (구체적으로 작성).1'],
+        약정시설수: ['약정시설수'], 약정월정료: ['약정월정료'], 해지일자: ['해지일자'], 수동재계약: ['수동재계약'],
+        만기비중: ['만기도래 비중 금액', '만기도래 비중'], 업셀링: ['업셀링('], 업셀링금액: ['업셀링 금액'],
     };
+    const CORE_EXACT = ['3Q징후', '2회징후', '3Q불만', '2회불만'];  // 비슷한 이름의 다른 열로 번지지 않게 정확히 같은 이름만
     const BRANCH_ORDER_WEB = ['중앙', '강북', '서대문', '고양', '의정부', '남양주', '강릉', '원주'];
     function coreCol(columns, names) {
         return columns.find(c => names.includes(c)) || columns.find(c => names.some(n => c.startsWith(n))) || null;
@@ -779,7 +790,12 @@ __DASH_SECTIONS__
     function buildCorePayload(core, voc) {
         if (!core || !core.rows.length) return null;
         const col = {};
-        Object.keys(CORE_FIELDS).forEach(k => { col[k] = coreCol(core.columns, CORE_FIELDS[k]); });
+        Object.keys(CORE_FIELDS).forEach(k => {
+            col[k] = CORE_EXACT.includes(k) ? (core.columns.find(c => CORE_FIELDS[k].includes(c)) || null) : coreCol(core.columns, CORE_FIELDS[k]);
+        });
+        // '1회 방문일자_3Q 내' -> '3Q' (화면 문구용). 분기 방문 열이 없으면 방문일자 하나로만 본다.
+        const qm = /(\d)\s*Q/.exec(col['3Q방문일자'] || '');
+        const period = qm ? qm[1] + 'Q' : (col['3Q방문일자'] ? '분기' : null);
         if (!col.관리고객명 && !col.계약번호) return null;
         const coordCol = coreCol(core.columns, ['위치좌표(위도,경도)', '위치좌표', '좌표']);
         const latCol = coreCol(core.columns, ['위도', 'lat', 'LAT']), lngCol = coreCol(core.columns, ['경도', 'lng', 'LNG', 'lon']);
@@ -799,8 +815,20 @@ __DASH_SECTIONS__
         }
         const rows = core.rows.map(r => {
             const g = k => col[k] ? cv(r[idx(col[k])]) : null;
-            const visit3q = coreDate(g('3Q방문일자')), visit = coreDate(g('방문일자'));
-            const sign = String(g('해지징후') || '').toUpperCase();
+            const visit3q = coreDate(g('3Q방문일자')), visit = coreDate(g('방문일자')), visit2 = coreDate(g('2회방문일자'));
+            const yn = k => { const v = String(g(k) || '').trim().toUpperCase(); return v === 'Y' || v === 'N' ? v : null; };
+            const note = k => { const v = g(k); return v === null ? null : String(v); };
+            // 방문 회차별 기록 (이전 -> 분기 1회 -> 분기 2회)
+            const history = [
+                { 회차: period ? '이전' : '방문', 일자: visit, 징후: yn('해지징후'), 내용: note('불만요구'), 대상: g('방문대상'), 방문자: g('방문자') },
+                { 회차: (period || '') + ' 1회', 일자: visit3q, 징후: yn('3Q징후'), 내용: note('3Q불만') },
+                { 회차: (period || '') + ' 2회', 일자: visit2, 징후: yn('2회징후'), 내용: note('2회불만') },
+            ].filter(h => h.일자 || h.내용 || h.징후);
+            const signs = history.map(h => h.징후);
+            const sign = signs.includes('Y') ? 'Y' : (signs.includes('N') ? 'N' : null);
+            const notes = history.map(h => h.내용).filter(Boolean);
+            const inPeriod = period ? (visit3q || visit2) : visit;
+            const dates = [visit, visit3q, visit2].filter(Boolean).sort();
             const contract = coreContract(g('계약번호'));
             let lat = null, lng = null, src = null;
             if (coordCol) { const v = cv(r[idx(coordCol)]); if (typeof v === 'string' && v.includes(',')) { const [a, b] = v.split(',').map(Number); if (a && b) { lat = a; lng = b; src = '파일'; } } }
@@ -810,17 +838,22 @@ __DASH_SECTIONS__
                 설치주소: g('설치주소'), 영업구역: g('영업구역'), 영업구역담당: g('영업구역담당'), 관리고객담당자: g('관리고객담당자'), 영업자: g('영업자'),
                 시설수: coreNum(g('시설수')), 월정료: coreNum(g('월정료')), 재계약대상시설수: coreNum(g('재계약대상시설수')),
                 재계약대상월정료: coreNum(g('재계약대상월정료')), 계약종료일: coreDate(g('계약종료일')), 방문일자: visit, '3Q방문일자': visit3q,
-                '2회방문일자': coreDate(g('2회방문일자')), 방문대상: g('방문대상'), 방문자: g('방문자'),
-                해지징후: sign === 'Y' ? 'Y' : (sign === 'N' ? 'N' : null), 불만요구: g('불만요구'), 요약정리: g('요약정리'), 약정여부: g('약정여부'),
-                해지건수: coreNum(g('해지건수')), 해지월정료: coreNum(g('해지월정료')), VOC: vocs[contract] || [],
-                활동상태: sign === 'Y' ? '해지징후' : ((visit3q || visit) ? '방문완료' : '미방문'), lat, lng, 좌표출처: src,
+                '2회방문일자': visit2, 방문대상: g('방문대상'), 방문자: g('방문자'),
+                해지징후: sign, 불만요구: notes.length ? notes[notes.length - 1] : null,  // 가장 최근 회차의 메모
+                방문이력: history, 최근방문: dates.length ? dates[dates.length - 1] : null,
+                요약정리: g('요약정리'), 약정여부: g('약정여부'), 약정시설수: coreNum(g('약정시설수')), 약정월정료: coreNum(g('약정월정료')),
+                해지건수: coreNum(g('해지건수')), 해지월정료: coreNum(g('해지월정료')), 해지일자: coreDate(g('해지일자')),
+                수동재계약: coreDate(g('수동재계약')), 만기비중: coreNum(g('만기비중')), 업셀링: note('업셀링'), 업셀링금액: coreNum(g('업셀링금액')),
+                VOC: vocs[contract] || [],
+                // 방문완료 = 이번 분기 안에 방문 (분기 열이 없는 파일은 방문일자 기준)
+                활동상태: sign === 'Y' ? '해지징후' : (inPeriod ? '방문완료' : '미방문'), lat, lng, 좌표출처: src,
             };
         });
         const rank = b => { const i = BRANCH_ORDER_WEB.indexOf(b); return i < 0 ? BRANCH_ORDER_WEB.length : i; };
         rows.sort((a, b) => (rank(a.지사) - rank(b.지사)) || String(a.지사).localeCompare(String(b.지사)) || String(a.관리고객명 || '').localeCompare(String(b.관리고객명 || '')));
         const noCoord = rows.filter(r => r.lat === null).length;
-        return { rows, coord_stats: { 파일: rows.length - noCoord, 카카오: 0, 없음: noCoord }, voc_matched: rows.filter(r => r.VOC.length).length,
-                 kakao_key_set: null, kakao_error: null, coord_note: noCoord ? '웹 업로드는 주소→좌표 변환을 하지 않음 -- 지도는 GUI 리포트(카카오 키)에서' : null };
+        return { rows, coord_stats: { 파일: rows.length - noCoord, 카카오: 0, 없음: noCoord }, voc_matched: rows.filter(r => r.VOC.length).length, period,
+                 kakao_key_set: null, kakao_error: null, coord_note: noCoord ? '웹 업로드는 주소→좌표 변환을 하지 않음 -- 지도는 데스크톱 GUI 리포트에서' : null };
     }
 
     // ---- file -> {columns, rows} (mirrors handlers.py load_data) ----
@@ -917,7 +950,7 @@ __DASH_SECTIONS__
     }
 
     runBtn.addEventListener('click', async () => {
-        if (!picked.db || missingRequired('db').length) return;
+        if (!canRun()) return;
         if (typeof XLSX === 'undefined') { progress.textContent = '엑셀 읽기 모듈을 불러오지 못했습니다. 인터넷 연결을 확인 후 새로고침하세요.'; return; }
         runBtn.disabled = true;
         const t0 = performance.now();
@@ -946,17 +979,21 @@ __DASH_SECTIONS__
                 loadedNames.push(p.name + ' (' + table.rows.length.toLocaleString('ko-KR') + '행)');
                 setStatus(key, p.name + ' · 시트 ' + p.sheet + ' · 헤더 ' + p.headerRow + '행 · ' + table.rows.length.toLocaleString('ko-KR') + '행', 'ok');
             }
-            if (!payload.db.rows.length) throw new Error('총괄DB 시트 "' + picked.db.sheet + '"에 데이터 행이 없습니다.');
+            const coreOnly = !payload.db;
+            payload.core = buildCorePayload(coreTables.core, coreTables.core_voc);
+            if (coreOnly && !payload.core) throw new Error('코어고객 시트에서 "관리고객 명" 또는 "계약번호" 열을 찾을 수 없습니다 (시트·헤더 행을 확인하세요).');
+            if (!coreOnly && !payload.db.rows.length) throw new Error('총괄DB 시트 "' + picked.db.sheet + '"에 데이터 행이 없습니다.');
             progress.textContent = '병합·집계 중...';
             await new Promise(r => setTimeout(r, 0));
+            document.body.classList.toggle('core-only', coreOnly);  // 코어고객 섹션만 보이게 (report.py CSS)
             document.getElementById('webDashboard').hidden = false;
             const adminWrap = document.getElementById('adminOnlyWrap');
             if (adminWrap) adminWrap.style.display = '';
-            payload.core = buildCorePayload(coreTables.core, coreTables.core_voc);
-            const res = window.DataIntelLoad(payload);
+            const res = coreOnly ? { rows: 0 } : window.DataIntelLoad(payload);
             if (window.DataIntelCore) window.DataIntelCore(payload.core);
             lastPayload = payload;
             document.getElementById('webShare').hidden = false;
+            updateShareMode();
             // 대시보드가 바로 보이게 업로드 칸은 한 줄로 접고 섹션 메뉴를 켠다
             document.getElementById('webUploadSummary').textContent = loadedNames.join(' · ');
             document.getElementById('webUpload').open = false;
@@ -965,8 +1002,9 @@ __DASH_SECTIONS__
             const nav = document.getElementById('dashNav');
             if (nav) { nav.hidden = false; window.dispatchEvent(new Event('resize')); }
             const secs = ((performance.now() - t0) / 1000).toFixed(1);
-            progress.textContent = '✅ 완료 -- 관리계약 ' + res.rows.toLocaleString('ko-KR') + '건 (' + secs + '초). 파일을 바꾸면 다시 만들 수 있습니다.';
-            document.getElementById('reportMeta').textContent = '관리계약 ' + res.rows.toLocaleString('ko-KR') + '건 · 이 브라우저에서 계산됨';
+            const what = coreOnly ? '코어고객 ' + payload.core.rows.length.toLocaleString('ko-KR') + '곳' : '관리계약 ' + res.rows.toLocaleString('ko-KR') + '건';
+            progress.textContent = '✅ 완료 -- ' + what + ' (' + secs + '초). 파일을 바꾸면 다시 만들 수 있습니다.';
+            document.getElementById('reportMeta').textContent = what + ' · 이 브라우저에서 계산됨';
         } catch (e) {
             console.error(e);
             progress.textContent = '⚠️ 처리 실패: ' + (e && e.message ? e.message : e);
@@ -992,6 +1030,21 @@ __DASH_SECTIONS__
         return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
     }
     $('shareExpiry').value = daysFromToday(30);
+    // 코어고객 현황만 공유: 9번이 있을 때만 고를 수 있고, 총괄DB 없이 만들었으면 항상 코어고객만.
+    // 종합 리포트(kbgw-report)를 덮어쓰지 않도록 배포 저장소도 따로 쓴다.
+    const CORE_TITLE = '코어고객 활동현황', CORE_REPO = 'kbgw-core-report', MAIN_REPO = 'kbgw-report';
+    const coreOnlyShare = () => !!(lastPayload && lastPayload.core && (!lastPayload.db || $('shareCoreOnly').checked));
+    function updateShareMode() {
+        const hasCore = !!(lastPayload && lastPayload.core), noDb = !!(lastPayload && !lastPayload.db);
+        $('shareCoreOnlyWrap').hidden = !hasCore;
+        if (noDb) $('shareCoreOnly').checked = true;
+        if (!hasCore) $('shareCoreOnly').checked = false;
+        $('shareCoreOnly').disabled = noDb;
+        const repo = $('ghRepo');
+        if (coreOnlyShare() && repo.value.trim() === MAIN_REPO) repo.value = CORE_REPO;
+        else if (!coreOnlyShare() && repo.value.trim() === CORE_REPO) repo.value = MAIN_REPO;
+    }
+    $('shareCoreOnly').addEventListener('change', updateShareMode);
     try { const t = localStorage.getItem('dataintel-gh-token'); if (t) { $('ghToken').value = t; $('ghRemember').checked = true; } } catch (e) {}
 
     function prefilterFiles(payload) {
@@ -1015,7 +1068,7 @@ __DASH_SECTIONS__
         return '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
     }
     const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    async function buildReportHtml(userPwd, adminPwd, expiry) {
+    async function buildReportHtml(userPwd, adminPwd, expiry, coreOnly) {
         let src = await pageSource();
         const must = (from, to) => {
             if (!src.includes(from)) throw new Error('리포트 틀을 만들 수 없습니다 (페이지를 새로고침 후 다시 시도).');
@@ -1026,16 +1079,21 @@ __DASH_SECTIONS__
         must('new Date("9999-12-31T23:59:59")', 'new Date("' + expiry + 'T23:59:59")');
         must('<style id="webVisibleStyle">#content { display: block; }</style>', '<style>#webUpload, #webShare { display: none !important; }</style>');
         const bodyAt = src.indexOf('<body>');
-        src = src.slice(0, bodyAt + 6) + '\n' + CFG.lockScreenHtml.replace('__EXPIRY_TEXT__', esc(expiry)) + src.slice(bodyAt + 6);
-        const data = prefilterFiles(lastPayload);
+        const lock = CFG.lockScreenHtml.replace('__EXPIRY_TEXT__', esc(expiry));
+        src = src.slice(0, bodyAt + 6) + '\n' + (coreOnly ? lock.replace('Data Intel PRO 보안 리포트', CORE_TITLE + ' 보안 리포트') : lock) + src.slice(bodyAt + 6);
+        // 코어고객만 공유할 때는 총괄DB·매칭 파일을 아예 싣지 않는다
+        const data = coreOnly ? { db: null, files: {}, zoneOwnerMap: {}, core: lastPayload.core } : prefilterFiles(lastPayload);
         const generated = new Date();
-        const meta = '생성일시 ' + generated.toLocaleString('ko-KR') + ' · 관리계약 ' + data.db.rows.length.toLocaleString('ko-KR') + '건 · 만료일 ' + expiry;
+        const meta = '생성일시 ' + generated.toLocaleString('ko-KR') + ' · '
+            + (coreOnly ? '코어고객 ' + data.core.rows.length.toLocaleString('ko-KR') + '곳' : '관리계약 ' + data.db.rows.length.toLocaleString('ko-KR') + '건') + ' · 만료일 ' + expiry;
         const boot = '<script type="application/json" id="webPreload">' + JSON.stringify(data).replace(/<\//g, '<\\/') + '<\/script>\n'
             + '<script>document.addEventListener("DOMContentLoaded", function () {'
             + ' var p = JSON.parse(document.getElementById("webPreload").textContent);'
             + ' document.getElementById("webDashboard").hidden = false;'
-            + ' var nav = document.getElementById("dashNav"); if (nav) nav.hidden = false;'
-            + ' window.DataIntelLoad(p);'
+            + (coreOnly
+                ? ' document.body.classList.add("core-only"); document.title = ' + JSON.stringify(CORE_TITLE) + ';'
+                  + ' var h = document.querySelector(".topbar h1"); if (h) h.textContent = ' + JSON.stringify(CORE_TITLE) + ';'
+                : ' document.body.classList.remove("core-only"); var nav = document.getElementById("dashNav"); if (nav) nav.hidden = false; window.DataIntelLoad(p);')
             + ' if (window.DataIntelCore) window.DataIntelCore(p.core || null);'
             + ' document.getElementById("reportMeta").textContent = ' + JSON.stringify(meta) + ';'
             + '});<\/script>\n';
@@ -1047,7 +1105,7 @@ __DASH_SECTIONS__
         for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
         return btoa(s);
     }
-    async function encryptReport(reportHtml, passwords, expiry) {
+    async function encryptReport(reportHtml, passwords, expiry, title) {
         // secure_report.py encrypt_report와 같은 형식: 본문은 랜덤 키로 AES-256-GCM, 그 키를 비밀번호별 PBKDF2 키로 감쌈
         const contentKey = crypto.getRandomValues(new Uint8Array(32));
         const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -1064,7 +1122,7 @@ __DASH_SECTIONS__
             slots.push({ salt: b64(salt), iv: b64(siv), key: b64(wrapped) });
         }
         const payload = JSON.stringify({ v: 1, iter: CFG.iterations, slots, iv: b64(iv), data: b64(data) });
-        return CFG.unlockTemplate.split('__TITLE__').join('Data Intel PRO 보안 리포트')
+        return CFG.unlockTemplate.split('__TITLE__').join(title)
             .replace('__EXPIRY__', '<p class="exp">만료일: ' + esc(expiry) + '</p>')
             .replace('__PAYLOAD__', payload);
     }
@@ -1075,15 +1133,16 @@ __DASH_SECTIONS__
         const userPwd = $('shareUserPwd').value.trim() || strongPassword(12);
         const adminPwd = $('shareAdminPwd').value.trim() || strongPassword(12);
         if (userPwd === adminPwd) throw new Error('사용자 비밀번호와 관리자 비밀번호는 달라야 합니다.');
+        const coreOnly = coreOnlyShare();
         $('shareProgress').textContent = '리포트 만드는 중...';
-        const reportHtml = await buildReportHtml(userPwd, adminPwd, expiry);
+        const reportHtml = await buildReportHtml(userPwd, adminPwd, expiry, coreOnly);
         $('shareProgress').textContent = '암호화 중...';
-        const html = await encryptReport(reportHtml, [userPwd, adminPwd], expiry);
-        return { html, userPwd, adminPwd, expiry };
+        const html = await encryptReport(reportHtml, [userPwd, adminPwd], expiry, coreOnly ? CORE_TITLE + ' 보안 리포트' : 'Data Intel PRO 보안 리포트');
+        return { html, userPwd, adminPwd, expiry, coreOnly, file: coreOnly ? 'Core_Customer_Report.html' : 'Data_Intel_PRO_Report.html' };
     }
     function showShare(r, url) {
-        const lines = ['[Data Intel PRO 리포트]'];
-        lines.push(url ? '링크: ' + url : '첨부 파일: Data_Intel_PRO_Report.html (브라우저로 열기)');
+        const lines = [r.coreOnly ? '[' + CORE_TITLE + ' 리포트]' : '[Data Intel PRO 리포트]'];
+        lines.push(url ? '링크: ' + url : '첨부 파일: ' + r.file + ' (브라우저로 열기)');
         lines.push('비밀번호: ' + r.userPwd, '만료일: ' + r.expiry);
         $('shareText').textContent = lines.join('\n');
         $('shareAdminNote').textContent = '관리자 비밀번호(공유하지 마세요): ' + r.adminPwd;
@@ -1099,7 +1158,7 @@ __DASH_SECTIONS__
         try {
             const r = await makeEncrypted();
             const url = URL.createObjectURL(new Blob([r.html], { type: 'text/html;charset=utf-8' }));
-            const a = document.createElement('a'); a.href = url; a.download = 'Data_Intel_PRO_Report.html'; a.click();
+            const a = document.createElement('a'); a.href = url; a.download = r.file; a.click();
             setTimeout(() => URL.revokeObjectURL(url), 5000);
             $('shareProgress').textContent = '✅ 다운로드 완료 -- 파일은 암호화되어 있어 메일·메신저로 보내도 됩니다.';
             showShare(r, null);
@@ -1161,7 +1220,7 @@ __DASH_SECTIONS__
         const btn = $('shareDeployBtn'); btn.disabled = true; $('shareDownloadBtn').disabled = true;
         try {
             const token = $('ghToken').value.trim();
-            const repo = $('ghRepo').value.trim() || 'kbgw-report';
+            const repo = $('ghRepo').value.trim() || (coreOnlyShare() ? CORE_REPO : MAIN_REPO);
             if (!token) throw new Error('GitHub 토큰을 입력하세요.');
             if (!/^[A-Za-z0-9._-]+$/.test(repo)) throw new Error('저장소 이름은 영문·숫자·-·_ 만 쓸 수 있습니다.');
             try { if ($('ghRemember').checked) localStorage.setItem('dataintel-gh-token', token); else localStorage.removeItem('dataintel-gh-token'); } catch (e) {}

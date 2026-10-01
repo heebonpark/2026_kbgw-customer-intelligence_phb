@@ -1342,24 +1342,90 @@ body {
 @container (max-width: 46px) { .zl5 { display: none; } }
 /* ---- 구역별 고급 시각화 ---- */
 .core-filter-bar { margin-bottom: 14px; }
-.core-legend { margin: 6px 0 8px; align-items: center; }
+.core-headline { display: flex; flex-direction: column; gap: 3px; margin-bottom: 14px; }
+.core-headline-main { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.core-headline-sub { font-size: 12.5px; color: var(--text-secondary); }
+.core-meter { height: 6px; background: var(--grid-line); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+.core-meter > span { display: block; height: 100%; background: var(--good); border-radius: 3px; }
+.core-block-title { font-size: 14px; font-weight: 700; margin: 26px 0 10px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; color: var(--text-primary); }
+.core-block-title small { font-weight: 400; font-size: 12px; color: var(--text-muted); }
+#coreSectionWrap .stat-grid { margin-bottom: 0; }
+.core-action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 12px; }
+.core-action { padding: 14px 12px 10px; border-top: 3px solid var(--baseline); }
+.core-action.is-critical { border-top-color: var(--critical); }
+.core-action.is-serious { border-top-color: var(--serious); }
+.core-action.is-warning { border-top-color: var(--warning); }
+.core-action-head { display: flex; align-items: baseline; gap: 8px; font-size: 13px; font-weight: 700; margin: 0 4px 8px; }
+.core-action-count { margin-left: auto; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.core-action-list { display: flex; flex-direction: column; gap: 2px; max-height: 218px; overflow-y: auto; }
+.core-action-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 8px; width: 100%; text-align: left; padding: 6px 8px; border: 0; border-radius: 8px;
+                    background: none; color: inherit; font: inherit; cursor: pointer; }
+.core-action-item:hover, .core-action-item:focus-visible { background: var(--page-plane); outline: none; }
+.core-action-name { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.core-action-tag { font-size: 11.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.core-action-sub { grid-column: 1 / -1; font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.core-action-empty { font-size: 12px; color: var(--text-muted); padding: 6px 8px; }
+.core-charts { margin-bottom: 0; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); }
+.core-charts .chart-note { margin-bottom: 10px; }
+.core-chart-legend { margin: 0 0 10px; }
+.core-row { grid-template-columns: 62px 1fr 104px; }
+.core-row.wide { grid-template-columns: 168px 1fr 44px; }
+.core-row[data-core-key], .core-row[data-core-q] { cursor: pointer; }
+.core-row.is-active { background: color-mix(in srgb, var(--brand) 12%, transparent); outline: 1px solid var(--brand); }
+/* 중립(미방문·여유 있는 계약): 연한 --baseline은 다크 모드에서 배경과 구분이 안 돼 한 단계 진한 회색 */
+.role-none { background: var(--text-muted); }
+.core-cols { display: flex; align-items: flex-end; gap: 6px; height: 186px; }
+.core-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; border-radius: 6px; }
+.core-col:hover, .core-col:focus { background: var(--page-plane); outline: none; }
+.core-col-val { font-size: 11.5px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; margin-bottom: 3px; }
+.core-col-bar { width: 62%; max-width: 46px; border-radius: 4px 4px 0 0; min-height: 2px; }
+.core-col-label { width: 100%; min-height: 40px; text-align: center; font-size: 11px; color: var(--text-secondary); border-top: 1px solid var(--baseline); padding-top: 5px;
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.core-col-sub { display: block; font-size: 10.5px; color: var(--text-muted); }
+.core-map-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin: 0 0 8px; }
+.core-legend { margin: 0; align-items: center; }
+.core-size-note { color: var(--text-muted); font-size: 12px; }
 .core-coord-note { margin-left: auto; color: var(--text-muted); font-size: 12px; }
 .core-sign-key { border-radius: 50%; background: var(--surface-1); border: 3px solid var(--critical); box-sizing: border-box; }
-.core-map { height: 520px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 14px; background: var(--page-plane); }
+.core-map { height: 520px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 4px; background: var(--page-plane); }
 .core-map-empty { height: auto; padding: 18px 20px; font-size: 13px; color: var(--text-secondary); }
 .core-pop { font-size: 12px; line-height: 1.45; min-width: 220px; }
 .core-pop-title { font-weight: 800; font-size: 13.5px; margin-bottom: 4px; }
 .core-pop-note { margin: 4px 0; padding: 5px 7px; background: #f6f6f3; border-radius: 6px; color: #333; }
 .core-pop-addr { color: #666; margin: 2px 0 6px; }
-.core-table-scroll { max-height: 560px; }
+.core-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 10px; }
+.core-toolbar .filter-input { max-width: 360px; }
+.core-table-scroll { max-height: 640px; }
 #coreTable td { vertical-align: top; }
-#coreTable tbody tr { cursor: pointer; }
-#coreTable tbody tr:hover td { background: var(--page-plane); }
+#coreTable th[data-core-sort] { cursor: pointer; user-select: none; }
+#coreTable tbody tr[data-core-row] { cursor: pointer; }
+#coreTable tbody tr[data-core-row]:hover td { background: var(--page-plane); }
 #coreTable tr.core-active td { background: color-mix(in srgb, var(--brand) 12%, var(--surface-1)); }
 #coreTable tr.core-sign td { background: color-mix(in srgb, var(--critical) 7%, var(--surface-1)); }
-#coreTable td.core-sign-cell { color: var(--critical); font-weight: 800; }
-#coreTable td.core-note { max-width: 360px; white-space: normal; font-size: 12px; color: var(--text-secondary); }
+#coreTable td.core-note { max-width: 380px; min-width: 220px; white-space: normal; font-size: 12px; color: var(--text-secondary); }
 #coreTable td.core-novisit { color: var(--text-muted); }
+#coreTable tr.core-detail td { background: var(--page-plane); white-space: normal; padding: 14px 16px; }
+.core-state { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.core-state::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--baseline); }
+.core-state.s-방문완료::before { background: var(--good); }
+.core-state.s-해지징후::before { background: var(--critical); }
+.core-dday { margin-left: 6px; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.core-dday.soon { color: var(--critical); font-weight: 700; }
+.core-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 18px; }
+.core-detail-title { font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px; }
+.core-hist { border-left: 2px solid var(--baseline); padding: 0 0 10px 10px; margin-left: 3px; font-size: 12px; }
+.core-hist-head { font-weight: 600; color: var(--text-primary); }
+.core-hist-body { color: var(--text-secondary); margin-top: 2px; line-height: 1.5; }
+.core-kv { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 4px 10px; font-size: 12px; margin: 0 0 10px; }
+.core-kv dt { color: var(--text-muted); }
+.core-kv dd { margin: 0; color: var(--text-primary); }
+/* 코어고객만 보는 화면 (총괄DB 없이 9번만 올린 웹 / 코어고객만 공유) */
+body.core-only .dash-sec:not(#secCore), body.core-only #dashNav, body.core-only .dash-admin, body.core-only .dash-anchor,
+body.core-only .global-filter-bar:not(.core-filter-bar) { display: none !important; }
+body.core-only #secCore > summary { display: none; }
+.core-foot { margin: 12px 0 0; }
+.core-page-note { font-size: 12px; color: var(--text-muted); margin: 0 0 14px; }
+@media (max-width: 640px) { .core-row.wide { grid-template-columns: 110px 1fr 40px; } .core-map { height: 380px; } }
 .perf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; align-items: start; margin-bottom: 16px; }
 .perf-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .perf-band { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; font-weight: 700; font-size: 14.5px;
@@ -1877,17 +1943,37 @@ function initDashNav() {
 document.addEventListener('DOMContentLoaded', initDashNav);
 
 // ===== 9. 코어고객 활동관리 -- 독립 섹션 (총괄DB 필터와 무관). core_customers.py build_core_payload의 rows를 그린다 =====
+// 화면 순서: 필터 -> 한 줄 요약 -> 지표 -> 우선 조치 대상 -> 차트 -> 지도 -> 활동내역 표(행을 누르면 방문이력·VOC·계약정보)
 (function () {
     const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';
     const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css';
     const BRANCHES = ['중앙', '강북', '서대문', '고양', '의정부', '남양주', '강릉', '원주'];
     const STATES = ['방문완료', '미방문', '해지징후'];
+    const STATE_ROLE = { 방문완료: 'role-good', 미방문: 'role-none', 해지징후: 'role-critical' };
+    const STATE_VAR = { 방문완료: '--good', 미방문: '--text-muted', 해지징후: '--critical' };
+    const VOC_STATES = ['처리완료', '접수', '미접수'];
+    const VOC_ROLE = { 처리완료: 'role-good', 접수: 'role-warning', 미접수: 'role-critical' };
+    const END_BUCKETS = [['종료일 지남', 'role-critical'], ['3개월 내', 'role-serious'], ['6개월 내', 'role-warning'], ['1년 내', 'role-none'], ['1년 이후', 'role-none'], ['미상', 'role-none']];
     const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; };
+    const int = n => Math.round(n || 0).toLocaleString('ko-KR');
     const won = n => n == null ? '-' : (n >= 100000000 ? (n / 100000000).toFixed(1) + '억원' : n >= 10000 ? Math.round(n / 10000).toLocaleString('ko-KR') + '만원' : Math.round(n).toLocaleString('ko-KR') + '원');
+    const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
     const kakaoLink = a => a ? 'https://map.kakao.com/link/search/' + encodeURIComponent(a) : null;
     const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    let state = { 관리주체: '', 지사: '', 활동상태: '' };
-    let payload = null, map = null, layer = null, markers = new Map();
+    const fresh = () => ({ 관리주체: '', 지사: '', 활동상태: '', q: '', color: '활동상태', sort: null, dir: 1, open: null });
+    let state = fresh();
+    let payload = null, map = null, layer = null, markers = new Map(), period = '';
+
+    // ---- 날짜 ----
+    const today0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+    const daysTo = d => { if (!d) return null; const t = new Date(d + 'T00:00:00'); return isNaN(t) ? null : Math.round((t - today0()) / 86400000); };
+    const ddayText = n => n == null ? '' : (n < 0 ? Math.abs(n) + '일 지남' : 'D-' + n);
+    const endBucket = r => { const n = daysTo(r.계약종료일); return n == null ? '미상' : n < 0 ? '종료일 지남' : n <= 90 ? '3개월 내' : n <= 180 ? '6개월 내' : n <= 365 ? '1년 내' : '1년 이후'; };
+    const lastVisit = r => r.최근방문 || r['2회방문일자'] || r['3Q방문일자'] || r.방문일자 || null;
+    // 이번 분기 안에 방문했는가 (분기 열이 없는 파일은 방문일자 기준) -- 해지징후 고객도 방문은 한 것
+    const visited = r => period ? !!(r['3Q방문일자'] || r['2회방문일자']) : !!r.방문일자;
+    const owner = r => r.관리고객담당자 || r.영업구역담당 || '담당 미지정';
+    const pendingVoc = r => (r.VOC || []).filter(v => v.상태 === '접수' || v.상태 === '미접수');
 
     function loadLeaflet(done) {
         if (window.L) { done(); return; }
@@ -1904,12 +1990,37 @@ document.addEventListener('DOMContentLoaded', initDashNav);
     }
     const visible = () => payload.rows.filter(r =>
         (!state.관리주체 || r.관리주체 === state.관리주체) && (!state.지사 || r.지사 === state.지사) && (!state.활동상태 || r.활동상태 === state.활동상태));
+    const branchList = rows => BRANCHES.filter(b => rows.some(r => r.지사 === b)).concat(Array.from(new Set(rows.map(r => r.지사))).filter(b => !BRANCHES.includes(b)));
 
-    function pills(label, key, values) {
+    // ---- 공용 hover 툴팁: data-core-tip="제목|줄1|줄2" ----
+    let tipEl = null;
+    function showTip(target, x, y) {
+        if (!tipEl || !document.body.contains(tipEl)) { tipEl = el('div', 'dv-tip'); tipEl.setAttribute('role', 'tooltip'); document.body.appendChild(tipEl); }
+        tipEl.textContent = '';
+        target.dataset.coreTip.split('|').forEach((line, i) => tipEl.appendChild(el('div', i ? 'dv-tip-line' : 'dv-tip-head', line)));
+        tipEl.style.display = 'block';
+        const pad = 14, w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+        let left = x + pad, top = y + pad;
+        if (left + w > window.innerWidth - 8) left = x - w - pad;
+        if (top + h > window.innerHeight - 8) top = y - h - pad;
+        tipEl.style.left = Math.max(8, left) + 'px'; tipEl.style.top = Math.max(8, top) + 'px';
+    }
+    const hideTip = () => { if (tipEl) tipEl.style.display = 'none'; };
+    document.addEventListener('mousemove', e => {
+        const t = e.target.closest ? e.target.closest('[data-core-tip]') : null;
+        if (t) showTip(t, e.clientX, e.clientY); else hideTip();
+    });
+    document.addEventListener('focusin', e => {
+        const t = e.target.closest ? e.target.closest('[data-core-tip]') : null;
+        if (t) { const b = t.getBoundingClientRect(); showTip(t, b.left + b.width / 2, b.bottom); } else hideTip();
+    });
+
+    // ---- 작은 부품 ----
+    function pills(label, key, values, noAll) {
         const g = el('div', 'filter-group');
         g.appendChild(el('span', 'filter-group-label', label));
         const row = el('div', 'filter-pill-row');
-        [''].concat(values).forEach(v => {
+        (noAll ? values : [''].concat(values)).forEach(v => {
             const b = el('button', 'filter-pill' + (state[key] === v ? ' active' : ''), v === '' ? '전체' : v);
             b.type = 'button'; b.dataset.coreKey = key; b.dataset.coreValue = v;
             row.appendChild(b);
@@ -1917,20 +2028,238 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         g.appendChild(row);
         return g;
     }
-    function tile(label, value, sub) {
+    function tile(label, value, sub, meter) {
         const t = el('div', 'stat-tile');
         t.appendChild(el('div', 'stat-label', label));
         t.appendChild(el('div', 'stat-value', value));
+        if (meter != null) { const m = el('div', 'core-meter'); const f = el('span'); f.style.width = Math.max(0, Math.min(100, meter)) + '%'; m.appendChild(f); t.appendChild(m); }
         t.appendChild(el('div', 'stat-sub', sub));
         return t;
     }
+    function legend(items) {
+        const g = el('div', 'legend-grid core-chart-legend');
+        items.forEach(([name, role]) => {
+            const it = el('div', 'legend-item');
+            it.appendChild(el('span', 'legend-swatch ' + role));
+            it.appendChild(el('span', 'legend-label', name));
+            g.appendChild(it);
+        });
+        return g;
+    }
+    function card(title, note) {
+        const c = el('div', 'chart-card');
+        c.appendChild(el('h3', 'chart-title', title));
+        c.appendChild(el('p', 'chart-note', note || ''));
+        return c;
+    }
+    // 가로 누적 막대 한 줄. parts: [{name, n, role, text}] (text 없으면 건수), scale: 가장 긴 줄의 합
+    function stackRow(label, parts, scale, valueText, tipLines, cls) {
+        const row = el('div', 'zone-row core-row' + (cls ? ' ' + cls : ''));
+        row.tabIndex = 0;
+        row.dataset.coreTip = [label].concat(tipLines).join('|');
+        const lab = el('span', 'bar-row-label', label); lab.title = label;
+        row.appendChild(lab);
+        const track = el('div', 'zone-track');
+        parts.forEach(p => {
+            if (!p.n) return;
+            const seg = el('div', 'zone-seg ' + p.role);
+            const text = p.text === undefined ? int(p.n) : p.text;
+            if (text) seg.appendChild(el('span', 'zl' + Math.min(String(text).length, 5), text));
+            seg.style.width = (p.n / (scale || 1) * 100).toFixed(2) + '%';
+            track.appendChild(seg);
+        });
+        row.appendChild(track);
+        row.appendChild(el('span', 'bar-row-value', valueText));
+        return row;
+    }
+    // 세로 막대. items: [{label, value, role, sub, tip}]
+    function columns(items) {
+        const wrap = el('div', 'core-cols');
+        const max = Math.max(1, ...items.map(i => i.value));
+        items.forEach(i => {
+            const col = el('div', 'core-col');
+            col.tabIndex = 0;
+            col.dataset.coreTip = i.tip;
+            col.appendChild(el('span', 'core-col-val', i.value ? int(i.value) : ''));
+            const bar = el('div', 'core-col-bar ' + i.role);
+            bar.style.height = (i.value / max * 118).toFixed(1) + 'px';
+            col.appendChild(bar);
+            const lab = el('span', 'core-col-label', i.label);
+            if (i.sub) lab.appendChild(el('span', 'core-col-sub', i.sub));
+            col.appendChild(lab);
+            wrap.appendChild(col);
+        });
+        return wrap;
+    }
+    const countBy = (rows, f) => { const m = new Map(); rows.forEach(r => { const k = f(r); m.set(k, (m.get(k) || 0) + 1); }); return m; };
+    const stateParts = rows => STATES.map(s => ({ name: s, n: rows.filter(r => r.활동상태 === s).length, role: STATE_ROLE[s] }));
+
+    // ---- 한 줄 요약 ----
+    function headline(rows) {
+        const n = rows.length, v = rows.filter(visited).length;
+        const un = rows.filter(r => !visited(r)), sign = rows.filter(r => r.해지징후 === 'Y');
+        const box = el('div', 'callout core-headline ' + (un.length || sign.length ? 'callout-warning' : 'callout-good'));
+        box.appendChild(el('div', 'core-headline-main', '코어고객 ' + int(n) + '곳 중 ' + int(v) + '곳(' + pct(v, n) + '%) ' + (period ? period + ' ' : '') + '방문 완료 · 미방문 ' + un.length + '곳 · 해지징후 ' + sign.length + '곳'));
+        const notes = [];
+        if (un.length) {
+            const by = Array.from(countBy(un, r => r.지사)).sort((a, b) => b[1] - a[1]);
+            notes.push('미방문이 많은 지사: ' + by.slice(0, 3).map(([b, c]) => b + ' ' + c + '곳').join(', '));
+        }
+        const soon = rows.filter(r => { const d = daysTo(r.계약종료일); return d != null && d <= 90; });
+        if (soon.length) notes.push('계약종료 3개월 이내(지남 포함) ' + soon.length + '곳 · 월정료 ' + won(soon.reduce((s, r) => s + (r.월정료 || 0), 0)));
+        const pend = rows.reduce((s, r) => s + pendingVoc(r).length, 0);
+        if (pend) notes.push('미처리 VOC ' + pend + '건');
+        if (!notes.length) notes.push('미방문·계약종료 임박·미처리 VOC가 없습니다.');
+        notes.forEach(t => box.appendChild(el('div', 'core-headline-sub', t)));
+        return box;
+    }
+
+    // ---- 우선 조치 대상 ----
+    function actionCard(title, tone, items, empty) {
+        const c = el('div', 'chart-card core-action is-' + tone);
+        const head = el('div', 'core-action-head');
+        head.appendChild(el('span', null, title));
+        head.appendChild(el('span', 'core-action-count', items.length + '곳'));
+        c.appendChild(head);
+        const list = el('div', 'core-action-list');
+        if (!items.length) list.appendChild(el('div', 'core-action-empty', empty));
+        items.forEach(it => {
+            const b = el('button', 'core-action-item');
+            b.type = 'button'; b.dataset.coreFocus = it.r._i;
+            b.appendChild(el('span', 'core-action-name', it.r.관리고객명 || '-'));
+            b.appendChild(el('span', 'core-action-tag', it.tag || ''));
+            b.appendChild(el('span', 'core-action-sub', it.r.지사 + ' · ' + owner(it.r) + (it.sub ? ' · ' + it.sub : '')));
+            list.appendChild(b);
+        });
+        c.appendChild(list);
+        return c;
+    }
+    function actions(rows) {
+        const g = el('div', 'core-action-grid');
+        const byEnd = (a, b) => (daysTo(a.계약종료일) == null ? 99999 : daysTo(a.계약종료일)) - (daysTo(b.계약종료일) == null ? 99999 : daysTo(b.계약종료일));
+        g.appendChild(actionCard('해지징후 고객', 'critical',
+            rows.filter(r => r.해지징후 === 'Y').map(r => ({ r, tag: won(r.월정료), sub: r.불만요구 || '' })), '해지징후로 표시된 고객이 없습니다.'));
+        g.appendChild(actionCard((period ? period + ' ' : '') + '미방문 고객', 'serious',
+            rows.filter(r => !visited(r)).sort(byEnd).map(r => ({ r, tag: r.계약종료일 ? '종료 ' + ddayText(daysTo(r.계약종료일)) : '', sub: r.방문일자 ? '이전 방문 ' + r.방문일자 : '방문 기록 없음' })),
+            '미방문 고객이 없습니다.'));
+        g.appendChild(actionCard('계약종료 3개월 이내', 'warning',
+            rows.filter(r => { const d = daysTo(r.계약종료일); return d != null && d <= 90; }).sort(byEnd)
+                .map(r => ({ r, tag: ddayText(daysTo(r.계약종료일)), sub: r.계약종료일 + ' · ' + won(r.월정료) + (r.수동재계약 ? ' · 수동재계약 ' + r.수동재계약 : '') })),
+            '3개월 안에 종료되는 계약이 없습니다.'));
+        g.appendChild(actionCard('VOC 미처리 (접수·미접수)', 'warning',
+            rows.filter(r => pendingVoc(r).length).map(r => ({ r, tag: pendingVoc(r).length + '건', sub: pendingVoc(r).map(v => (v.상태 || '') + ' ' + (v.유형 || '')).join(', ') })),
+            payload.rows.some(r => r.VOC && r.VOC.length) ? '미처리 VOC가 없습니다.' : 'VOC 매칭 파일(9-1)이 없습니다.'));
+        return g;
+    }
+
+    // ---- 차트 ----
+    function charts(rows) {
+        const g = el('div', 'chart-grid core-charts');
+        const P = period ? period + ' ' : '';
+
+        // 1) 지사별 방문 현황 (누르면 그 지사만)
+        const c1 = card('지사별 ' + P + '방문 현황', '막대 = 고객 수 · 오른쪽 = 방문 고객/전체 (방문율) · 줄을 누르면 그 지사만 봅니다');
+        c1.appendChild(legend(STATES.map(s => [s, STATE_ROLE[s]])));
+        const groups = branchList(rows).map(b => ({ b, rows: rows.filter(r => r.지사 === b) }));
+        const maxN = Math.max(1, ...groups.map(x => x.rows.length));
+        const l1 = el('div', 'zone-list');
+        groups.forEach(x => {
+            const parts = stateParts(x.rows), v = x.rows.filter(visited).length;
+            const row = stackRow(x.b, parts, maxN, v + '/' + x.rows.length + ' · ' + pct(v, x.rows.length) + '%',
+                parts.map(p => p.name + ' ' + p.n + '곳').concat(['방문율 ' + pct(v, x.rows.length) + '%']), state.지사 === x.b ? 'is-active' : '');
+            row.dataset.coreKey = '지사'; row.dataset.coreValue = x.b;
+            l1.appendChild(row);
+        });
+        c1.appendChild(l1);
+        g.appendChild(c1);
+
+        // 2) 월별 방문 추이 -- 방문 회차(이전/분기 1회/2회) 날짜를 모두 센다
+        const months = new Map();
+        rows.forEach(r => [r.방문일자, r['3Q방문일자'], r['2회방문일자']].forEach(d => { if (d && d.length >= 7) months.set(d.slice(0, 7), (months.get(d.slice(0, 7)) || 0) + 1); }));
+        const c2 = card('월별 방문 추이', '방문일자(이전·분기 1회·2회)를 월별로 센 건수 · 최근 12개월');
+        const keys = Array.from(months.keys()).sort();
+        if (keys.length) {
+            const span = [];
+            let [y, m] = keys[keys.length - 1].split('-').map(Number);
+            for (let i = 0; i < 12; i++) { span.unshift(y + '-' + String(m).padStart(2, '0')); m--; if (m === 0) { m = 12; y--; } }
+            const from = span.findIndex(k => months.has(k));
+            c2.appendChild(columns(span.slice(Math.max(0, from)).map(k => ({
+                label: k.slice(2, 4) + '.' + k.slice(5), value: months.get(k) || 0, role: 'role-s1', tip: k + '|방문 ' + (months.get(k) || 0) + '건' }))));
+        } else c2.appendChild(el('div', 'core-action-empty', '방문일자 기록이 없습니다.'));
+        g.appendChild(c2);
+
+        // 3) 계약종료 시기
+        const c3 = card('계약종료 시기', '오늘 기준 남은 기간별 고객 수 · 아래 금액 = 월정료 합계');
+        c3.appendChild(columns(END_BUCKETS.filter(([name]) => name !== '미상' || rows.some(r => endBucket(r) === '미상')).map(([name, role]) => {
+            const rs = rows.filter(r => endBucket(r) === name), fee = rs.reduce((s, r) => s + (r.월정료 || 0), 0);
+            return { label: name, value: rs.length, role, sub: rs.length ? won(fee) : '', tip: name + '|' + rs.length + '곳|월정료 ' + won(fee) + '|' + (period || '분기') + ' 미방문 ' + rs.filter(r => !visited(r)).length + '곳' };
+        })));
+        g.appendChild(c3);
+
+        // 4) 지사별 월정료 (재계약대상 / 그 외)
+        const c4 = card('지사별 월정료', '막대 = 월정료 합계 · 재계약대상 금액을 따로 표시');
+        c4.appendChild(legend([['재계약대상', 'role-s2'], ['그 외', 'role-s1']]));
+        const fees = groups.map(x => {
+            const total = x.rows.reduce((s, r) => s + (r.월정료 || 0), 0);
+            const re = Math.min(total, x.rows.reduce((s, r) => s + (r.재계약대상월정료 || 0), 0));
+            return { b: x.b, total, re };
+        });
+        const maxFee = Math.max(1, ...fees.map(f => f.total));
+        const l4 = el('div', 'zone-list');
+        fees.forEach(f => l4.appendChild(stackRow(f.b, [{ n: f.re, role: 'role-s2', text: '' }, { n: f.total - f.re, role: 'role-s1', text: '' }], maxFee, won(f.total),
+            ['월정료 ' + won(f.total), '재계약대상 ' + won(f.re) + ' (' + pct(f.re, f.total) + '%)'])));
+        c4.appendChild(l4);
+        g.appendChild(c4);
+
+        // 5) VOC 유형별 처리 현황
+        const c5 = card('VOC 유형별 처리 현황', '9-1 VOC매칭 · 건수가 많은 유형 순');
+        const vocs = rows.flatMap(r => r.VOC || []);
+        if (vocs.length) {
+            c5.appendChild(legend(VOC_STATES.map(s => [s, VOC_ROLE[s]])));
+            let kinds = Array.from(countBy(vocs, v => v.유형 || '유형 없음')).sort((a, b) => b[1] - a[1]);
+            const top = kinds.slice(0, 7).map(k => k[0]);
+            const label = v => top.includes(v.유형 || '유형 없음') ? (v.유형 || '유형 없음') : '기타';
+            const names = kinds.length > 7 ? top.concat(['기타']) : top;
+            const maxV = Math.max(1, ...names.map(nm => vocs.filter(v => label(v) === nm).length));
+            const l5 = el('div', 'zone-list');
+            names.forEach(nm => {
+                const vs = vocs.filter(v => label(v) === nm);
+                const parts = VOC_STATES.map(s => ({ name: s, n: vs.filter(v => v.상태 === s).length, role: VOC_ROLE[s] }));
+                const etc = vs.length - parts.reduce((s, p) => s + p.n, 0);
+                if (etc) parts.push({ name: '기타 상태', n: etc, role: 'role-muted' });
+                l5.appendChild(stackRow(nm, parts, maxV, vs.length + '건', parts.filter(p => p.n).map(p => p.name + ' ' + p.n + '건'), 'wide'));
+            });
+            c5.appendChild(l5);
+        } else c5.appendChild(el('div', 'core-action-empty', '매칭된 VOC가 없습니다 (9-1 파일을 함께 올리면 표시됩니다).'));
+        g.appendChild(c5);
+
+        // 6) 담당자별 방문 현황 -- 미방문·해지징후가 많은 순 (누르면 표에서 그 담당자만)
+        const c6 = card('담당자별 ' + P + '방문 현황', '미방문·해지징후가 많은 순 상위 10명 · 줄을 누르면 아래 표에서 그 담당자만 봅니다');
+        c6.appendChild(legend(STATES.map(s => [s, STATE_ROLE[s]])));
+        const owners = Array.from(new Set(rows.map(owner))).map(o => ({ o, rows: rows.filter(r => owner(r) === o) }))
+            .map(x => Object.assign(x, { bad: x.rows.filter(r => r.활동상태 !== '방문완료').length }))
+            .sort((a, b) => b.bad - a.bad || b.rows.length - a.rows.length || String(a.o).localeCompare(String(b.o))).slice(0, 10);
+        const maxO = Math.max(1, ...owners.map(x => x.rows.length));
+        const l6 = el('div', 'zone-list');
+        owners.forEach(x => {
+            const parts = stateParts(x.rows), v = x.rows.filter(visited).length;
+            const row = stackRow(x.o, parts, maxO, v + '/' + x.rows.length, [x.rows[0].지사].concat(parts.map(p => p.name + ' ' + p.n + '곳')), state.q === x.o ? 'is-active' : '');
+            row.dataset.coreQ = x.o;
+            l6.appendChild(row);
+        });
+        c6.appendChild(l6);
+        g.appendChild(c6);
+        return g;
+    }
+
+    // ---- 지도 ----
     function popupEl(r) {
         const box = el('div', 'core-pop');
         box.appendChild(el('div', 'core-pop-title', r.관리고객명 || '-'));
         const lines = [
-            r.지사 + ' · ' + r.관리주체 + (r.관리고객담당자 ? ' · 담당 ' + r.관리고객담당자 : ''),
-            '최근 방문: ' + (r['3Q방문일자'] || r.방문일자 || '없음') + (r.방문자 ? ' (' + r.방문자 + ')' : ''),
-            '해지징후: ' + (r.해지징후 || '-') + ' · 월정료 ' + won(r.월정료),
+            r.지사 + ' · ' + r.관리주체 + ' · 담당 ' + owner(r),
+            '상태: ' + r.활동상태 + ' · 최근 방문 ' + (lastVisit(r) || '없음'),
+            '월정료 ' + won(r.월정료) + (r.계약종료일 ? ' · 계약종료 ' + r.계약종료일 + ' (' + ddayText(daysTo(r.계약종료일)) + ')' : ''),
         ];
         if (r.VOC && r.VOC.length) lines.push('VOC ' + r.VOC.length + '건: ' + r.VOC.map(v => (v.상태 || '-') + ' ' + (v.유형 || '')).join(', '));
         lines.forEach(t => box.appendChild(el('div', 'core-pop-line', t)));
@@ -1940,13 +2269,27 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         if (link) { const a = el('a', 'pending-map-link', '🗺 카카오맵'); a.href = link; a.target = '_blank'; a.rel = 'noopener'; box.appendChild(a); }
         return box;
     }
+    function mapLegend() {
+        const box = document.getElementById('coreMapLegend');
+        if (!box) return;
+        box.textContent = '';
+        const dot = (name, v, ring) => {
+            const it = el('div', 'legend-item'); const sw = el('span', 'legend-swatch' + (ring ? ' core-sign-key' : ''));
+            if (!ring) { sw.style.background = cssVar(v); sw.style.borderRadius = '50%'; }
+            it.appendChild(sw); it.appendChild(el('span', 'legend-label', name)); box.appendChild(it);
+        };
+        if (state.color === '활동상태') STATES.forEach(s => dot(s, STATE_VAR[s]));
+        else { dot('본부장', '--s7'); dot('지사장', '--s1'); dot('해지징후 (빨간 테두리)', null, true); }
+        box.appendChild(el('span', 'legend-label core-size-note', '원 크기 = 월정료'));
+    }
     function drawMap(rows) {
         const holder = document.getElementById('coreMap');
         if (!holder) return;
+        mapLegend();
         const pts = rows.filter(r => r.lat != null && r.lng != null);
         if (!payload.rows.some(r => r.lat != null)) {
             holder.className = 'core-map core-map-empty';
-            holder.textContent = '지도 좌표가 없습니다 -- GUI의 "카카오 REST 키" 칸에 키를 넣고 리포트를 다시 만들면 설치주소가 지도에 표시됩니다. (표의 🗺 링크로 카카오맵 바로가기)';
+            holder.textContent = '지도 좌표가 없습니다 -- 데스크톱 GUI의 "카카오 REST 키" 칸에 키를 넣고 리포트를 만들면 설치주소가 지도에 표시됩니다. (표에서 행을 열면 카카오맵 바로가기가 있습니다)';
             return;
         }
         loadLeaflet(() => {
@@ -1958,132 +2301,278 @@ document.addEventListener('DOMContentLoaded', initDashNav);
                     maxZoom: 19, attribution: 'Tiles &copy; Esri',
                 }).addTo(map);
                 layer = L.layerGroup().addTo(map);
+                map._coreFit = false;
                 // 잠금 화면 뒤(숨김, 크기 0)에서 그려지면 확대 수준이 틀어진다 -- 보이는 크기가 생기면 다시 맞춘다
                 if (window.ResizeObserver) {
-                    let wasHidden = !holder.offsetWidth;
+                    const m = map;
                     new ResizeObserver(() => {
-                        if (!holder.offsetWidth) { wasHidden = true; return; }
-                        map.invalidateSize();
-                        if (wasHidden && map._coreBounds) map.fitBounds(map._coreBounds, { padding: [24, 24], maxZoom: 14 });
-                        wasHidden = false;
+                        if (!holder.offsetWidth || map !== m) return;
+                        m.invalidateSize();
+                        if (!m._coreFit && m._coreBounds) { m.fitBounds(m._coreBounds, { padding: [24, 24], maxZoom: 14 }); m._coreFit = true; }
                     }).observe(holder);
                 }
             }
             layer.clearLayers(); markers.clear();
-            const color = { 본부장: cssVar('--s7') || '#4a3aa7', 지사장: cssVar('--s1') || '#2a78d6' };
+            const owners = { 본부장: cssVar('--s7') || '#4a3aa7', 지사장: cssVar('--s1') || '#2a78d6' };
             const ring = cssVar('--surface-1') || '#fff', danger = cssVar('--critical') || '#d03b3b';
+            const maxFee = Math.max(1, ...pts.map(r => r.월정료 || 0));
             pts.forEach(r => {
-                const sign = r.해지징후 === 'Y';
+                const sign = r.해지징후 === 'Y', byState = state.color === '활동상태';
+                const fill = byState ? (cssVar(STATE_VAR[r.활동상태]) || '#888') : (owners[r.관리주체] || cssVar('--baseline') || '#888');
                 const m = L.circleMarker([r.lat, r.lng], {
-                    radius: sign ? 9 : 7, weight: sign ? 3 : 2, color: sign ? danger : ring,
-                    fillColor: color[r.관리주체] || cssVar('--baseline') || '#888', fillOpacity: 0.9,
+                    radius: 6 + 7 * Math.sqrt((r.월정료 || 0) / maxFee), weight: !byState && sign ? 3 : 2, color: !byState && sign ? danger : ring,
+                    fillColor: fill, fillOpacity: 0.88,
                 }).bindPopup(popupEl(r), { maxWidth: 320 });
-                m.bindTooltip(r.관리고객명 || '', { direction: 'top', offset: [0, -6] });
-                m.on('click', () => highlightRow(r.계약번호));
+                m.bindTooltip((r.관리고객명 || '') + ' · ' + r.활동상태, { direction: 'top', offset: [0, -6] });
+                m.on('click', () => openRow(r._i, 'map'));
                 m.addTo(layer);
-                markers.set(r.계약번호, m);
+                markers.set(r._i, m);
             });
             map._coreBounds = pts.length ? L.latLngBounds(pts.map(r => [r.lat, r.lng])) : null;
-            if (map._coreBounds && holder.offsetWidth) map.fitBounds(map._coreBounds, { padding: [24, 24], maxZoom: 14 });
-            else if (!holder.offsetWidth) map.setView([37.6, 127.2], 8);
-            setTimeout(() => map.invalidateSize(), 50);
+            if (!map._coreFit) {
+                if (map._coreBounds && holder.offsetWidth) { map.invalidateSize(); map.fitBounds(map._coreBounds, { padding: [24, 24], maxZoom: 14 }); map._coreFit = true; }
+                else map.setView([37.6, 127.2], 8);
+            }
+            setTimeout(() => { if (map) map.invalidateSize(); }, 50);
         });
     }
-    function highlightRow(key) {
-        document.querySelectorAll('#coreTable tr.core-active').forEach(tr => tr.classList.remove('core-active'));
-        const tr = document.querySelector('#coreTable tr[data-core-key="' + key + '"]');
-        if (tr) { tr.classList.add('core-active'); tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+
+    // ---- 활동내역 표 ----
+    const COLS = [
+        ['지사', r => BRANCHES.indexOf(r.지사) < 0 ? 99 : BRANCHES.indexOf(r.지사)], ['관리주체', r => r.관리주체], ['관리고객 명', r => r.관리고객명 || ''],
+        ['담당', r => owner(r)], ['상태', r => STATES.indexOf(r.활동상태)], ['최근 방문', r => lastVisit(r) || ''],
+        ['계약종료', r => r.계약종료일 || '9999'], ['월정료', r => r.월정료 || 0], ['VOC', r => (r.VOC || []).length], ['최근 메모 (불만·요구·영업기회)', null],
+    ];
+    function tableRows() {
+        const q = state.q.trim().toLowerCase();
+        let rows = visible();
+        if (q) rows = rows.filter(r => [r.관리고객명, r.관리고객담당자, r.영업구역담당, r.영업자, r.설치주소, r.불만요구, r.요약정리, r.계약번호, r.지사].join(' ').toLowerCase().includes(q));
+        if (state.sort != null && COLS[state.sort][1]) {
+            const f = COLS[state.sort][1];
+            rows = rows.slice().sort((a, b) => { const x = f(a), y = f(b); return (x < y ? -1 : x > y ? 1 : 0) * state.dir; });
+        }
+        return rows;
     }
-    function table(rows) {
-        const wrap = el('div', 'table-scroll core-table-scroll');
-        const t = el('table'); t.id = 'coreTable';
-        const head = el('tr');
-        ['지사', '관리주체', '관리고객 명', '담당', '최근 방문', '방문대상 / 방문자', '해지징후', '불만·요구·추가영업기회', 'VOC', '월정료', '지도']
-            .forEach(h => head.appendChild(el('th', null, h)));
-        const thead = el('thead'); thead.appendChild(head); t.appendChild(thead);
-        const tb = el('tbody');
+    function kv(dl, k, v) { if (v === null || v === undefined || v === '') return; dl.appendChild(el('dt', null, k)); dl.appendChild(el('dd', null, v)); }
+    function detailEl(r) {
+        const grid = el('div', 'core-detail-grid');
+        const a = el('div');
+        a.appendChild(el('div', 'core-detail-title', '방문 이력'));
+        const hist = r.방문이력 || [];
+        if (!hist.length) a.appendChild(el('div', 'core-action-empty', '방문 기록이 없습니다.'));
+        hist.forEach(h => {
+            const item = el('div', 'core-hist');
+            item.appendChild(el('div', 'core-hist-head', [h.회차, h.일자 || '날짜 미기재', h.징후 ? '해지징후 ' + h.징후 : null, [h.대상, h.방문자].filter(Boolean).join(' / ') || null].filter(Boolean).join(' · ')));
+            if (h.내용) item.appendChild(el('div', 'core-hist-body', h.내용));
+            a.appendChild(item);
+        });
+        grid.appendChild(a);
+        const b = el('div');
+        b.appendChild(el('div', 'core-detail-title', 'VOC ' + (r.VOC || []).length + '건'));
+        if (!(r.VOC || []).length) b.appendChild(el('div', 'core-action-empty', '매칭된 VOC가 없습니다.'));
+        (r.VOC || []).forEach(v => {
+            const item = el('div', 'core-hist');
+            item.appendChild(el('div', 'core-hist-head', [v.상태, v.유형, v.접수일, v.처리자].filter(Boolean).join(' · ')));
+            if (v.처리내용) item.appendChild(el('div', 'core-hist-body', v.처리내용));
+            b.appendChild(item);
+        });
+        grid.appendChild(b);
+        const c = el('div');
+        c.appendChild(el('div', 'core-detail-title', '계약 정보'));
+        const dl = el('dl', 'core-kv');
+        kv(dl, '계약번호', r.계약번호);
+        kv(dl, '계약종료일', r.계약종료일 ? r.계약종료일 + ' (' + ddayText(daysTo(r.계약종료일)) + ')' : null);
+        kv(dl, '수동재계약', r.수동재계약);
+        kv(dl, '시설 · 월정료', (r.시설수 != null ? int(r.시설수) + '개 · ' : '') + won(r.월정료));
+        if (r.재계약대상월정료) kv(dl, '재계약대상', (r.재계약대상시설수 != null ? int(r.재계약대상시설수) + '개 · ' : '') + won(r.재계약대상월정료));
+        if (r.약정여부) kv(dl, '약정', r.약정여부 + (r.약정시설수 ? ' · ' + int(r.약정시설수) + '개 · ' + won(r.약정월정료) : ''));
+        if (r.해지건수) kv(dl, '해지', int(r.해지건수) + '건 · ' + won(r.해지월정료) + (r.해지일자 ? ' · ' + r.해지일자 : ''));
+        if (r.업셀링) kv(dl, '업셀링', r.업셀링 + (r.업셀링금액 ? ' · ' + won(r.업셀링금액) : ''));
+        kv(dl, '영업자', r.영업자);
+        kv(dl, '영업구역', [r.영업구역, r.영업구역담당].filter(Boolean).join(' · '));
+        kv(dl, '요약정리', r.요약정리);
+        kv(dl, '설치주소', r.설치주소);
+        c.appendChild(dl);
+        const link = kakaoLink(r.설치주소);
+        if (link) { const m = el('a', 'pending-map-link', '🗺 카카오맵에서 보기'); m.href = link; m.target = '_blank'; m.rel = 'noopener'; c.appendChild(m); }
+        grid.appendChild(c);
+        return grid;
+    }
+    function fillTable() {
+        const t = document.getElementById('coreTable');
+        if (!t) return;
+        const rows = tableRows();
+        const head = t.querySelector('thead tr');
+        head.textContent = '';
+        COLS.forEach(([name, f], i) => {
+            const th = el('th', null, name + (state.sort === i ? (state.dir > 0 ? ' ▲' : ' ▼') : ''));
+            if (f) { th.dataset.coreSort = i; th.title = '눌러서 정렬'; }
+            head.appendChild(th);
+        });
+        const tb = t.querySelector('tbody');
+        tb.textContent = '';
         rows.forEach(r => {
-            const tr = el('tr'); tr.dataset.coreKey = r.계약번호 || '';
+            const tr = el('tr'); tr.dataset.coreRow = r._i;
             if (r.해지징후 === 'Y') tr.className = 'core-sign';
-            const cells = [r.지사, r.관리주체, r.관리고객명, r.관리고객담당자 || r.영업구역담당,
-                (r['3Q방문일자'] || r.방문일자 || '미방문'), [r.방문대상, r.방문자].filter(Boolean).join(' / '),
-                r.해지징후 === 'Y' ? '▲ Y' : (r.해지징후 || '-'), r.불만요구 || '',
-                r.VOC && r.VOC.length ? r.VOC.map(v => (v.상태 || '-') + (v.유형 ? ' · ' + v.유형 : '')).join(' / ') : '', won(r.월정료)];
-            cells.forEach((c, i) => {
-                const td = el('td', i === 7 ? 'core-note' : (i === 9 ? 'cell-num' : null), c || '-');
-                if (i === 4 && !(r['3Q방문일자'] || r.방문일자)) td.classList.add('core-novisit');
-                if (i === 6 && r.해지징후 === 'Y') td.classList.add('core-sign-cell');
-                tr.appendChild(td);
-            });
-            const mapTd = el('td');
-            const link = kakaoLink(r.설치주소);
-            if (link) { const a = el('a', 'pending-map-link', '🗺'); a.href = link; a.target = '_blank'; a.rel = 'noopener'; a.title = r.설치주소; mapTd.appendChild(a); }
-            tr.appendChild(mapTd);
-            tr.addEventListener('click', e => {
-                if (e.target.closest('a')) return;
-                highlightRow(r.계약번호);
-                const m = markers.get(r.계약번호);
-                if (m && map) { map.setView(m.getLatLng(), Math.max(map.getZoom(), 15)); m.openPopup(); document.getElementById('coreMap').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
-            });
+            if (state.open === r._i) tr.classList.add('core-active');
+            [r.지사, r.관리주체, r.관리고객명 || '-', owner(r)].forEach(c => tr.appendChild(el('td', null, c)));
+            const st = el('td'); st.appendChild(el('span', 'core-state s-' + r.활동상태, r.활동상태)); tr.appendChild(st);
+            tr.appendChild(el('td', lastVisit(r) ? null : 'core-novisit', lastVisit(r) || '기록 없음'));
+            const end = el('td', null, r.계약종료일 || '-');
+            const dd = daysTo(r.계약종료일);
+            if (dd != null && dd <= 365) end.appendChild(el('span', 'core-dday' + (dd <= 90 ? ' soon' : ''), ddayText(dd)));
+            tr.appendChild(end);
+            tr.appendChild(el('td', 'cell-num', won(r.월정료)));
+            const pend = pendingVoc(r).length;
+            tr.appendChild(el('td', null, (r.VOC || []).length ? r.VOC.length + '건' + (pend ? ' (미처리 ' + pend + ')' : '') : '-'));
+            tr.appendChild(el('td', 'core-note', r.불만요구 || '-'));
             tb.appendChild(tr);
+            if (state.open === r._i) {
+                const dr = el('tr', 'core-detail'); const td = el('td'); td.colSpan = COLS.length;
+                td.appendChild(detailEl(r)); dr.appendChild(td); tb.appendChild(dr);
+            }
         });
-        t.appendChild(tb); wrap.appendChild(t);
-        return wrap;
+        if (!rows.length) { const tr = el('tr', 'core-detail'); const td = el('td', null, '조건에 맞는 고객이 없습니다.'); td.colSpan = COLS.length; tr.appendChild(td); tb.appendChild(tr); }
+        const cnt = document.getElementById('coreTableCount');
+        if (cnt) cnt.textContent = rows.length.toLocaleString('ko-KR') + ' / ' + payload.rows.length.toLocaleString('ko-KR') + '곳';
     }
+    // 행 열기 -- src: 'table'(표에서 누름: 다시 누르면 접힘) / 'list'(우선 조치 대상: 표로 이동) / 'map'(지도 마커: 화면은 그대로, 표 안에서만 이동)
+    function openRow(i, src) {
+        const r = payload.rows.find(x => x._i === i);
+        if (!r) return;
+        state.open = (src === 'table' && state.open === i) ? null : i;
+        if (!tableRows().includes(r)) {
+            state.q = '';
+            if (!visible().includes(r)) { state.관리주체 = ''; state.지사 = ''; state.활동상태 = ''; render(); }
+            else { const s = document.getElementById('coreSearch'); if (s) s.value = ''; fillTable(); }
+        } else fillTable();
+        const tr = document.querySelector('#coreTable tr[data-core-row="' + i + '"]');
+        if (tr && src === 'list') tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        if (tr && src === 'map') { const box = tr.closest('.table-scroll'); if (box) box.scrollTop = Math.max(0, tr.offsetTop - 44); }
+        const m = markers.get(i);
+        if (m && map && src !== 'map' && state.open === i) { map.setView(m.getLatLng(), Math.max(map.getZoom(), 13)); m.openPopup(); }
+    }
+    function downloadCsv() {
+        const head = ['지사', '관리주체', '관리고객명', '계약번호', '담당', '활동상태', '최근방문', '해지징후', '계약종료일', '월정료', '재계약대상월정료', 'VOC건수', '미처리VOC', '최근메모', '설치주소'];
+        const q = v => '"' + String(v === null || v === undefined ? '' : v).split('"').join('""') + '"';
+        const lines = [head.map(q).join(',')].concat(tableRows().map(r => [r.지사, r.관리주체, r.관리고객명, r.계약번호, owner(r), r.활동상태, lastVisit(r), r.해지징후, r.계약종료일,
+            r.월정료, r.재계약대상월정료, (r.VOC || []).length, pendingVoc(r).length, r.불만요구, r.설치주소].map(q).join(',')));
+        const blob = new Blob([String.fromCharCode(0xFEFF) + lines.join(String.fromCharCode(13, 10))], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '코어고객_활동내역.csv'; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    }
+
     function render() {
         const wrap = document.getElementById('coreSectionWrap');
         if (!wrap || !payload) return;
-        const rows = visible();
+        const rows = visible(), all = payload.rows;
         map = null;  // 지도 컨테이너를 새로 만드므로 지도도 새로
-        wrap.innerHTML = '';
-        const all = payload.rows;
-        const branches = BRANCHES.filter(b => all.some(r => r.지사 === b)).concat(Array.from(new Set(all.map(r => r.지사))).filter(b => !BRANCHES.includes(b)));
+        wrap.textContent = '';
         const bar = el('div', 'global-filter-bar core-filter-bar');
         bar.appendChild(pills('관리주체', '관리주체', Array.from(new Set(all.map(r => r.관리주체))).sort()));
-        bar.appendChild(pills('지사', '지사', branches));
+        bar.appendChild(pills('지사', '지사', branchList(all)));
         bar.appendChild(pills('활동', '활동상태', STATES.filter(s => all.some(r => r.활동상태 === s))));
         bar.appendChild(el('span', 'filter-summary', rows.length.toLocaleString('ko-KR') + ' / ' + all.length.toLocaleString('ko-KR') + '곳'));
         wrap.appendChild(bar);
+        wrap.appendChild(headline(rows));
 
-        const sum = (k) => rows.reduce((n, r) => n + (r[k] || 0), 0);
+        const sum = k => rows.reduce((n, r) => n + (r[k] || 0), 0);
         const vocs = rows.flatMap(r => r.VOC || []);
+        const v = rows.filter(visited).length;
+        const soon = rows.filter(r => { const d = daysTo(r.계약종료일); return d != null && d <= 90; });
         const grid = el('div', 'stat-grid');
-        grid.appendChild(tile('코어고객', rows.length.toLocaleString('ko-KR') + '곳', '본부장 ' + rows.filter(r => r.관리주체 === '본부장').length + ' · 지사장 ' + rows.filter(r => r.관리주체 === '지사장').length));
-        grid.appendChild(tile('3분기 방문 완료', rows.filter(r => r['3Q방문일자']).length + '곳', '미방문 ' + rows.filter(r => r.활동상태 === '미방문').length + '곳'));
-        grid.appendChild(tile('해지징후', rows.filter(r => r.해지징후 === 'Y').length + '곳', '불만·요구 기록 ' + rows.filter(r => r.불만요구).length + '곳'));
-        grid.appendChild(tile('월정료 합계', won(sum('월정료')), '재계약대상 ' + won(sum('재계약대상월정료'))));
-        grid.appendChild(tile('VOC (매칭)', vocs.length + '건', '처리완료 ' + vocs.filter(v => v.상태 === '처리완료').length + ' · 접수 ' + vocs.filter(v => v.상태 === '접수').length + ' · 미접수 ' + vocs.filter(v => v.상태 === '미접수').length));
+        grid.appendChild(tile('코어고객', int(rows.length) + '곳', '본부장 ' + rows.filter(r => r.관리주체 === '본부장').length + ' · 지사장 ' + rows.filter(r => r.관리주체 === '지사장').length + ' · 시설 ' + int(sum('시설수')) + '개'));
+        grid.appendChild(tile((period ? period + ' ' : '') + '방문율', pct(v, rows.length) + '%', '방문 ' + v + '곳 · 미방문 ' + (rows.length - v) + '곳', pct(v, rows.length)));
+        grid.appendChild(tile('해지징후', rows.filter(r => r.해지징후 === 'Y').length + '곳', '불만·요구 메모 ' + rows.filter(r => r.불만요구).length + '곳'));
+        grid.appendChild(tile('월정료 합계', won(sum('월정료')), '재계약대상 ' + won(sum('재계약대상월정료')) + ' (' + pct(sum('재계약대상월정료'), sum('월정료')) + '%)'));
+        grid.appendChild(tile('계약종료 3개월 이내', soon.length + '곳', '월정료 ' + won(soon.reduce((s, r) => s + (r.월정료 || 0), 0))));
+        grid.appendChild(tile('VOC (매칭)', vocs.length + '건', VOC_STATES.map(s => s + ' ' + vocs.filter(x => x.상태 === s).length).join(' · ')));
         wrap.appendChild(grid);
 
+        const t1 = el('h3', 'core-block-title', '우선 조치 대상'); t1.appendChild(el('small', null, '고객을 누르면 아래 표에서 방문 이력·VOC·계약 정보를 펼칩니다'));
+        wrap.appendChild(t1);
+        wrap.appendChild(actions(rows));
+        const t2 = el('h3', 'core-block-title', '현황 분석'); t2.appendChild(el('small', null, '막대에 마우스를 올리면 자세한 수치가 보입니다'));
+        wrap.appendChild(t2);
+        wrap.appendChild(charts(rows));
+
+        const t3 = el('h3', 'core-block-title', '설치주소 지도');
+        wrap.appendChild(t3);
         const cs = payload.coord_stats || {};
-        const legend = el('div', 'legend-grid core-legend');
-        [['본부장', '--s7'], ['지사장', '--s1']].forEach(([n, v]) => {
-            const it = el('div', 'legend-item'); const sw = el('span', 'legend-swatch'); sw.style.background = cssVar(v); sw.style.borderRadius = '50%';
-            it.appendChild(sw); it.appendChild(el('span', 'legend-label', n)); legend.appendChild(it);
-        });
-        const it = el('div', 'legend-item'); const sw = el('span', 'legend-swatch core-sign-key'); it.appendChild(sw); it.appendChild(el('span', 'legend-label', '해지징후 (빨간 테두리)')); legend.appendChild(it);
-        legend.appendChild(el('span', 'legend-value core-coord-note', '지도 표시 ' + all.filter(r => r.lat != null).length + '/' + all.length + '곳'
+        const mh = el('div', 'core-map-head');
+        mh.appendChild(pills('색상 기준', 'color', ['활동상태', '관리주체'], true));
+        const lg = el('div', 'legend-grid core-legend'); lg.id = 'coreMapLegend'; mh.appendChild(lg);
+        mh.appendChild(el('span', 'core-coord-note', '지도 표시 ' + rows.filter(r => r.lat != null).length + '/' + rows.length + '곳'
             + (cs.동단위 ? ' · 동 단위 위치 ' + cs.동단위 + '곳' : '')
             + (cs.없음 ? ' · 좌표 없음 ' + cs.없음 + '곳' + (payload.coord_note ? ' (' + payload.coord_note + ')'
-                : payload.kakao_error ? ' (카카오 오류: ' + payload.kakao_error + ')' : (payload.kakao_key_set === false ? ' (카카오 키 미설정)' : '')) : '')));
-        wrap.appendChild(legend);
+                : payload.kakao_error ? ' (' + payload.kakao_error + ')' : (payload.kakao_key_set === false ? ' (카카오 키 미설정)' : '')) : '')));
+        wrap.appendChild(mh);
         const mapBox = el('div', 'core-map'); mapBox.id = 'coreMap';
         wrap.appendChild(mapBox);
-        wrap.appendChild(el('p', 'section-desc', '활동내역 -- 행을 누르면 지도에서 위치를 보여줍니다 · ▲ 해지징후 · 회색 날짜 = 방문 기록 없음'));
-        wrap.appendChild(table(rows));
+
+        const t4 = el('h3', 'core-block-title', '활동내역'); t4.appendChild(el('small', null, '행을 누르면 방문 이력·VOC·계약 정보가 펼쳐집니다 (지도에도 표시) · 제목을 누르면 정렬'));
+        wrap.appendChild(t4);
+        const tools = el('div', 'core-toolbar');
+        const search = el('input', 'filter-input'); search.type = 'search'; search.id = 'coreSearch'; search.placeholder = '고객명 · 담당자 · 주소 · 메모 검색'; search.value = state.q;
+        search.setAttribute('aria-label', '코어고객 검색');
+        tools.appendChild(search);
+        const cnt = el('span', 'row-count'); cnt.id = 'coreTableCount'; tools.appendChild(cnt);
+        const csv = el('button', 'filter-pill', '📥 엑셀(CSV) 저장'); csv.type = 'button'; csv.id = 'coreCsvBtn'; tools.appendChild(csv);
+        wrap.appendChild(tools);
+        const scroll = el('div', 'table-scroll core-table-scroll');
+        const t = el('table'); t.id = 'coreTable';
+        const thead = el('thead'); thead.appendChild(el('tr')); t.appendChild(thead); t.appendChild(el('tbody'));
+        scroll.appendChild(t); wrap.appendChild(scroll);
+        wrap.appendChild(el('p', 'section-desc core-foot', '기준 -- 방문완료: ' + (period ? period + ' 안에' : '') + ' 방문일자가 있는 고객 · 해지징후: 방문 기록 중 한 번이라도 Y · 계약종료 D-day: 이 리포트를 여는 날 기준'));
+        fillTable();
         drawMap(rows);
     }
+
     document.addEventListener('click', (e) => {
+        if (!payload || !e.target.closest) return;
+        if (e.target.closest('#coreCsvBtn')) { downloadCsv(); return; }
+        const focus = e.target.closest('[data-core-focus]');
+        if (focus) { openRow(Number(focus.dataset.coreFocus), 'list'); return; }
+        const sort = e.target.closest('#coreTable th[data-core-sort]');
+        if (sort) { const i = Number(sort.dataset.coreSort); state.dir = state.sort === i ? -state.dir : 1; state.sort = i; fillTable(); return; }
+        const tr = e.target.closest('#coreTable tr[data-core-row]');
+        if (tr && !e.target.closest('a')) { openRow(Number(tr.dataset.coreRow), 'table'); return; }
+        const qrow = e.target.closest('[data-core-q]');
+        if (qrow) {
+            state.q = state.q === qrow.dataset.coreQ ? '' : qrow.dataset.coreQ;
+            const s = document.getElementById('coreSearch'); if (s) { s.value = state.q; s.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+            document.querySelectorAll('[data-core-q]').forEach(x => x.classList.toggle('is-active', x.dataset.coreQ === state.q));
+            fillTable(); return;
+        }
         const b = e.target.closest('[data-core-key][data-core-value]');
         if (!b) return;
-        state[b.dataset.coreKey] = b.dataset.coreValue;
-        map = null;
+        const k = b.dataset.coreKey, v = b.dataset.coreValue;
+        if (k === 'color') {
+            state.color = v;
+            b.parentElement.querySelectorAll('.filter-pill').forEach(x => x.classList.toggle('active', x === b));
+            drawMap(visible()); return;
+        }
+        state[k] = (state[k] === v) ? '' : v;  // 같은 것을 다시 누르면 해제
+        state.open = null;
         render();
     });
+    document.addEventListener('input', (e) => {
+        if (e.target && e.target.id === 'coreSearch') { state.q = e.target.value; fillTable(); }
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' || !e.target.closest) return;
+        const row = e.target.closest('.core-row[data-core-key], .core-row[data-core-q]');
+        if (row) row.click();
+    });
+    // 테마를 바꾸면 지도 마커 색도 다시 (막대는 CSS 변수라 자동)
+    new MutationObserver(() => { if (payload && map) drawMap(visible()); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
     // GUI 리포트는 내장 JSON(#coreData)으로, 웹 업로드는 window.DataIntelCore(payload)로 들어온다
     window.DataIntelCore = function (p) {
         payload = p && p.rows && p.rows.length ? p : null;
-        state = { 관리주체: '', 지사: '', 활동상태: '' };
+        if (payload) payload.rows.forEach((r, i) => { r._i = i; });
+        period = payload && payload.period ? payload.period : '';
+        state = fresh();
         map = null;
         const sec = document.getElementById('secCore');
         const link = document.querySelector('#dashNav a[data-sec="secCore"]');
@@ -5321,3 +5810,92 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
         html_out = encrypt_report(html_out, [password, admin_password], expiry_date=expiry_date)
 
     return html_out, password, expiry_date, admin_password
+
+
+CORE_REPORT_TITLE = "코어고객 활동현황"
+# 코어고객 전용 리포트는 총괄DB 엔진(매칭·집계)이 필요 없다 -- 잠금/테마/코어 섹션까지만 싣는다
+CORE_SCRIPT_TEMPLATE = APP_SCRIPT_TEMPLATE.split('// ===== Client-side matching + dashboard engine =====')[0]
+
+
+def generate_core_report(core_df, core_voc_df=None, password=None, admin_password=None, expiry_date=None,
+                         encrypt=True, kakao_key=None, log=print):
+    """9. 코어고객 활동관리(+ 9-1 VOC매칭)만으로 만드는 독립 리포트 -- 총괄DB 없이.
+
+    Same lock/encryption as generate_html_report: a blank password becomes a
+    strong random one, expiry defaults to the end of this month. There is no
+    admin panel here; admin_password (this PC's saved one by default) is just
+    a second password that also opens the report, so the owner can always
+    open what they shared.
+
+    Returns (html, password, expiry_date, admin_password, customer_count).
+    Raises ValueError when the sheet has no 관리고객 명 / 계약번호 column.
+    """
+    from .core_customers import build_core_payload, load_kakao_key
+    payload = build_core_payload(core_df, core_voc_df, kakao_key=kakao_key or load_kakao_key(), log=log)
+    if not payload:
+        raise ValueError("코어고객 파일에서 '관리고객 명' 또는 '계약번호' 열을 찾을 수 없습니다 (시트·헤더 행을 확인하세요).")
+
+    if encrypt:
+        from .secure_report import generate_strong_password, load_admin_password
+        if password is None:
+            password = generate_strong_password()
+        if admin_password is None:
+            admin_password = load_admin_password()
+    if password is None:
+        import random
+        password = str(random.randint(1000, 9999))
+    if admin_password is None:
+        admin_password = password
+    if expiry_date is None:
+        expiry_date = get_end_of_month_iso()
+
+    core_json = ('<script type="application/json" id="coreData">'
+                 + json.dumps(payload, ensure_ascii=False).replace('<', '\\u003c') + '</script>')
+    script = (CORE_SCRIPT_TEMPLATE.replace('__PASSWORD__', password)
+              .replace('__ADMIN_PASSWORD__', admin_password).replace('__EXPIRY__', expiry_date))
+    generated_at = datetime.now().strftime('%Y-%m-%d %H:%M')
+    count = len(payload['rows'])
+
+    html_out = f"""<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{CORE_REPORT_TITLE}</title>
+<style>{CSS}</style>
+</head>
+<body class="core-only">
+
+<div id="lockScreen" class="lock-screen">
+    <h2>{CORE_REPORT_TITLE} 보안 리포트</h2>
+    <p>만료일: {_e(expiry_date)}</p>
+    <input type="password" id="pwd" placeholder="비밀번호 입력" autocomplete="off">
+    <button onclick="checkPassword()">확인</button>
+    <div id="errorMsg" class="error"></div>
+</div>
+
+<div id="content">
+    <div class="topbar">
+        <div>
+            <h1>{CORE_REPORT_TITLE}</h1>
+            <div class="meta" id="reportMeta">생성일시 {_e(generated_at)} · 코어고객 {count:,}곳 · 만료일 {_e(expiry_date)}</div>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()">🌓 테마 전환</button>
+    </div>
+    <div class="container">
+        <div id="secCore">
+        <div id="coreSectionWrap"></div>
+        {core_json}
+        </div>
+    </div>
+</div>
+
+<script>{script}</script>
+</body>
+</html>"""
+
+    if encrypt:
+        from .secure_report import encrypt_report
+        html_out = encrypt_report(html_out, [password, admin_password], expiry_date=expiry_date,
+                                  title=f"{CORE_REPORT_TITLE} 보안 리포트")
+    return html_out, password, expiry_date, admin_password, count

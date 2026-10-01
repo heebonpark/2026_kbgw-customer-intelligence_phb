@@ -3,6 +3,7 @@ Publishes the generated (encrypted) HTML report to GitHub Pages.
 
     python deploy_report.py                       # Data_Intel_PRO_Report.html -> kbgw-report
     python deploy_report.py report.html --repo my-report --public
+    python deploy_report.py Core_Customer_Report.html --repo kbgw-core-report --public   # 코어고객 리포트
 
 Needs git and the GitHub CLI (`gh`, logged in with `gh auth login`).
 
@@ -24,6 +25,7 @@ import sys
 import tempfile
 
 DEFAULT_REPO = "kbgw-report"
+CORE_REPO = "kbgw-core-report"  # 코어고객 전용 리포트 -- 종합 리포트(kbgw-report)를 덮어쓰지 않게 따로
 ENCRYPTED_MARKER = 'id="encPayload"'
 
 
@@ -38,7 +40,7 @@ def _run(cmd, cwd=None, check=True):
     return result
 
 
-def deploy(html_path, repo_name=DEFAULT_REPO, public=False, log=print):
+def deploy(html_path, repo_name=DEFAULT_REPO, public=False, log=print, description='Data Intel PRO 암호화 리포트 배포용'):
     """Returns the published https URL. Raises DeployError with a readable
     reason on any failure."""
     if not os.path.exists(html_path):
@@ -58,7 +60,7 @@ def deploy(html_path, repo_name=DEFAULT_REPO, public=False, log=print):
     if _run(['gh', 'repo', 'view', full], check=False).returncode != 0:
         log(f"배포 저장소 생성: {full} ({'public' if public else 'private'})")
         _run(['gh', 'repo', 'create', full, '--public' if public else '--private',
-              '--description', 'Data Intel PRO 암호화 리포트 배포용'])
+              '--description', description])
 
     workdir = tempfile.mkdtemp(prefix='report_deploy_')
     try:

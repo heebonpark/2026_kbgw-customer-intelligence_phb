@@ -56,14 +56,27 @@ CORE_FIELDS = {
     '약정여부': ['약정여부'],
     '해지건수': ['해지건수'],
     '해지월정료': ['해지월정료'],
+    # 분기 방문(1회·2회)마다 따로 적는 해지징후 / 메모 열 -- 엑셀에서 같은 제목이 반복돼 두 번째는 '.1'
+    '3Q징후': ['해지징후 및 불만 여부'],
+    '2회징후': ['해지징후 및 불만 여부.1'],
+    '3Q불만': ['불만사항/요구사항/추가영업기회 (구체적으로 작성)'],
+    '2회불만': ['불만사항/요구사항/추가영업기회 (구체적으로 작성).1'],
+    '약정시설수': ['약정시설수'],
+    '약정월정료': ['약정월정료'],
+    '해지일자': ['해지일자'],
+    '수동재계약': ['수동재계약'],
+    '만기비중': ['만기도래 비중 금액', '만기도래 비중'],
+    '업셀링': ['업셀링('],
+    '업셀링금액': ['업셀링 금액'],
 }
+EXACT_ONLY_FIELDS = {'3Q징후', '2회징후', '3Q불만', '2회불만'}  # 비슷한 이름의 다른 열로 번지지 않게
 COORD_COL_CANDIDATES = ['위치좌표(위도,경도)', '위치좌표', '좌표']
 LAT_CANDIDATES, LNG_CANDIDATES = ['위도', 'lat', 'LAT'], ['경도', 'lng', 'LNG', 'lon']
 
 
-def _find_col(df, names):
+def _find_col(df, names, exact=False):
     col = _first_matching_col(df, names)
-    if col:
+    if col or exact:
         return col
     return next((c for c in df.columns for n in names if str(c).startswith(n)), None)
 
@@ -242,7 +255,10 @@ def build_core_payload(core_df, voc_df=None, kakao_key=None, log=print):
     rows 필드 이름은 report.py renderCoreSection / web_app.py buildCorePayload와 같다."""
     if core_df is None or core_df.empty:
         return None
-    cols = {k: _find_col(core_df, v) for k, v in CORE_FIELDS.items()}
+    cols = {k: _find_col(core_df, v, exact=k in EXACT_ONLY_FIELDS) for k, v in CORE_FIELDS.items()}
+    # '1회 방문일자_3Q 내' -> '3Q' (화면 문구용). 분기 방문 열이 없으면 방문일자 하나로만 본다.
+    quarter = re.search(r'(\d)\s*Q', str(cols['3Q방문일자'] or ''))
+    period = f"{quarter.group(1)}Q" if quarter else ('분기' if cols['3Q방문일자'] else None)
     if not cols['관리고객명'] and not cols['계약번호']:
         return None
     coord_cols = (_find_col(core_df, COORD_COL_CANDIDATES), _find_col(core_df, LAT_CANDIDATES), _find_col(core_df, LNG_CANDIDATES))
@@ -267,7 +283,20 @@ def build_core_payload(core_df, voc_df=None, kakao_key=None, log=print):
         g = lambda k: _clean(r.get(cols[k])) if cols[k] else None
         visit3q = _date(g('3Q방문일자'))
         visit = _date(g('방문일자'))
-        sign = (str(g('해지징후') or '')).upper()
+        visit2 = _date(g('2회방문일자'))
+        yn = lambda k: (lambda v: v if v in ('Y', 'N') else None)(str(g(k) or '').strip().upper())
+        note = lambda k: (lambda v: None if v is None else str(v))(g(k))
+        # 방문 회차별 기록 (이전 -> 분기 1회 -> 분기 2회)
+        history = [h for h in (
+            {'회차': '이전' if period else '방문', '일자': visit, '징후': yn('해지징후'), '내용': note('불만요구'),
+             '대상': g('방문대상'), '방문자': g('방문자')},
+            {'회차': f'{period} 1회', '일자': visit3q, '징후': yn('3Q징후'), '내용': note('3Q불만')},
+            {'회차': f'{period} 2회', '일자': visit2, '징후': yn('2회징후'), '내용': note('2회불만')},
+        ) if h['일자'] or h['내용'] or h['징후']]
+        signs = [h['징후'] for h in history]
+        sign = 'Y' if 'Y' in signs else ('N' if 'N' in signs else '')
+        notes = [h['내용'] for h in history if h['내용']]
+        in_period = (visit3q or visit2) if period else visit
         contract = _contract(g('계약번호'))
         row = {
             '계약번호': contract, '관리고객명': g('관리고객명'), '관리주체': g('관리주체') or '미지정',
@@ -276,12 +305,18 @@ def build_core_payload(core_df, voc_df=None, kakao_key=None, log=print):
             '영업자': g('영업자'), '시설수': _num(g('시설수')), '월정료': _num(g('월정료')),
             '재계약대상시설수': _num(g('재계약대상시설수')), '재계약대상월정료': _num(g('재계약대상월정료')),
             '계약종료일': _date(g('계약종료일')), '방문일자': visit, '3Q방문일자': visit3q,
-            '2회방문일자': _date(g('2회방문일자')), '방문대상': g('방문대상'), '방문자': g('방문자'),
-            '해지징후': 'Y' if sign == 'Y' else ('N' if sign == 'N' else None),
-            '불만요구': g('불만요구'), '요약정리': g('요약정리'), '약정여부': g('약정여부'),
-            '해지건수': _num(g('해지건수')), '해지월정료': _num(g('해지월정료')),
+            '2회방문일자': visit2, '방문대상': g('방문대상'), '방문자': g('방문자'),
+            '해지징후': sign or None,
+            '불만요구': notes[-1] if notes else None,  # 가장 최근 회차의 메모
+            '방문이력': history, '최근방문': max([d for d in (visit, visit3q, visit2) if d], default=None),
+            '요약정리': g('요약정리'), '약정여부': g('약정여부'),
+            '약정시설수': _num(g('약정시설수')), '약정월정료': _num(g('약정월정료')),
+            '해지건수': _num(g('해지건수')), '해지월정료': _num(g('해지월정료')), '해지일자': _date(g('해지일자')),
+            '수동재계약': _date(g('수동재계약')), '만기비중': _num(g('만기비중')),
+            '업셀링': note('업셀링'), '업셀링금액': _num(g('업셀링금액')),
             'VOC': vocs.get(contract, []),
-            '활동상태': '해지징후' if sign == 'Y' else ('방문완료' if (visit3q or visit) else '미방문'),
+            # 방문완료 = 이번 분기 안에 방문 (분기 열이 없는 파일은 방문일자 기준)
+            '활동상태': '해지징후' if sign == 'Y' else ('방문완료' if in_period else '미방문'),
             'lat': None, 'lng': None, '좌표출처': None,
         }
         hit = _file_coord(r, coord_cols)
@@ -323,5 +358,5 @@ def build_core_payload(core_df, voc_df=None, kakao_key=None, log=print):
              '카카오': sum(1 for x in rows if x['좌표출처'] == '카카오'),
              '동단위': sum(1 for x in rows if x['좌표출처'] == '카카오(동 단위)'),
              '없음': sum(1 for x in rows if x['lat'] is None)}
-    return {"rows": rows, "coord_stats": stats, "voc_matched": sum(1 for x in rows if x['VOC']),
+    return {"rows": rows, "coord_stats": stats, "voc_matched": sum(1 for x in rows if x['VOC']), "period": period,
             "kakao_key_set": bool(kakao_key), "kakao_error": error}

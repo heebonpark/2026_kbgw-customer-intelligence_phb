@@ -149,24 +149,90 @@ body {
 @container (max-width: 46px) { .zl5 { display: none; } }
 /* ---- 구역별 고급 시각화 ---- */
 .core-filter-bar { margin-bottom: 14px; }
-.core-legend { margin: 6px 0 8px; align-items: center; }
+.core-headline { display: flex; flex-direction: column; gap: 3px; margin-bottom: 14px; }
+.core-headline-main { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.core-headline-sub { font-size: 12.5px; color: var(--text-secondary); }
+.core-meter { height: 6px; background: var(--grid-line); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+.core-meter > span { display: block; height: 100%; background: var(--good); border-radius: 3px; }
+.core-block-title { font-size: 14px; font-weight: 700; margin: 26px 0 10px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; color: var(--text-primary); }
+.core-block-title small { font-weight: 400; font-size: 12px; color: var(--text-muted); }
+#coreSectionWrap .stat-grid { margin-bottom: 0; }
+.core-action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr)); gap: 12px; }
+.core-action { padding: 14px 12px 10px; border-top: 3px solid var(--baseline); }
+.core-action.is-critical { border-top-color: var(--critical); }
+.core-action.is-serious { border-top-color: var(--serious); }
+.core-action.is-warning { border-top-color: var(--warning); }
+.core-action-head { display: flex; align-items: baseline; gap: 8px; font-size: 13px; font-weight: 700; margin: 0 4px 8px; }
+.core-action-count { margin-left: auto; font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.core-action-list { display: flex; flex-direction: column; gap: 2px; max-height: 218px; overflow-y: auto; }
+.core-action-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 8px; width: 100%; text-align: left; padding: 6px 8px; border: 0; border-radius: 8px;
+                    background: none; color: inherit; font: inherit; cursor: pointer; }
+.core-action-item:hover, .core-action-item:focus-visible { background: var(--page-plane); outline: none; }
+.core-action-name { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.core-action-tag { font-size: 11.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.core-action-sub { grid-column: 1 / -1; font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.core-action-empty { font-size: 12px; color: var(--text-muted); padding: 6px 8px; }
+.core-charts { margin-bottom: 0; grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); }
+.core-charts .chart-note { margin-bottom: 10px; }
+.core-chart-legend { margin: 0 0 10px; }
+.core-row { grid-template-columns: 62px 1fr 104px; }
+.core-row.wide { grid-template-columns: 168px 1fr 44px; }
+.core-row[data-core-key], .core-row[data-core-q] { cursor: pointer; }
+.core-row.is-active { background: color-mix(in srgb, var(--brand) 12%, transparent); outline: 1px solid var(--brand); }
+/* 중립(미방문·여유 있는 계약): 연한 --baseline은 다크 모드에서 배경과 구분이 안 돼 한 단계 진한 회색 */
+.role-none { background: var(--text-muted); }
+.core-cols { display: flex; align-items: flex-end; gap: 6px; height: 186px; }
+.core-col { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; border-radius: 6px; }
+.core-col:hover, .core-col:focus { background: var(--page-plane); outline: none; }
+.core-col-val { font-size: 11.5px; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; margin-bottom: 3px; }
+.core-col-bar { width: 62%; max-width: 46px; border-radius: 4px 4px 0 0; min-height: 2px; }
+.core-col-label { width: 100%; min-height: 40px; text-align: center; font-size: 11px; color: var(--text-secondary); border-top: 1px solid var(--baseline); padding-top: 5px;
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.core-col-sub { display: block; font-size: 10.5px; color: var(--text-muted); }
+.core-map-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin: 0 0 8px; }
+.core-legend { margin: 0; align-items: center; }
+.core-size-note { color: var(--text-muted); font-size: 12px; }
 .core-coord-note { margin-left: auto; color: var(--text-muted); font-size: 12px; }
 .core-sign-key { border-radius: 50%; background: var(--surface-1); border: 3px solid var(--critical); box-sizing: border-box; }
-.core-map { height: 520px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 14px; background: var(--page-plane); }
+.core-map { height: 520px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 4px; background: var(--page-plane); }
 .core-map-empty { height: auto; padding: 18px 20px; font-size: 13px; color: var(--text-secondary); }
 .core-pop { font-size: 12px; line-height: 1.45; min-width: 220px; }
 .core-pop-title { font-weight: 800; font-size: 13.5px; margin-bottom: 4px; }
 .core-pop-note { margin: 4px 0; padding: 5px 7px; background: #f6f6f3; border-radius: 6px; color: #333; }
 .core-pop-addr { color: #666; margin: 2px 0 6px; }
-.core-table-scroll { max-height: 560px; }
+.core-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 10px; }
+.core-toolbar .filter-input { max-width: 360px; }
+.core-table-scroll { max-height: 640px; }
 #coreTable td { vertical-align: top; }
-#coreTable tbody tr { cursor: pointer; }
-#coreTable tbody tr:hover td { background: var(--page-plane); }
+#coreTable th[data-core-sort] { cursor: pointer; user-select: none; }
+#coreTable tbody tr[data-core-row] { cursor: pointer; }
+#coreTable tbody tr[data-core-row]:hover td { background: var(--page-plane); }
 #coreTable tr.core-active td { background: color-mix(in srgb, var(--brand) 12%, var(--surface-1)); }
 #coreTable tr.core-sign td { background: color-mix(in srgb, var(--critical) 7%, var(--surface-1)); }
-#coreTable td.core-sign-cell { color: var(--critical); font-weight: 800; }
-#coreTable td.core-note { max-width: 360px; white-space: normal; font-size: 12px; color: var(--text-secondary); }
+#coreTable td.core-note { max-width: 380px; min-width: 220px; white-space: normal; font-size: 12px; color: var(--text-secondary); }
 #coreTable td.core-novisit { color: var(--text-muted); }
+#coreTable tr.core-detail td { background: var(--page-plane); white-space: normal; padding: 14px 16px; }
+.core-state { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.core-state::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--baseline); }
+.core-state.s-방문완료::before { background: var(--good); }
+.core-state.s-해지징후::before { background: var(--critical); }
+.core-dday { margin-left: 6px; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.core-dday.soon { color: var(--critical); font-weight: 700; }
+.core-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 18px; }
+.core-detail-title { font-size: 12px; font-weight: 700; color: var(--text-secondary); margin-bottom: 8px; }
+.core-hist { border-left: 2px solid var(--baseline); padding: 0 0 10px 10px; margin-left: 3px; font-size: 12px; }
+.core-hist-head { font-weight: 600; color: var(--text-primary); }
+.core-hist-body { color: var(--text-secondary); margin-top: 2px; line-height: 1.5; }
+.core-kv { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 4px 10px; font-size: 12px; margin: 0 0 10px; }
+.core-kv dt { color: var(--text-muted); }
+.core-kv dd { margin: 0; color: var(--text-primary); }
+/* 코어고객만 보는 화면 (총괄DB 없이 9번만 올린 웹 / 코어고객만 공유) */
+body.core-only .dash-sec:not(#secCore), body.core-only #dashNav, body.core-only .dash-admin, body.core-only .dash-anchor,
+body.core-only .global-filter-bar:not(.core-filter-bar) { display: none !important; }
+body.core-only #secCore > summary { display: none; }
+.core-foot { margin: 12px 0 0; }
+.core-page-note { font-size: 12px; color: var(--text-muted); margin: 0 0 14px; }
+@media (max-width: 640px) { .core-row.wide { grid-template-columns: 110px 1fr 40px; } .core-map { height: 380px; } }
 .perf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; align-items: start; margin-bottom: 16px; }
 .perf-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .perf-band { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; font-weight: 700; font-size: 14.5px;
@@ -615,7 +681,7 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
             <p class="web-privacy">🔒 파일은 서버로 전송되지 않습니다 -- 이 브라우저 안에서만 읽고 계산하며, 창을 닫으면 사라집니다.</p>
             <div class="web-slots">
         <div class="web-slot web-slot-required" data-key="db">
-            <span class="web-slot-title">1. 총괄관리DB <span class="web-slot-note">(필수)</span></span>
+            <span class="web-slot-title">1. 총괄관리DB <span class="web-slot-note">(필수 · 코어고객 현황만 만들 때는 생략)</span></span>
             <div class="web-slot-actions">
                 <button type="button" class="web-mini web-pick" data-pick-for="db">📂 파일 선택</button>
                 <button type="button" class="web-mini web-reload" data-reload-for="db" hidden>🔄 다시 불러오기</button>
@@ -693,7 +759,7 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
             <span class="web-slot-status" data-status-for="zone_owner">파일을 선택하세요</span>
         </div>
         <div class="web-slot" data-key="core">
-            <span class="web-slot-title">9. 코어고객 활동관리 <span class="web-slot-note">(선택 · 독립 섹션·지도)</span></span>
+            <span class="web-slot-title">9. 코어고객 활동관리 <span class="web-slot-note">(선택 · 이 파일만 올려도 코어고객 현황 생성)</span></span>
             <div class="web-slot-actions">
                 <button type="button" class="web-mini web-pick" data-pick-for="core">📂 파일 선택</button>
                 <button type="button" class="web-mini web-reload" data-reload-for="core" hidden>🔄 다시 불러오기</button>
@@ -721,10 +787,10 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
             <div class="web-actions">
                 <button type="button" class="web-run" id="webRunBtn" disabled>📊 대시보드 만들기</button>
                 <button type="button" class="web-btn2" id="webReloadAll" hidden title="엑셀에서 저장(Ctrl+S)한 최신 내용으로 모든 파일을 다시 읽고 대시보드를 새로 만듭니다">🔄 모두 다시 불러오고 대시보드 갱신</button>
-                <span class="web-progress" id="webProgress">1. 총괄관리DB는 필수입니다.</span>
+                <span class="web-progress" id="webProgress">1. 총괄관리DB(종합 대시보드) 또는 9. 코어고객(코어고객 현황만)을 선택하세요.</span>
             </div>
             <p class="web-footnote">엑셀에서 열어 둔 파일도 선택할 수 있습니다 -- 단, <b>마지막으로 저장된 내용</b>을 읽으므로 수정 중이면 먼저 저장하세요. 한 번 고른 파일은 <b>🔄 다시 불러오기</b>로 다시 고르지 않고 최신 저장본을 읽습니다 (Chrome·Edge). 저장 안 한 내용까지 쓰려면 <b>📋 엑셀에서 붙여넣기</b>를 쓰세요. 파일을 고르면 <b>시트 · 헤더 행 · 컬럼(열 위치)</b>을 자동으로 맞추고 미리보기를 보여줍니다 -- 다르면 드롭다운에서 바꾸세요. 설정은 이 브라우저에 기억되어 다음에 같은 양식이면 자동 적용됩니다.</p>
-            <p class="web-footnote">4. 해지파이프라인 · 7. 해지시설내역 섹션은 데스크톱 GUI 리포트에서 제공합니다.</p>
+            <p class="web-footnote"><b>9. 코어고객</b>(+9-1)만 올리면 총괄DB 없이 <b>코어고객 현황</b>만 만들고 공유할 수 있습니다 (설치주소 지도는 데스크톱 GUI 리포트에서). 4. 해지파이프라인 · 7. 해지시설내역 섹션도 데스크톱 GUI 리포트에서 제공합니다.</p>
         </details>
         <div class="web-quickbar" id="webQuickbar" hidden>
             <button type="button" class="web-btn2" id="webQuickReload" hidden>🔄 모두 다시 불러오고 갱신</button>
@@ -742,6 +808,7 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
                     <input type="password" id="shareAdminPwd" autocomplete="new-password" placeholder="예: GUI와 같은 관리자 비밀번호"></label>
                 <label class="web-field">만료일 <small>이 날짜가 지나면 열리지 않음</small>
                     <input type="date" id="shareExpiry"></label>
+                <label class="web-field web-remember" id="shareCoreOnlyWrap" hidden><input type="checkbox" id="shareCoreOnly"> 코어고객 현황만 공유 <small>총괄DB 내용은 넣지 않음</small></label>
             </div>
             <div class="web-actions">
                 <button type="button" class="web-run" id="shareDownloadBtn">📥 암호화 HTML 다운로드</button>
@@ -869,12 +936,12 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
 </div>
 
 <script type="application/json" id="embeddedData">{"db": {"columns": [], "rows": []}, "files": {"original": {"columns": [], "rows": []}, "facility": {"columns": [], "rows": []}, "patrol": {"columns": [], "rows": []}, "voc": {"columns": [], "rows": []}, "cancel": {"columns": [], "rows": []}, "cancelled_facility": {"columns": [], "rows": []}}, "matchingConfig": {"original": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "facility": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "patrol": [{"db_col": "서비스번호", "file_col": "고객번호", "enabled": true}], "voc": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "cancel": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "cancelled_facility": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}]}, "fileLabels": {"original": "2026년 관리고객원본", "facility": "시설현황", "patrol": "순찰 정기점검 내역", "voc": "VOC정보조회", "cancel": "해지 파이프라인", "cancelled_facility": "해지시설 내역"}, "dbKeyCandidates": ["계약번호", "서비스번호"], "fileKeyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "hqOrder": ["강북/강원", "강남/서부", "대구/경북", "부산/경남", "충남/충북", "전남/전북"], "branchOrder": ["중앙", "강북", "서대문", "고양", "의정부", "남양주", "강릉", "원주"], "zoneOwnerMap": {}}</script>
-<script type="application/json" id="uploadConfig">{"matchable": ["original", "facility", "patrol", "voc", "cancel", "cancelled_facility"], "keyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "sheetHints": {"db": ["활동대상구분", "담당채널"], "voc": ["VOC유형대", "계약번호"], "patrol": ["고객번호"], "original": ["계약번호"], "facility": ["계약번호"], "zone_owner": ["구역번호"], "core": ["관리주체", "관리고객 명"], "core_voc": ["VOC유형", "VOC유형대"]}, "fieldSpecs": {"db": [{"name": "활동대상구분", "aliases": ["활동대상구분", "담당채널"], "required": true}, {"name": "지사", "aliases": ["지사", "관리지사명", "관리지사"], "required": true}, {"name": "계약번호", "aliases": ["계약번호"]}, {"name": "서비스번호", "aliases": ["서비스번호"]}, {"name": "상호", "aliases": ["상호", "상호명", "고객명"]}, {"name": "설치주소", "aliases": ["설치주소", "주소"]}, {"name": "영업구역정보", "aliases": ["영업구역정보", "영업구역번호", "영업구역"], "zone": true, "fuzzy": ["영업구역"]}, {"name": "기술구역정보", "aliases": ["기술구역정보", "기술구역번호", "기술구역"], "zone": true, "fuzzy": ["기술구역"]}, {"name": "구역정보", "aliases": ["구역정보", "구역"], "zone": true, "fuzzy": ["출동구역", "구역정보"], "fuzzyExclude": ["영업", "기술"]}, {"name": "활동유무", "aliases": ["활동유무", "활동유무(o,x)"], "prefix": "활동유무", "required": true}, {"name": "SP담당", "aliases": ["SP담당", "SP_담당", "SP 담당", "SP담당자", "SP_담당자", "SP 담당자"]}], "zone_owner": [{"name": "구역번호", "aliases": ["구역번호", "영업구역번호"], "required": true}, {"name": "담당자명", "aliases": ["담당자명", "담당자", "사원명", "(신규)사원명"], "required": true}]}, "dbKeyCandidates": ["계약번호", "서비스번호"], "unlockTemplate": "\u003c!DOCTYPE html>\n\u003chtml lang=\"ko\">\n\u003chead>\n\u003cmeta charset=\"UTF-8\">\n\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n\u003cmeta name=\"robots\" content=\"noindex, nofollow\">\n\u003ctitle>__TITLE__\u003c/title>\n\u003cstyle>\n:root { --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; --brand: #2563eb; --error: #d03b3b; }\n@media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --muted: #94a3b8; --border: #334155; } }\n* { box-sizing: border-box; }\nbody { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--text);\n       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; padding: 16px; }\n.card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; text-align: center; }\nh1 { font-size: 20px; margin: 0 0 6px; }\n.exp, .hint { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }\ninput { width: 100%; font-size: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }\nbutton { width: 100%; margin-top: 12px; font-size: 15px; font-weight: 700; padding: 12px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; }\nbutton:disabled { opacity: .6; cursor: progress; }\n.err { min-height: 18px; margin-top: 10px; font-size: 13px; color: var(--error); }\n\u003c/style>\n\u003c/head>\n\u003cbody>\n\u003cform class=\"card\" id=\"unlockForm\" autocomplete=\"off\">\n    \u003ch1>🔒 __TITLE__\u003c/h1>\n    __EXPIRY__\n    \u003cp class=\"hint\">공유받은 비밀번호를 입력하세요. 데이터는 암호화되어 있습니다.\u003c/p>\n    \u003cinput type=\"password\" id=\"unlockPwd\" placeholder=\"비밀번호\" autofocus>\n    \u003cbutton type=\"submit\" id=\"unlockBtn\">열기\u003c/button>\n    \u003cdiv class=\"err\" id=\"unlockErr\">\u003c/div>\n\u003c/form>\n\u003cscript type=\"application/json\" id=\"encPayload\">__PAYLOAD__\u003c/script>\n\u003cscript>\n(function () {\n    const payload = JSON.parse(document.getElementById('encPayload').textContent);\n    const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));\n    const form = document.getElementById('unlockForm');\n    const btn = document.getElementById('unlockBtn');\n    const err = document.getElementById('unlockErr');\n\n    async function unwrapContentKey(pwd) {\n        const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);\n        for (const slot of payload.slots) {\n            const kek = await crypto.subtle.deriveKey(\n                { name: 'PBKDF2', salt: b64(slot.salt), iterations: payload.iter, hash: 'SHA-256' },\n                base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);\n            try {\n                return await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(slot.iv) }, kek, b64(slot.key));\n            } catch (e) { /* not this slot -- try the next password slot */ }\n        }\n        return null;\n    }\n\n    form.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        const pwd = document.getElementById('unlockPwd').value;\n        if (!pwd) return;\n        if (!window.crypto || !crypto.subtle) {\n            err.textContent = '이 브라우저에서는 열 수 없습니다 (https 주소 또는 최신 브라우저가 필요합니다).';\n            return;\n        }\n        btn.disabled = true; btn.textContent = '여는 중...'; err.textContent = '';\n        try {\n            const rawKey = await unwrapContentKey(pwd);\n            if (!rawKey) throw new Error('bad password');\n            const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);\n            const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(payload.iv) }, key, b64(payload.data));\n            const reportHtml = new TextDecoder().decode(plain);\n            document.open();\n            document.write(reportHtml);\n            document.close();\n            // Hand the same password to the report's own lock screen: it still\n            // enforces the expiry date and decides user vs admin view.\n            const unlock = () => {\n                const input = document.getElementById('pwd');\n                if (input && typeof window.checkPassword === 'function') { input.value = pwd; window.checkPassword(); }\n            };\n            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', unlock); else unlock();\n        } catch (ex) {\n            btn.disabled = false; btn.textContent = '열기';\n            err.textContent = '비밀번호가 올바르지 않습니다.';\n        }\n    });\n})();\n\u003c/script>\n\u003c/body>\n\u003c/html>", "lockScreenHtml": "\u003cdiv id=\"lockScreen\" class=\"lock-screen\">\n    \u003ch2>Data Intel PRO 보안 리포트\u003c/h2>\n    \u003cp>만료일: __EXPIRY_TEXT__\u003c/p>\n    \u003cinput type=\"password\" id=\"pwd\" placeholder=\"비밀번호 입력\" autocomplete=\"off\">\n    \u003cbutton onclick=\"checkPassword()\">확인\u003c/button>\n    \u003cdiv id=\"errorMsg\" class=\"error\">\u003c/div>\n\u003c/div>", "iterations": 310000, "filler": "oxgtYMdPqfNxRTXRAeBFVIlj"}</script>
+<script type="application/json" id="uploadConfig">{"matchable": ["original", "facility", "patrol", "voc", "cancel", "cancelled_facility"], "keyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "sheetHints": {"db": ["활동대상구분", "담당채널"], "voc": ["VOC유형대", "계약번호"], "patrol": ["고객번호"], "original": ["계약번호"], "facility": ["계약번호"], "zone_owner": ["구역번호"], "core": ["관리주체", "관리고객 명"], "core_voc": ["VOC유형", "VOC유형대"]}, "fieldSpecs": {"db": [{"name": "활동대상구분", "aliases": ["활동대상구분", "담당채널"], "required": true}, {"name": "지사", "aliases": ["지사", "관리지사명", "관리지사"], "required": true}, {"name": "계약번호", "aliases": ["계약번호"]}, {"name": "서비스번호", "aliases": ["서비스번호"]}, {"name": "상호", "aliases": ["상호", "상호명", "고객명"]}, {"name": "설치주소", "aliases": ["설치주소", "주소"]}, {"name": "영업구역정보", "aliases": ["영업구역정보", "영업구역번호", "영업구역"], "zone": true, "fuzzy": ["영업구역"]}, {"name": "기술구역정보", "aliases": ["기술구역정보", "기술구역번호", "기술구역"], "zone": true, "fuzzy": ["기술구역"]}, {"name": "구역정보", "aliases": ["구역정보", "구역"], "zone": true, "fuzzy": ["출동구역", "구역정보"], "fuzzyExclude": ["영업", "기술"]}, {"name": "활동유무", "aliases": ["활동유무", "활동유무(o,x)"], "prefix": "활동유무", "required": true}, {"name": "SP담당", "aliases": ["SP담당", "SP_담당", "SP 담당", "SP담당자", "SP_담당자", "SP 담당자"]}], "zone_owner": [{"name": "구역번호", "aliases": ["구역번호", "영업구역번호"], "required": true}, {"name": "담당자명", "aliases": ["담당자명", "담당자", "사원명", "(신규)사원명"], "required": true}]}, "dbKeyCandidates": ["계약번호", "서비스번호"], "unlockTemplate": "\u003c!DOCTYPE html>\n\u003chtml lang=\"ko\">\n\u003chead>\n\u003cmeta charset=\"UTF-8\">\n\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n\u003cmeta name=\"robots\" content=\"noindex, nofollow\">\n\u003ctitle>__TITLE__\u003c/title>\n\u003cstyle>\n:root { --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; --brand: #2563eb; --error: #d03b3b; }\n@media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --muted: #94a3b8; --border: #334155; } }\n* { box-sizing: border-box; }\nbody { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--text);\n       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; padding: 16px; }\n.card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; text-align: center; }\nh1 { font-size: 20px; margin: 0 0 6px; }\n.exp, .hint { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }\ninput { width: 100%; font-size: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }\nbutton { width: 100%; margin-top: 12px; font-size: 15px; font-weight: 700; padding: 12px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; }\nbutton:disabled { opacity: .6; cursor: progress; }\n.err { min-height: 18px; margin-top: 10px; font-size: 13px; color: var(--error); }\n\u003c/style>\n\u003c/head>\n\u003cbody>\n\u003cform class=\"card\" id=\"unlockForm\" autocomplete=\"off\">\n    \u003ch1>🔒 __TITLE__\u003c/h1>\n    __EXPIRY__\n    \u003cp class=\"hint\">공유받은 비밀번호를 입력하세요. 데이터는 암호화되어 있습니다.\u003c/p>\n    \u003cinput type=\"password\" id=\"unlockPwd\" placeholder=\"비밀번호\" autofocus>\n    \u003cbutton type=\"submit\" id=\"unlockBtn\">열기\u003c/button>\n    \u003cdiv class=\"err\" id=\"unlockErr\">\u003c/div>\n\u003c/form>\n\u003cscript type=\"application/json\" id=\"encPayload\">__PAYLOAD__\u003c/script>\n\u003cscript>\n(function () {\n    const payload = JSON.parse(document.getElementById('encPayload').textContent);\n    const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));\n    const form = document.getElementById('unlockForm');\n    const btn = document.getElementById('unlockBtn');\n    const err = document.getElementById('unlockErr');\n\n    async function unwrapContentKey(pwd) {\n        const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);\n        for (const slot of payload.slots) {\n            const kek = await crypto.subtle.deriveKey(\n                { name: 'PBKDF2', salt: b64(slot.salt), iterations: payload.iter, hash: 'SHA-256' },\n                base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);\n            try {\n                return await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(slot.iv) }, kek, b64(slot.key));\n            } catch (e) { /* not this slot -- try the next password slot */ }\n        }\n        return null;\n    }\n\n    form.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        const pwd = document.getElementById('unlockPwd').value;\n        if (!pwd) return;\n        if (!window.crypto || !crypto.subtle) {\n            err.textContent = '이 브라우저에서는 열 수 없습니다 (https 주소 또는 최신 브라우저가 필요합니다).';\n            return;\n        }\n        btn.disabled = true; btn.textContent = '여는 중...'; err.textContent = '';\n        try {\n            const rawKey = await unwrapContentKey(pwd);\n            if (!rawKey) throw new Error('bad password');\n            const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);\n            const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(payload.iv) }, key, b64(payload.data));\n            const reportHtml = new TextDecoder().decode(plain);\n            document.open();\n            document.write(reportHtml);\n            document.close();\n            // Hand the same password to the report's own lock screen: it still\n            // enforces the expiry date and decides user vs admin view.\n            const unlock = () => {\n                const input = document.getElementById('pwd');\n                if (input && typeof window.checkPassword === 'function') { input.value = pwd; window.checkPassword(); }\n            };\n            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', unlock); else unlock();\n        } catch (ex) {\n            btn.disabled = false; btn.textContent = '열기';\n            err.textContent = '비밀번호가 올바르지 않습니다.';\n        }\n    });\n})();\n\u003c/script>\n\u003c/body>\n\u003c/html>", "lockScreenHtml": "\u003cdiv id=\"lockScreen\" class=\"lock-screen\">\n    \u003ch2>Data Intel PRO 보안 리포트\u003c/h2>\n    \u003cp>만료일: __EXPIRY_TEXT__\u003c/p>\n    \u003cinput type=\"password\" id=\"pwd\" placeholder=\"비밀번호 입력\" autocomplete=\"off\">\n    \u003cbutton onclick=\"checkPassword()\">확인\u003c/button>\n    \u003cdiv id=\"errorMsg\" class=\"error\">\u003c/div>\n\u003c/div>", "iterations": 310000, "filler": "kvfdNdFXWtwXEIHrVPLtESow"}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // ===== Lock screen =====
-const CORRECT_PWD = "oxgtYMdPqfNxRTXRAeBFVIlj";
-const ADMIN_PWD = "oxgtYMdPqfNxRTXRAeBFVIlj";
+const CORRECT_PWD = "kvfdNdFXWtwXEIHrVPLtESow";
+const ADMIN_PWD = "kvfdNdFXWtwXEIHrVPLtESow";
 const EXPIRY_DATE = new Date("9999-12-31T23:59:59");
 let isAdminUnlocked = false;
 
@@ -1027,17 +1094,37 @@ function initDashNav() {
 document.addEventListener('DOMContentLoaded', initDashNav);
 
 // ===== 9. 코어고객 활동관리 -- 독립 섹션 (총괄DB 필터와 무관). core_customers.py build_core_payload의 rows를 그린다 =====
+// 화면 순서: 필터 -> 한 줄 요약 -> 지표 -> 우선 조치 대상 -> 차트 -> 지도 -> 활동내역 표(행을 누르면 방문이력·VOC·계약정보)
 (function () {
     const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';
     const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css';
     const BRANCHES = ['중앙', '강북', '서대문', '고양', '의정부', '남양주', '강릉', '원주'];
     const STATES = ['방문완료', '미방문', '해지징후'];
+    const STATE_ROLE = { 방문완료: 'role-good', 미방문: 'role-none', 해지징후: 'role-critical' };
+    const STATE_VAR = { 방문완료: '--good', 미방문: '--text-muted', 해지징후: '--critical' };
+    const VOC_STATES = ['처리완료', '접수', '미접수'];
+    const VOC_ROLE = { 처리완료: 'role-good', 접수: 'role-warning', 미접수: 'role-critical' };
+    const END_BUCKETS = [['종료일 지남', 'role-critical'], ['3개월 내', 'role-serious'], ['6개월 내', 'role-warning'], ['1년 내', 'role-none'], ['1년 이후', 'role-none'], ['미상', 'role-none']];
     const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; };
+    const int = n => Math.round(n || 0).toLocaleString('ko-KR');
     const won = n => n == null ? '-' : (n >= 100000000 ? (n / 100000000).toFixed(1) + '억원' : n >= 10000 ? Math.round(n / 10000).toLocaleString('ko-KR') + '만원' : Math.round(n).toLocaleString('ko-KR') + '원');
+    const pct = (a, b) => b ? Math.round(a / b * 100) : 0;
     const kakaoLink = a => a ? 'https://map.kakao.com/link/search/' + encodeURIComponent(a) : null;
     const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    let state = { 관리주체: '', 지사: '', 활동상태: '' };
-    let payload = null, map = null, layer = null, markers = new Map();
+    const fresh = () => ({ 관리주체: '', 지사: '', 활동상태: '', q: '', color: '활동상태', sort: null, dir: 1, open: null });
+    let state = fresh();
+    let payload = null, map = null, layer = null, markers = new Map(), period = '';
+
+    // ---- 날짜 ----
+    const today0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+    const daysTo = d => { if (!d) return null; const t = new Date(d + 'T00:00:00'); return isNaN(t) ? null : Math.round((t - today0()) / 86400000); };
+    const ddayText = n => n == null ? '' : (n < 0 ? Math.abs(n) + '일 지남' : 'D-' + n);
+    const endBucket = r => { const n = daysTo(r.계약종료일); return n == null ? '미상' : n < 0 ? '종료일 지남' : n <= 90 ? '3개월 내' : n <= 180 ? '6개월 내' : n <= 365 ? '1년 내' : '1년 이후'; };
+    const lastVisit = r => r.최근방문 || r['2회방문일자'] || r['3Q방문일자'] || r.방문일자 || null;
+    // 이번 분기 안에 방문했는가 (분기 열이 없는 파일은 방문일자 기준) -- 해지징후 고객도 방문은 한 것
+    const visited = r => period ? !!(r['3Q방문일자'] || r['2회방문일자']) : !!r.방문일자;
+    const owner = r => r.관리고객담당자 || r.영업구역담당 || '담당 미지정';
+    const pendingVoc = r => (r.VOC || []).filter(v => v.상태 === '접수' || v.상태 === '미접수');
 
     function loadLeaflet(done) {
         if (window.L) { done(); return; }
@@ -1054,12 +1141,37 @@ document.addEventListener('DOMContentLoaded', initDashNav);
     }
     const visible = () => payload.rows.filter(r =>
         (!state.관리주체 || r.관리주체 === state.관리주체) && (!state.지사 || r.지사 === state.지사) && (!state.활동상태 || r.활동상태 === state.활동상태));
+    const branchList = rows => BRANCHES.filter(b => rows.some(r => r.지사 === b)).concat(Array.from(new Set(rows.map(r => r.지사))).filter(b => !BRANCHES.includes(b)));
 
-    function pills(label, key, values) {
+    // ---- 공용 hover 툴팁: data-core-tip="제목|줄1|줄2" ----
+    let tipEl = null;
+    function showTip(target, x, y) {
+        if (!tipEl || !document.body.contains(tipEl)) { tipEl = el('div', 'dv-tip'); tipEl.setAttribute('role', 'tooltip'); document.body.appendChild(tipEl); }
+        tipEl.textContent = '';
+        target.dataset.coreTip.split('|').forEach((line, i) => tipEl.appendChild(el('div', i ? 'dv-tip-line' : 'dv-tip-head', line)));
+        tipEl.style.display = 'block';
+        const pad = 14, w = tipEl.offsetWidth, h = tipEl.offsetHeight;
+        let left = x + pad, top = y + pad;
+        if (left + w > window.innerWidth - 8) left = x - w - pad;
+        if (top + h > window.innerHeight - 8) top = y - h - pad;
+        tipEl.style.left = Math.max(8, left) + 'px'; tipEl.style.top = Math.max(8, top) + 'px';
+    }
+    const hideTip = () => { if (tipEl) tipEl.style.display = 'none'; };
+    document.addEventListener('mousemove', e => {
+        const t = e.target.closest ? e.target.closest('[data-core-tip]') : null;
+        if (t) showTip(t, e.clientX, e.clientY); else hideTip();
+    });
+    document.addEventListener('focusin', e => {
+        const t = e.target.closest ? e.target.closest('[data-core-tip]') : null;
+        if (t) { const b = t.getBoundingClientRect(); showTip(t, b.left + b.width / 2, b.bottom); } else hideTip();
+    });
+
+    // ---- 작은 부품 ----
+    function pills(label, key, values, noAll) {
         const g = el('div', 'filter-group');
         g.appendChild(el('span', 'filter-group-label', label));
         const row = el('div', 'filter-pill-row');
-        [''].concat(values).forEach(v => {
+        (noAll ? values : [''].concat(values)).forEach(v => {
             const b = el('button', 'filter-pill' + (state[key] === v ? ' active' : ''), v === '' ? '전체' : v);
             b.type = 'button'; b.dataset.coreKey = key; b.dataset.coreValue = v;
             row.appendChild(b);
@@ -1067,20 +1179,238 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         g.appendChild(row);
         return g;
     }
-    function tile(label, value, sub) {
+    function tile(label, value, sub, meter) {
         const t = el('div', 'stat-tile');
         t.appendChild(el('div', 'stat-label', label));
         t.appendChild(el('div', 'stat-value', value));
+        if (meter != null) { const m = el('div', 'core-meter'); const f = el('span'); f.style.width = Math.max(0, Math.min(100, meter)) + '%'; m.appendChild(f); t.appendChild(m); }
         t.appendChild(el('div', 'stat-sub', sub));
         return t;
     }
+    function legend(items) {
+        const g = el('div', 'legend-grid core-chart-legend');
+        items.forEach(([name, role]) => {
+            const it = el('div', 'legend-item');
+            it.appendChild(el('span', 'legend-swatch ' + role));
+            it.appendChild(el('span', 'legend-label', name));
+            g.appendChild(it);
+        });
+        return g;
+    }
+    function card(title, note) {
+        const c = el('div', 'chart-card');
+        c.appendChild(el('h3', 'chart-title', title));
+        c.appendChild(el('p', 'chart-note', note || ''));
+        return c;
+    }
+    // 가로 누적 막대 한 줄. parts: [{name, n, role, text}] (text 없으면 건수), scale: 가장 긴 줄의 합
+    function stackRow(label, parts, scale, valueText, tipLines, cls) {
+        const row = el('div', 'zone-row core-row' + (cls ? ' ' + cls : ''));
+        row.tabIndex = 0;
+        row.dataset.coreTip = [label].concat(tipLines).join('|');
+        const lab = el('span', 'bar-row-label', label); lab.title = label;
+        row.appendChild(lab);
+        const track = el('div', 'zone-track');
+        parts.forEach(p => {
+            if (!p.n) return;
+            const seg = el('div', 'zone-seg ' + p.role);
+            const text = p.text === undefined ? int(p.n) : p.text;
+            if (text) seg.appendChild(el('span', 'zl' + Math.min(String(text).length, 5), text));
+            seg.style.width = (p.n / (scale || 1) * 100).toFixed(2) + '%';
+            track.appendChild(seg);
+        });
+        row.appendChild(track);
+        row.appendChild(el('span', 'bar-row-value', valueText));
+        return row;
+    }
+    // 세로 막대. items: [{label, value, role, sub, tip}]
+    function columns(items) {
+        const wrap = el('div', 'core-cols');
+        const max = Math.max(1, ...items.map(i => i.value));
+        items.forEach(i => {
+            const col = el('div', 'core-col');
+            col.tabIndex = 0;
+            col.dataset.coreTip = i.tip;
+            col.appendChild(el('span', 'core-col-val', i.value ? int(i.value) : ''));
+            const bar = el('div', 'core-col-bar ' + i.role);
+            bar.style.height = (i.value / max * 118).toFixed(1) + 'px';
+            col.appendChild(bar);
+            const lab = el('span', 'core-col-label', i.label);
+            if (i.sub) lab.appendChild(el('span', 'core-col-sub', i.sub));
+            col.appendChild(lab);
+            wrap.appendChild(col);
+        });
+        return wrap;
+    }
+    const countBy = (rows, f) => { const m = new Map(); rows.forEach(r => { const k = f(r); m.set(k, (m.get(k) || 0) + 1); }); return m; };
+    const stateParts = rows => STATES.map(s => ({ name: s, n: rows.filter(r => r.활동상태 === s).length, role: STATE_ROLE[s] }));
+
+    // ---- 한 줄 요약 ----
+    function headline(rows) {
+        const n = rows.length, v = rows.filter(visited).length;
+        const un = rows.filter(r => !visited(r)), sign = rows.filter(r => r.해지징후 === 'Y');
+        const box = el('div', 'callout core-headline ' + (un.length || sign.length ? 'callout-warning' : 'callout-good'));
+        box.appendChild(el('div', 'core-headline-main', '코어고객 ' + int(n) + '곳 중 ' + int(v) + '곳(' + pct(v, n) + '%) ' + (period ? period + ' ' : '') + '방문 완료 · 미방문 ' + un.length + '곳 · 해지징후 ' + sign.length + '곳'));
+        const notes = [];
+        if (un.length) {
+            const by = Array.from(countBy(un, r => r.지사)).sort((a, b) => b[1] - a[1]);
+            notes.push('미방문이 많은 지사: ' + by.slice(0, 3).map(([b, c]) => b + ' ' + c + '곳').join(', '));
+        }
+        const soon = rows.filter(r => { const d = daysTo(r.계약종료일); return d != null && d <= 90; });
+        if (soon.length) notes.push('계약종료 3개월 이내(지남 포함) ' + soon.length + '곳 · 월정료 ' + won(soon.reduce((s, r) => s + (r.월정료 || 0), 0)));
+        const pend = rows.reduce((s, r) => s + pendingVoc(r).length, 0);
+        if (pend) notes.push('미처리 VOC ' + pend + '건');
+        if (!notes.length) notes.push('미방문·계약종료 임박·미처리 VOC가 없습니다.');
+        notes.forEach(t => box.appendChild(el('div', 'core-headline-sub', t)));
+        return box;
+    }
+
+    // ---- 우선 조치 대상 ----
+    function actionCard(title, tone, items, empty) {
+        const c = el('div', 'chart-card core-action is-' + tone);
+        const head = el('div', 'core-action-head');
+        head.appendChild(el('span', null, title));
+        head.appendChild(el('span', 'core-action-count', items.length + '곳'));
+        c.appendChild(head);
+        const list = el('div', 'core-action-list');
+        if (!items.length) list.appendChild(el('div', 'core-action-empty', empty));
+        items.forEach(it => {
+            const b = el('button', 'core-action-item');
+            b.type = 'button'; b.dataset.coreFocus = it.r._i;
+            b.appendChild(el('span', 'core-action-name', it.r.관리고객명 || '-'));
+            b.appendChild(el('span', 'core-action-tag', it.tag || ''));
+            b.appendChild(el('span', 'core-action-sub', it.r.지사 + ' · ' + owner(it.r) + (it.sub ? ' · ' + it.sub : '')));
+            list.appendChild(b);
+        });
+        c.appendChild(list);
+        return c;
+    }
+    function actions(rows) {
+        const g = el('div', 'core-action-grid');
+        const byEnd = (a, b) => (daysTo(a.계약종료일) == null ? 99999 : daysTo(a.계약종료일)) - (daysTo(b.계약종료일) == null ? 99999 : daysTo(b.계약종료일));
+        g.appendChild(actionCard('해지징후 고객', 'critical',
+            rows.filter(r => r.해지징후 === 'Y').map(r => ({ r, tag: won(r.월정료), sub: r.불만요구 || '' })), '해지징후로 표시된 고객이 없습니다.'));
+        g.appendChild(actionCard((period ? period + ' ' : '') + '미방문 고객', 'serious',
+            rows.filter(r => !visited(r)).sort(byEnd).map(r => ({ r, tag: r.계약종료일 ? '종료 ' + ddayText(daysTo(r.계약종료일)) : '', sub: r.방문일자 ? '이전 방문 ' + r.방문일자 : '방문 기록 없음' })),
+            '미방문 고객이 없습니다.'));
+        g.appendChild(actionCard('계약종료 3개월 이내', 'warning',
+            rows.filter(r => { const d = daysTo(r.계약종료일); return d != null && d <= 90; }).sort(byEnd)
+                .map(r => ({ r, tag: ddayText(daysTo(r.계약종료일)), sub: r.계약종료일 + ' · ' + won(r.월정료) + (r.수동재계약 ? ' · 수동재계약 ' + r.수동재계약 : '') })),
+            '3개월 안에 종료되는 계약이 없습니다.'));
+        g.appendChild(actionCard('VOC 미처리 (접수·미접수)', 'warning',
+            rows.filter(r => pendingVoc(r).length).map(r => ({ r, tag: pendingVoc(r).length + '건', sub: pendingVoc(r).map(v => (v.상태 || '') + ' ' + (v.유형 || '')).join(', ') })),
+            payload.rows.some(r => r.VOC && r.VOC.length) ? '미처리 VOC가 없습니다.' : 'VOC 매칭 파일(9-1)이 없습니다.'));
+        return g;
+    }
+
+    // ---- 차트 ----
+    function charts(rows) {
+        const g = el('div', 'chart-grid core-charts');
+        const P = period ? period + ' ' : '';
+
+        // 1) 지사별 방문 현황 (누르면 그 지사만)
+        const c1 = card('지사별 ' + P + '방문 현황', '막대 = 고객 수 · 오른쪽 = 방문 고객/전체 (방문율) · 줄을 누르면 그 지사만 봅니다');
+        c1.appendChild(legend(STATES.map(s => [s, STATE_ROLE[s]])));
+        const groups = branchList(rows).map(b => ({ b, rows: rows.filter(r => r.지사 === b) }));
+        const maxN = Math.max(1, ...groups.map(x => x.rows.length));
+        const l1 = el('div', 'zone-list');
+        groups.forEach(x => {
+            const parts = stateParts(x.rows), v = x.rows.filter(visited).length;
+            const row = stackRow(x.b, parts, maxN, v + '/' + x.rows.length + ' · ' + pct(v, x.rows.length) + '%',
+                parts.map(p => p.name + ' ' + p.n + '곳').concat(['방문율 ' + pct(v, x.rows.length) + '%']), state.지사 === x.b ? 'is-active' : '');
+            row.dataset.coreKey = '지사'; row.dataset.coreValue = x.b;
+            l1.appendChild(row);
+        });
+        c1.appendChild(l1);
+        g.appendChild(c1);
+
+        // 2) 월별 방문 추이 -- 방문 회차(이전/분기 1회/2회) 날짜를 모두 센다
+        const months = new Map();
+        rows.forEach(r => [r.방문일자, r['3Q방문일자'], r['2회방문일자']].forEach(d => { if (d && d.length >= 7) months.set(d.slice(0, 7), (months.get(d.slice(0, 7)) || 0) + 1); }));
+        const c2 = card('월별 방문 추이', '방문일자(이전·분기 1회·2회)를 월별로 센 건수 · 최근 12개월');
+        const keys = Array.from(months.keys()).sort();
+        if (keys.length) {
+            const span = [];
+            let [y, m] = keys[keys.length - 1].split('-').map(Number);
+            for (let i = 0; i < 12; i++) { span.unshift(y + '-' + String(m).padStart(2, '0')); m--; if (m === 0) { m = 12; y--; } }
+            const from = span.findIndex(k => months.has(k));
+            c2.appendChild(columns(span.slice(Math.max(0, from)).map(k => ({
+                label: k.slice(2, 4) + '.' + k.slice(5), value: months.get(k) || 0, role: 'role-s1', tip: k + '|방문 ' + (months.get(k) || 0) + '건' }))));
+        } else c2.appendChild(el('div', 'core-action-empty', '방문일자 기록이 없습니다.'));
+        g.appendChild(c2);
+
+        // 3) 계약종료 시기
+        const c3 = card('계약종료 시기', '오늘 기준 남은 기간별 고객 수 · 아래 금액 = 월정료 합계');
+        c3.appendChild(columns(END_BUCKETS.filter(([name]) => name !== '미상' || rows.some(r => endBucket(r) === '미상')).map(([name, role]) => {
+            const rs = rows.filter(r => endBucket(r) === name), fee = rs.reduce((s, r) => s + (r.월정료 || 0), 0);
+            return { label: name, value: rs.length, role, sub: rs.length ? won(fee) : '', tip: name + '|' + rs.length + '곳|월정료 ' + won(fee) + '|' + (period || '분기') + ' 미방문 ' + rs.filter(r => !visited(r)).length + '곳' };
+        })));
+        g.appendChild(c3);
+
+        // 4) 지사별 월정료 (재계약대상 / 그 외)
+        const c4 = card('지사별 월정료', '막대 = 월정료 합계 · 재계약대상 금액을 따로 표시');
+        c4.appendChild(legend([['재계약대상', 'role-s2'], ['그 외', 'role-s1']]));
+        const fees = groups.map(x => {
+            const total = x.rows.reduce((s, r) => s + (r.월정료 || 0), 0);
+            const re = Math.min(total, x.rows.reduce((s, r) => s + (r.재계약대상월정료 || 0), 0));
+            return { b: x.b, total, re };
+        });
+        const maxFee = Math.max(1, ...fees.map(f => f.total));
+        const l4 = el('div', 'zone-list');
+        fees.forEach(f => l4.appendChild(stackRow(f.b, [{ n: f.re, role: 'role-s2', text: '' }, { n: f.total - f.re, role: 'role-s1', text: '' }], maxFee, won(f.total),
+            ['월정료 ' + won(f.total), '재계약대상 ' + won(f.re) + ' (' + pct(f.re, f.total) + '%)'])));
+        c4.appendChild(l4);
+        g.appendChild(c4);
+
+        // 5) VOC 유형별 처리 현황
+        const c5 = card('VOC 유형별 처리 현황', '9-1 VOC매칭 · 건수가 많은 유형 순');
+        const vocs = rows.flatMap(r => r.VOC || []);
+        if (vocs.length) {
+            c5.appendChild(legend(VOC_STATES.map(s => [s, VOC_ROLE[s]])));
+            let kinds = Array.from(countBy(vocs, v => v.유형 || '유형 없음')).sort((a, b) => b[1] - a[1]);
+            const top = kinds.slice(0, 7).map(k => k[0]);
+            const label = v => top.includes(v.유형 || '유형 없음') ? (v.유형 || '유형 없음') : '기타';
+            const names = kinds.length > 7 ? top.concat(['기타']) : top;
+            const maxV = Math.max(1, ...names.map(nm => vocs.filter(v => label(v) === nm).length));
+            const l5 = el('div', 'zone-list');
+            names.forEach(nm => {
+                const vs = vocs.filter(v => label(v) === nm);
+                const parts = VOC_STATES.map(s => ({ name: s, n: vs.filter(v => v.상태 === s).length, role: VOC_ROLE[s] }));
+                const etc = vs.length - parts.reduce((s, p) => s + p.n, 0);
+                if (etc) parts.push({ name: '기타 상태', n: etc, role: 'role-muted' });
+                l5.appendChild(stackRow(nm, parts, maxV, vs.length + '건', parts.filter(p => p.n).map(p => p.name + ' ' + p.n + '건'), 'wide'));
+            });
+            c5.appendChild(l5);
+        } else c5.appendChild(el('div', 'core-action-empty', '매칭된 VOC가 없습니다 (9-1 파일을 함께 올리면 표시됩니다).'));
+        g.appendChild(c5);
+
+        // 6) 담당자별 방문 현황 -- 미방문·해지징후가 많은 순 (누르면 표에서 그 담당자만)
+        const c6 = card('담당자별 ' + P + '방문 현황', '미방문·해지징후가 많은 순 상위 10명 · 줄을 누르면 아래 표에서 그 담당자만 봅니다');
+        c6.appendChild(legend(STATES.map(s => [s, STATE_ROLE[s]])));
+        const owners = Array.from(new Set(rows.map(owner))).map(o => ({ o, rows: rows.filter(r => owner(r) === o) }))
+            .map(x => Object.assign(x, { bad: x.rows.filter(r => r.활동상태 !== '방문완료').length }))
+            .sort((a, b) => b.bad - a.bad || b.rows.length - a.rows.length || String(a.o).localeCompare(String(b.o))).slice(0, 10);
+        const maxO = Math.max(1, ...owners.map(x => x.rows.length));
+        const l6 = el('div', 'zone-list');
+        owners.forEach(x => {
+            const parts = stateParts(x.rows), v = x.rows.filter(visited).length;
+            const row = stackRow(x.o, parts, maxO, v + '/' + x.rows.length, [x.rows[0].지사].concat(parts.map(p => p.name + ' ' + p.n + '곳')), state.q === x.o ? 'is-active' : '');
+            row.dataset.coreQ = x.o;
+            l6.appendChild(row);
+        });
+        c6.appendChild(l6);
+        g.appendChild(c6);
+        return g;
+    }
+
+    // ---- 지도 ----
     function popupEl(r) {
         const box = el('div', 'core-pop');
         box.appendChild(el('div', 'core-pop-title', r.관리고객명 || '-'));
         const lines = [
-            r.지사 + ' · ' + r.관리주체 + (r.관리고객담당자 ? ' · 담당 ' + r.관리고객담당자 : ''),
-            '최근 방문: ' + (r['3Q방문일자'] || r.방문일자 || '없음') + (r.방문자 ? ' (' + r.방문자 + ')' : ''),
-            '해지징후: ' + (r.해지징후 || '-') + ' · 월정료 ' + won(r.월정료),
+            r.지사 + ' · ' + r.관리주체 + ' · 담당 ' + owner(r),
+            '상태: ' + r.활동상태 + ' · 최근 방문 ' + (lastVisit(r) || '없음'),
+            '월정료 ' + won(r.월정료) + (r.계약종료일 ? ' · 계약종료 ' + r.계약종료일 + ' (' + ddayText(daysTo(r.계약종료일)) + ')' : ''),
         ];
         if (r.VOC && r.VOC.length) lines.push('VOC ' + r.VOC.length + '건: ' + r.VOC.map(v => (v.상태 || '-') + ' ' + (v.유형 || '')).join(', '));
         lines.forEach(t => box.appendChild(el('div', 'core-pop-line', t)));
@@ -1090,13 +1420,27 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         if (link) { const a = el('a', 'pending-map-link', '🗺 카카오맵'); a.href = link; a.target = '_blank'; a.rel = 'noopener'; box.appendChild(a); }
         return box;
     }
+    function mapLegend() {
+        const box = document.getElementById('coreMapLegend');
+        if (!box) return;
+        box.textContent = '';
+        const dot = (name, v, ring) => {
+            const it = el('div', 'legend-item'); const sw = el('span', 'legend-swatch' + (ring ? ' core-sign-key' : ''));
+            if (!ring) { sw.style.background = cssVar(v); sw.style.borderRadius = '50%'; }
+            it.appendChild(sw); it.appendChild(el('span', 'legend-label', name)); box.appendChild(it);
+        };
+        if (state.color === '활동상태') STATES.forEach(s => dot(s, STATE_VAR[s]));
+        else { dot('본부장', '--s7'); dot('지사장', '--s1'); dot('해지징후 (빨간 테두리)', null, true); }
+        box.appendChild(el('span', 'legend-label core-size-note', '원 크기 = 월정료'));
+    }
     function drawMap(rows) {
         const holder = document.getElementById('coreMap');
         if (!holder) return;
+        mapLegend();
         const pts = rows.filter(r => r.lat != null && r.lng != null);
         if (!payload.rows.some(r => r.lat != null)) {
             holder.className = 'core-map core-map-empty';
-            holder.textContent = '지도 좌표가 없습니다 -- GUI의 "카카오 REST 키" 칸에 키를 넣고 리포트를 다시 만들면 설치주소가 지도에 표시됩니다. (표의 🗺 링크로 카카오맵 바로가기)';
+            holder.textContent = '지도 좌표가 없습니다 -- 데스크톱 GUI의 "카카오 REST 키" 칸에 키를 넣고 리포트를 만들면 설치주소가 지도에 표시됩니다. (표에서 행을 열면 카카오맵 바로가기가 있습니다)';
             return;
         }
         loadLeaflet(() => {
@@ -1108,132 +1452,278 @@ document.addEventListener('DOMContentLoaded', initDashNav);
                     maxZoom: 19, attribution: 'Tiles &copy; Esri',
                 }).addTo(map);
                 layer = L.layerGroup().addTo(map);
+                map._coreFit = false;
                 // 잠금 화면 뒤(숨김, 크기 0)에서 그려지면 확대 수준이 틀어진다 -- 보이는 크기가 생기면 다시 맞춘다
                 if (window.ResizeObserver) {
-                    let wasHidden = !holder.offsetWidth;
+                    const m = map;
                     new ResizeObserver(() => {
-                        if (!holder.offsetWidth) { wasHidden = true; return; }
-                        map.invalidateSize();
-                        if (wasHidden && map._coreBounds) map.fitBounds(map._coreBounds, { padding: [24, 24], maxZoom: 14 });
-                        wasHidden = false;
+                        if (!holder.offsetWidth || map !== m) return;
+                        m.invalidateSize();
+                        if (!m._coreFit && m._coreBounds) { m.fitBounds(m._coreBounds, { padding: [24, 24], maxZoom: 14 }); m._coreFit = true; }
                     }).observe(holder);
                 }
             }
             layer.clearLayers(); markers.clear();
-            const color = { 본부장: cssVar('--s7') || '#4a3aa7', 지사장: cssVar('--s1') || '#2a78d6' };
+            const owners = { 본부장: cssVar('--s7') || '#4a3aa7', 지사장: cssVar('--s1') || '#2a78d6' };
             const ring = cssVar('--surface-1') || '#fff', danger = cssVar('--critical') || '#d03b3b';
+            const maxFee = Math.max(1, ...pts.map(r => r.월정료 || 0));
             pts.forEach(r => {
-                const sign = r.해지징후 === 'Y';
+                const sign = r.해지징후 === 'Y', byState = state.color === '활동상태';
+                const fill = byState ? (cssVar(STATE_VAR[r.활동상태]) || '#888') : (owners[r.관리주체] || cssVar('--baseline') || '#888');
                 const m = L.circleMarker([r.lat, r.lng], {
-                    radius: sign ? 9 : 7, weight: sign ? 3 : 2, color: sign ? danger : ring,
-                    fillColor: color[r.관리주체] || cssVar('--baseline') || '#888', fillOpacity: 0.9,
+                    radius: 6 + 7 * Math.sqrt((r.월정료 || 0) / maxFee), weight: !byState && sign ? 3 : 2, color: !byState && sign ? danger : ring,
+                    fillColor: fill, fillOpacity: 0.88,
                 }).bindPopup(popupEl(r), { maxWidth: 320 });
-                m.bindTooltip(r.관리고객명 || '', { direction: 'top', offset: [0, -6] });
-                m.on('click', () => highlightRow(r.계약번호));
+                m.bindTooltip((r.관리고객명 || '') + ' · ' + r.활동상태, { direction: 'top', offset: [0, -6] });
+                m.on('click', () => openRow(r._i, 'map'));
                 m.addTo(layer);
-                markers.set(r.계약번호, m);
+                markers.set(r._i, m);
             });
             map._coreBounds = pts.length ? L.latLngBounds(pts.map(r => [r.lat, r.lng])) : null;
-            if (map._coreBounds && holder.offsetWidth) map.fitBounds(map._coreBounds, { padding: [24, 24], maxZoom: 14 });
-            else if (!holder.offsetWidth) map.setView([37.6, 127.2], 8);
-            setTimeout(() => map.invalidateSize(), 50);
+            if (!map._coreFit) {
+                if (map._coreBounds && holder.offsetWidth) { map.invalidateSize(); map.fitBounds(map._coreBounds, { padding: [24, 24], maxZoom: 14 }); map._coreFit = true; }
+                else map.setView([37.6, 127.2], 8);
+            }
+            setTimeout(() => { if (map) map.invalidateSize(); }, 50);
         });
     }
-    function highlightRow(key) {
-        document.querySelectorAll('#coreTable tr.core-active').forEach(tr => tr.classList.remove('core-active'));
-        const tr = document.querySelector('#coreTable tr[data-core-key="' + key + '"]');
-        if (tr) { tr.classList.add('core-active'); tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+
+    // ---- 활동내역 표 ----
+    const COLS = [
+        ['지사', r => BRANCHES.indexOf(r.지사) < 0 ? 99 : BRANCHES.indexOf(r.지사)], ['관리주체', r => r.관리주체], ['관리고객 명', r => r.관리고객명 || ''],
+        ['담당', r => owner(r)], ['상태', r => STATES.indexOf(r.활동상태)], ['최근 방문', r => lastVisit(r) || ''],
+        ['계약종료', r => r.계약종료일 || '9999'], ['월정료', r => r.월정료 || 0], ['VOC', r => (r.VOC || []).length], ['최근 메모 (불만·요구·영업기회)', null],
+    ];
+    function tableRows() {
+        const q = state.q.trim().toLowerCase();
+        let rows = visible();
+        if (q) rows = rows.filter(r => [r.관리고객명, r.관리고객담당자, r.영업구역담당, r.영업자, r.설치주소, r.불만요구, r.요약정리, r.계약번호, r.지사].join(' ').toLowerCase().includes(q));
+        if (state.sort != null && COLS[state.sort][1]) {
+            const f = COLS[state.sort][1];
+            rows = rows.slice().sort((a, b) => { const x = f(a), y = f(b); return (x < y ? -1 : x > y ? 1 : 0) * state.dir; });
+        }
+        return rows;
     }
-    function table(rows) {
-        const wrap = el('div', 'table-scroll core-table-scroll');
-        const t = el('table'); t.id = 'coreTable';
-        const head = el('tr');
-        ['지사', '관리주체', '관리고객 명', '담당', '최근 방문', '방문대상 / 방문자', '해지징후', '불만·요구·추가영업기회', 'VOC', '월정료', '지도']
-            .forEach(h => head.appendChild(el('th', null, h)));
-        const thead = el('thead'); thead.appendChild(head); t.appendChild(thead);
-        const tb = el('tbody');
+    function kv(dl, k, v) { if (v === null || v === undefined || v === '') return; dl.appendChild(el('dt', null, k)); dl.appendChild(el('dd', null, v)); }
+    function detailEl(r) {
+        const grid = el('div', 'core-detail-grid');
+        const a = el('div');
+        a.appendChild(el('div', 'core-detail-title', '방문 이력'));
+        const hist = r.방문이력 || [];
+        if (!hist.length) a.appendChild(el('div', 'core-action-empty', '방문 기록이 없습니다.'));
+        hist.forEach(h => {
+            const item = el('div', 'core-hist');
+            item.appendChild(el('div', 'core-hist-head', [h.회차, h.일자 || '날짜 미기재', h.징후 ? '해지징후 ' + h.징후 : null, [h.대상, h.방문자].filter(Boolean).join(' / ') || null].filter(Boolean).join(' · ')));
+            if (h.내용) item.appendChild(el('div', 'core-hist-body', h.내용));
+            a.appendChild(item);
+        });
+        grid.appendChild(a);
+        const b = el('div');
+        b.appendChild(el('div', 'core-detail-title', 'VOC ' + (r.VOC || []).length + '건'));
+        if (!(r.VOC || []).length) b.appendChild(el('div', 'core-action-empty', '매칭된 VOC가 없습니다.'));
+        (r.VOC || []).forEach(v => {
+            const item = el('div', 'core-hist');
+            item.appendChild(el('div', 'core-hist-head', [v.상태, v.유형, v.접수일, v.처리자].filter(Boolean).join(' · ')));
+            if (v.처리내용) item.appendChild(el('div', 'core-hist-body', v.처리내용));
+            b.appendChild(item);
+        });
+        grid.appendChild(b);
+        const c = el('div');
+        c.appendChild(el('div', 'core-detail-title', '계약 정보'));
+        const dl = el('dl', 'core-kv');
+        kv(dl, '계약번호', r.계약번호);
+        kv(dl, '계약종료일', r.계약종료일 ? r.계약종료일 + ' (' + ddayText(daysTo(r.계약종료일)) + ')' : null);
+        kv(dl, '수동재계약', r.수동재계약);
+        kv(dl, '시설 · 월정료', (r.시설수 != null ? int(r.시설수) + '개 · ' : '') + won(r.월정료));
+        if (r.재계약대상월정료) kv(dl, '재계약대상', (r.재계약대상시설수 != null ? int(r.재계약대상시설수) + '개 · ' : '') + won(r.재계약대상월정료));
+        if (r.약정여부) kv(dl, '약정', r.약정여부 + (r.약정시설수 ? ' · ' + int(r.약정시설수) + '개 · ' + won(r.약정월정료) : ''));
+        if (r.해지건수) kv(dl, '해지', int(r.해지건수) + '건 · ' + won(r.해지월정료) + (r.해지일자 ? ' · ' + r.해지일자 : ''));
+        if (r.업셀링) kv(dl, '업셀링', r.업셀링 + (r.업셀링금액 ? ' · ' + won(r.업셀링금액) : ''));
+        kv(dl, '영업자', r.영업자);
+        kv(dl, '영업구역', [r.영업구역, r.영업구역담당].filter(Boolean).join(' · '));
+        kv(dl, '요약정리', r.요약정리);
+        kv(dl, '설치주소', r.설치주소);
+        c.appendChild(dl);
+        const link = kakaoLink(r.설치주소);
+        if (link) { const m = el('a', 'pending-map-link', '🗺 카카오맵에서 보기'); m.href = link; m.target = '_blank'; m.rel = 'noopener'; c.appendChild(m); }
+        grid.appendChild(c);
+        return grid;
+    }
+    function fillTable() {
+        const t = document.getElementById('coreTable');
+        if (!t) return;
+        const rows = tableRows();
+        const head = t.querySelector('thead tr');
+        head.textContent = '';
+        COLS.forEach(([name, f], i) => {
+            const th = el('th', null, name + (state.sort === i ? (state.dir > 0 ? ' ▲' : ' ▼') : ''));
+            if (f) { th.dataset.coreSort = i; th.title = '눌러서 정렬'; }
+            head.appendChild(th);
+        });
+        const tb = t.querySelector('tbody');
+        tb.textContent = '';
         rows.forEach(r => {
-            const tr = el('tr'); tr.dataset.coreKey = r.계약번호 || '';
+            const tr = el('tr'); tr.dataset.coreRow = r._i;
             if (r.해지징후 === 'Y') tr.className = 'core-sign';
-            const cells = [r.지사, r.관리주체, r.관리고객명, r.관리고객담당자 || r.영업구역담당,
-                (r['3Q방문일자'] || r.방문일자 || '미방문'), [r.방문대상, r.방문자].filter(Boolean).join(' / '),
-                r.해지징후 === 'Y' ? '▲ Y' : (r.해지징후 || '-'), r.불만요구 || '',
-                r.VOC && r.VOC.length ? r.VOC.map(v => (v.상태 || '-') + (v.유형 ? ' · ' + v.유형 : '')).join(' / ') : '', won(r.월정료)];
-            cells.forEach((c, i) => {
-                const td = el('td', i === 7 ? 'core-note' : (i === 9 ? 'cell-num' : null), c || '-');
-                if (i === 4 && !(r['3Q방문일자'] || r.방문일자)) td.classList.add('core-novisit');
-                if (i === 6 && r.해지징후 === 'Y') td.classList.add('core-sign-cell');
-                tr.appendChild(td);
-            });
-            const mapTd = el('td');
-            const link = kakaoLink(r.설치주소);
-            if (link) { const a = el('a', 'pending-map-link', '🗺'); a.href = link; a.target = '_blank'; a.rel = 'noopener'; a.title = r.설치주소; mapTd.appendChild(a); }
-            tr.appendChild(mapTd);
-            tr.addEventListener('click', e => {
-                if (e.target.closest('a')) return;
-                highlightRow(r.계약번호);
-                const m = markers.get(r.계약번호);
-                if (m && map) { map.setView(m.getLatLng(), Math.max(map.getZoom(), 15)); m.openPopup(); document.getElementById('coreMap').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
-            });
+            if (state.open === r._i) tr.classList.add('core-active');
+            [r.지사, r.관리주체, r.관리고객명 || '-', owner(r)].forEach(c => tr.appendChild(el('td', null, c)));
+            const st = el('td'); st.appendChild(el('span', 'core-state s-' + r.활동상태, r.활동상태)); tr.appendChild(st);
+            tr.appendChild(el('td', lastVisit(r) ? null : 'core-novisit', lastVisit(r) || '기록 없음'));
+            const end = el('td', null, r.계약종료일 || '-');
+            const dd = daysTo(r.계약종료일);
+            if (dd != null && dd <= 365) end.appendChild(el('span', 'core-dday' + (dd <= 90 ? ' soon' : ''), ddayText(dd)));
+            tr.appendChild(end);
+            tr.appendChild(el('td', 'cell-num', won(r.월정료)));
+            const pend = pendingVoc(r).length;
+            tr.appendChild(el('td', null, (r.VOC || []).length ? r.VOC.length + '건' + (pend ? ' (미처리 ' + pend + ')' : '') : '-'));
+            tr.appendChild(el('td', 'core-note', r.불만요구 || '-'));
             tb.appendChild(tr);
+            if (state.open === r._i) {
+                const dr = el('tr', 'core-detail'); const td = el('td'); td.colSpan = COLS.length;
+                td.appendChild(detailEl(r)); dr.appendChild(td); tb.appendChild(dr);
+            }
         });
-        t.appendChild(tb); wrap.appendChild(t);
-        return wrap;
+        if (!rows.length) { const tr = el('tr', 'core-detail'); const td = el('td', null, '조건에 맞는 고객이 없습니다.'); td.colSpan = COLS.length; tr.appendChild(td); tb.appendChild(tr); }
+        const cnt = document.getElementById('coreTableCount');
+        if (cnt) cnt.textContent = rows.length.toLocaleString('ko-KR') + ' / ' + payload.rows.length.toLocaleString('ko-KR') + '곳';
     }
+    // 행 열기 -- src: 'table'(표에서 누름: 다시 누르면 접힘) / 'list'(우선 조치 대상: 표로 이동) / 'map'(지도 마커: 화면은 그대로, 표 안에서만 이동)
+    function openRow(i, src) {
+        const r = payload.rows.find(x => x._i === i);
+        if (!r) return;
+        state.open = (src === 'table' && state.open === i) ? null : i;
+        if (!tableRows().includes(r)) {
+            state.q = '';
+            if (!visible().includes(r)) { state.관리주체 = ''; state.지사 = ''; state.활동상태 = ''; render(); }
+            else { const s = document.getElementById('coreSearch'); if (s) s.value = ''; fillTable(); }
+        } else fillTable();
+        const tr = document.querySelector('#coreTable tr[data-core-row="' + i + '"]');
+        if (tr && src === 'list') tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        if (tr && src === 'map') { const box = tr.closest('.table-scroll'); if (box) box.scrollTop = Math.max(0, tr.offsetTop - 44); }
+        const m = markers.get(i);
+        if (m && map && src !== 'map' && state.open === i) { map.setView(m.getLatLng(), Math.max(map.getZoom(), 13)); m.openPopup(); }
+    }
+    function downloadCsv() {
+        const head = ['지사', '관리주체', '관리고객명', '계약번호', '담당', '활동상태', '최근방문', '해지징후', '계약종료일', '월정료', '재계약대상월정료', 'VOC건수', '미처리VOC', '최근메모', '설치주소'];
+        const q = v => '"' + String(v === null || v === undefined ? '' : v).split('"').join('""') + '"';
+        const lines = [head.map(q).join(',')].concat(tableRows().map(r => [r.지사, r.관리주체, r.관리고객명, r.계약번호, owner(r), r.활동상태, lastVisit(r), r.해지징후, r.계약종료일,
+            r.월정료, r.재계약대상월정료, (r.VOC || []).length, pendingVoc(r).length, r.불만요구, r.설치주소].map(q).join(',')));
+        const blob = new Blob([String.fromCharCode(0xFEFF) + lines.join(String.fromCharCode(13, 10))], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '코어고객_활동내역.csv'; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    }
+
     function render() {
         const wrap = document.getElementById('coreSectionWrap');
         if (!wrap || !payload) return;
-        const rows = visible();
+        const rows = visible(), all = payload.rows;
         map = null;  // 지도 컨테이너를 새로 만드므로 지도도 새로
-        wrap.innerHTML = '';
-        const all = payload.rows;
-        const branches = BRANCHES.filter(b => all.some(r => r.지사 === b)).concat(Array.from(new Set(all.map(r => r.지사))).filter(b => !BRANCHES.includes(b)));
+        wrap.textContent = '';
         const bar = el('div', 'global-filter-bar core-filter-bar');
         bar.appendChild(pills('관리주체', '관리주체', Array.from(new Set(all.map(r => r.관리주체))).sort()));
-        bar.appendChild(pills('지사', '지사', branches));
+        bar.appendChild(pills('지사', '지사', branchList(all)));
         bar.appendChild(pills('활동', '활동상태', STATES.filter(s => all.some(r => r.활동상태 === s))));
         bar.appendChild(el('span', 'filter-summary', rows.length.toLocaleString('ko-KR') + ' / ' + all.length.toLocaleString('ko-KR') + '곳'));
         wrap.appendChild(bar);
+        wrap.appendChild(headline(rows));
 
-        const sum = (k) => rows.reduce((n, r) => n + (r[k] || 0), 0);
+        const sum = k => rows.reduce((n, r) => n + (r[k] || 0), 0);
         const vocs = rows.flatMap(r => r.VOC || []);
+        const v = rows.filter(visited).length;
+        const soon = rows.filter(r => { const d = daysTo(r.계약종료일); return d != null && d <= 90; });
         const grid = el('div', 'stat-grid');
-        grid.appendChild(tile('코어고객', rows.length.toLocaleString('ko-KR') + '곳', '본부장 ' + rows.filter(r => r.관리주체 === '본부장').length + ' · 지사장 ' + rows.filter(r => r.관리주체 === '지사장').length));
-        grid.appendChild(tile('3분기 방문 완료', rows.filter(r => r['3Q방문일자']).length + '곳', '미방문 ' + rows.filter(r => r.활동상태 === '미방문').length + '곳'));
-        grid.appendChild(tile('해지징후', rows.filter(r => r.해지징후 === 'Y').length + '곳', '불만·요구 기록 ' + rows.filter(r => r.불만요구).length + '곳'));
-        grid.appendChild(tile('월정료 합계', won(sum('월정료')), '재계약대상 ' + won(sum('재계약대상월정료'))));
-        grid.appendChild(tile('VOC (매칭)', vocs.length + '건', '처리완료 ' + vocs.filter(v => v.상태 === '처리완료').length + ' · 접수 ' + vocs.filter(v => v.상태 === '접수').length + ' · 미접수 ' + vocs.filter(v => v.상태 === '미접수').length));
+        grid.appendChild(tile('코어고객', int(rows.length) + '곳', '본부장 ' + rows.filter(r => r.관리주체 === '본부장').length + ' · 지사장 ' + rows.filter(r => r.관리주체 === '지사장').length + ' · 시설 ' + int(sum('시설수')) + '개'));
+        grid.appendChild(tile((period ? period + ' ' : '') + '방문율', pct(v, rows.length) + '%', '방문 ' + v + '곳 · 미방문 ' + (rows.length - v) + '곳', pct(v, rows.length)));
+        grid.appendChild(tile('해지징후', rows.filter(r => r.해지징후 === 'Y').length + '곳', '불만·요구 메모 ' + rows.filter(r => r.불만요구).length + '곳'));
+        grid.appendChild(tile('월정료 합계', won(sum('월정료')), '재계약대상 ' + won(sum('재계약대상월정료')) + ' (' + pct(sum('재계약대상월정료'), sum('월정료')) + '%)'));
+        grid.appendChild(tile('계약종료 3개월 이내', soon.length + '곳', '월정료 ' + won(soon.reduce((s, r) => s + (r.월정료 || 0), 0))));
+        grid.appendChild(tile('VOC (매칭)', vocs.length + '건', VOC_STATES.map(s => s + ' ' + vocs.filter(x => x.상태 === s).length).join(' · ')));
         wrap.appendChild(grid);
 
+        const t1 = el('h3', 'core-block-title', '우선 조치 대상'); t1.appendChild(el('small', null, '고객을 누르면 아래 표에서 방문 이력·VOC·계약 정보를 펼칩니다'));
+        wrap.appendChild(t1);
+        wrap.appendChild(actions(rows));
+        const t2 = el('h3', 'core-block-title', '현황 분석'); t2.appendChild(el('small', null, '막대에 마우스를 올리면 자세한 수치가 보입니다'));
+        wrap.appendChild(t2);
+        wrap.appendChild(charts(rows));
+
+        const t3 = el('h3', 'core-block-title', '설치주소 지도');
+        wrap.appendChild(t3);
         const cs = payload.coord_stats || {};
-        const legend = el('div', 'legend-grid core-legend');
-        [['본부장', '--s7'], ['지사장', '--s1']].forEach(([n, v]) => {
-            const it = el('div', 'legend-item'); const sw = el('span', 'legend-swatch'); sw.style.background = cssVar(v); sw.style.borderRadius = '50%';
-            it.appendChild(sw); it.appendChild(el('span', 'legend-label', n)); legend.appendChild(it);
-        });
-        const it = el('div', 'legend-item'); const sw = el('span', 'legend-swatch core-sign-key'); it.appendChild(sw); it.appendChild(el('span', 'legend-label', '해지징후 (빨간 테두리)')); legend.appendChild(it);
-        legend.appendChild(el('span', 'legend-value core-coord-note', '지도 표시 ' + all.filter(r => r.lat != null).length + '/' + all.length + '곳'
+        const mh = el('div', 'core-map-head');
+        mh.appendChild(pills('색상 기준', 'color', ['활동상태', '관리주체'], true));
+        const lg = el('div', 'legend-grid core-legend'); lg.id = 'coreMapLegend'; mh.appendChild(lg);
+        mh.appendChild(el('span', 'core-coord-note', '지도 표시 ' + rows.filter(r => r.lat != null).length + '/' + rows.length + '곳'
             + (cs.동단위 ? ' · 동 단위 위치 ' + cs.동단위 + '곳' : '')
             + (cs.없음 ? ' · 좌표 없음 ' + cs.없음 + '곳' + (payload.coord_note ? ' (' + payload.coord_note + ')'
-                : payload.kakao_error ? ' (카카오 오류: ' + payload.kakao_error + ')' : (payload.kakao_key_set === false ? ' (카카오 키 미설정)' : '')) : '')));
-        wrap.appendChild(legend);
+                : payload.kakao_error ? ' (' + payload.kakao_error + ')' : (payload.kakao_key_set === false ? ' (카카오 키 미설정)' : '')) : '')));
+        wrap.appendChild(mh);
         const mapBox = el('div', 'core-map'); mapBox.id = 'coreMap';
         wrap.appendChild(mapBox);
-        wrap.appendChild(el('p', 'section-desc', '활동내역 -- 행을 누르면 지도에서 위치를 보여줍니다 · ▲ 해지징후 · 회색 날짜 = 방문 기록 없음'));
-        wrap.appendChild(table(rows));
+
+        const t4 = el('h3', 'core-block-title', '활동내역'); t4.appendChild(el('small', null, '행을 누르면 방문 이력·VOC·계약 정보가 펼쳐집니다 (지도에도 표시) · 제목을 누르면 정렬'));
+        wrap.appendChild(t4);
+        const tools = el('div', 'core-toolbar');
+        const search = el('input', 'filter-input'); search.type = 'search'; search.id = 'coreSearch'; search.placeholder = '고객명 · 담당자 · 주소 · 메모 검색'; search.value = state.q;
+        search.setAttribute('aria-label', '코어고객 검색');
+        tools.appendChild(search);
+        const cnt = el('span', 'row-count'); cnt.id = 'coreTableCount'; tools.appendChild(cnt);
+        const csv = el('button', 'filter-pill', '📥 엑셀(CSV) 저장'); csv.type = 'button'; csv.id = 'coreCsvBtn'; tools.appendChild(csv);
+        wrap.appendChild(tools);
+        const scroll = el('div', 'table-scroll core-table-scroll');
+        const t = el('table'); t.id = 'coreTable';
+        const thead = el('thead'); thead.appendChild(el('tr')); t.appendChild(thead); t.appendChild(el('tbody'));
+        scroll.appendChild(t); wrap.appendChild(scroll);
+        wrap.appendChild(el('p', 'section-desc core-foot', '기준 -- 방문완료: ' + (period ? period + ' 안에' : '') + ' 방문일자가 있는 고객 · 해지징후: 방문 기록 중 한 번이라도 Y · 계약종료 D-day: 이 리포트를 여는 날 기준'));
+        fillTable();
         drawMap(rows);
     }
+
     document.addEventListener('click', (e) => {
+        if (!payload || !e.target.closest) return;
+        if (e.target.closest('#coreCsvBtn')) { downloadCsv(); return; }
+        const focus = e.target.closest('[data-core-focus]');
+        if (focus) { openRow(Number(focus.dataset.coreFocus), 'list'); return; }
+        const sort = e.target.closest('#coreTable th[data-core-sort]');
+        if (sort) { const i = Number(sort.dataset.coreSort); state.dir = state.sort === i ? -state.dir : 1; state.sort = i; fillTable(); return; }
+        const tr = e.target.closest('#coreTable tr[data-core-row]');
+        if (tr && !e.target.closest('a')) { openRow(Number(tr.dataset.coreRow), 'table'); return; }
+        const qrow = e.target.closest('[data-core-q]');
+        if (qrow) {
+            state.q = state.q === qrow.dataset.coreQ ? '' : qrow.dataset.coreQ;
+            const s = document.getElementById('coreSearch'); if (s) { s.value = state.q; s.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+            document.querySelectorAll('[data-core-q]').forEach(x => x.classList.toggle('is-active', x.dataset.coreQ === state.q));
+            fillTable(); return;
+        }
         const b = e.target.closest('[data-core-key][data-core-value]');
         if (!b) return;
-        state[b.dataset.coreKey] = b.dataset.coreValue;
-        map = null;
+        const k = b.dataset.coreKey, v = b.dataset.coreValue;
+        if (k === 'color') {
+            state.color = v;
+            b.parentElement.querySelectorAll('.filter-pill').forEach(x => x.classList.toggle('active', x === b));
+            drawMap(visible()); return;
+        }
+        state[k] = (state[k] === v) ? '' : v;  // 같은 것을 다시 누르면 해제
+        state.open = null;
         render();
     });
+    document.addEventListener('input', (e) => {
+        if (e.target && e.target.id === 'coreSearch') { state.q = e.target.value; fillTable(); }
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' || !e.target.closest) return;
+        const row = e.target.closest('.core-row[data-core-key], .core-row[data-core-q]');
+        if (row) row.click();
+    });
+    // 테마를 바꾸면 지도 마커 색도 다시 (막대는 CSS 변수라 자동)
+    new MutationObserver(() => { if (payload && map) drawMap(visible()); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
     // GUI 리포트는 내장 JSON(#coreData)으로, 웹 업로드는 window.DataIntelCore(payload)로 들어온다
     window.DataIntelCore = function (p) {
         payload = p && p.rows && p.rows.length ? p : null;
-        state = { 관리주체: '', 지사: '', 활동상태: '' };
+        if (payload) payload.rows.forEach((r, i) => { r._i = i; });
+        period = payload && payload.period ? payload.period : '';
+        state = fresh();
         map = null;
         const sec = document.getElementById('secCore');
         const link = document.querySelector('#dashNav a[data-sec="secCore"]');
@@ -4207,11 +4697,16 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         if (el) { el.textContent = text; el.className = 'web-slot-status' + (cls ? ' ' + cls : ''); }
     };
 
+    // 총괄DB가 있으면 종합 대시보드, 없이 9. 코어고객만 올리면 코어고객 현황만 만든다
+    const canRun = () => picked.db ? !missingRequired('db').length : !!picked.core;
     const refreshRun = (keepMessage) => {
         const dbMissing = picked.db ? missingRequired('db') : [];
-        runBtn.disabled = !picked.db || dbMissing.length > 0;
+        const coreOnly = !picked.db && !!picked.core;
+        runBtn.disabled = !canRun();
+        runBtn.textContent = coreOnly ? '💎 코어고객 현황 만들기' : '📊 대시보드 만들기';
         if (keepMessage) return;  // 실행 결과(완료/실패) 문구는 그대로 둔다
-        progress.textContent = !picked.db ? '1. 총괄관리DB는 필수입니다.'
+        progress.textContent = coreOnly ? '준비 완료 -- 총괄DB 없이 코어고객 현황만 만듭니다.'
+            : !picked.db ? '1. 총괄관리DB(종합 대시보드) 또는 9. 코어고객(코어고객 현황만)을 선택하세요.'
             : dbMissing.length ? '총괄관리DB의 필수 컬럼을 지정하세요: ' + dbMissing.join(', ')
             : '준비 완료 -- 대시보드 만들기를 누르세요.';
     };
@@ -4552,7 +5047,7 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         btn.disabled = true;
         try {
             for (const key of Object.keys(handles)) await readHandle(key);
-            if (picked.db && !missingRequired('db').length) runBtn.click();
+            if (canRun()) runBtn.click();
         } finally { btn.disabled = false; }
     });
 
@@ -4617,7 +5112,12 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         방문일자: ['방문일자'], '3Q방문일자': ['1회 방문일자'], '2회방문일자': ['2회 방문일자'], 방문대상: ['방문대상'], 방문자: ['방문자'],
         해지징후: ['해지징후'], 불만요구: ['불만사항/요구사항/추가영업기회'], 요약정리: ['요약정리'], 약정여부: ['약정여부'],
         해지건수: ['해지건수'], 해지월정료: ['해지월정료'],
+        '3Q징후': ['해지징후 및 불만 여부'], '2회징후': ['해지징후 및 불만 여부.1'],
+        '3Q불만': ['불만사항/요구사항/추가영업기회 (구체적으로 작성)'], '2회불만': ['불만사항/요구사항/추가영업기회 (구체적으로 작성).1'],
+        약정시설수: ['약정시설수'], 약정월정료: ['약정월정료'], 해지일자: ['해지일자'], 수동재계약: ['수동재계약'],
+        만기비중: ['만기도래 비중 금액', '만기도래 비중'], 업셀링: ['업셀링('], 업셀링금액: ['업셀링 금액'],
     };
+    const CORE_EXACT = ['3Q징후', '2회징후', '3Q불만', '2회불만'];  // 비슷한 이름의 다른 열로 번지지 않게 정확히 같은 이름만
     const BRANCH_ORDER_WEB = ['중앙', '강북', '서대문', '고양', '의정부', '남양주', '강릉', '원주'];
     function coreCol(columns, names) {
         return columns.find(c => names.includes(c)) || columns.find(c => names.some(n => c.startsWith(n))) || null;
@@ -4639,7 +5139,12 @@ document.addEventListener('DOMContentLoaded', initDashNav);
     function buildCorePayload(core, voc) {
         if (!core || !core.rows.length) return null;
         const col = {};
-        Object.keys(CORE_FIELDS).forEach(k => { col[k] = coreCol(core.columns, CORE_FIELDS[k]); });
+        Object.keys(CORE_FIELDS).forEach(k => {
+            col[k] = CORE_EXACT.includes(k) ? (core.columns.find(c => CORE_FIELDS[k].includes(c)) || null) : coreCol(core.columns, CORE_FIELDS[k]);
+        });
+        // '1회 방문일자_3Q 내' -> '3Q' (화면 문구용). 분기 방문 열이 없으면 방문일자 하나로만 본다.
+        const qm = /(\d)\s*Q/.exec(col['3Q방문일자'] || '');
+        const period = qm ? qm[1] + 'Q' : (col['3Q방문일자'] ? '분기' : null);
         if (!col.관리고객명 && !col.계약번호) return null;
         const coordCol = coreCol(core.columns, ['위치좌표(위도,경도)', '위치좌표', '좌표']);
         const latCol = coreCol(core.columns, ['위도', 'lat', 'LAT']), lngCol = coreCol(core.columns, ['경도', 'lng', 'LNG', 'lon']);
@@ -4659,8 +5164,20 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         }
         const rows = core.rows.map(r => {
             const g = k => col[k] ? cv(r[idx(col[k])]) : null;
-            const visit3q = coreDate(g('3Q방문일자')), visit = coreDate(g('방문일자'));
-            const sign = String(g('해지징후') || '').toUpperCase();
+            const visit3q = coreDate(g('3Q방문일자')), visit = coreDate(g('방문일자')), visit2 = coreDate(g('2회방문일자'));
+            const yn = k => { const v = String(g(k) || '').trim().toUpperCase(); return v === 'Y' || v === 'N' ? v : null; };
+            const note = k => { const v = g(k); return v === null ? null : String(v); };
+            // 방문 회차별 기록 (이전 -> 분기 1회 -> 분기 2회)
+            const history = [
+                { 회차: period ? '이전' : '방문', 일자: visit, 징후: yn('해지징후'), 내용: note('불만요구'), 대상: g('방문대상'), 방문자: g('방문자') },
+                { 회차: (period || '') + ' 1회', 일자: visit3q, 징후: yn('3Q징후'), 내용: note('3Q불만') },
+                { 회차: (period || '') + ' 2회', 일자: visit2, 징후: yn('2회징후'), 내용: note('2회불만') },
+            ].filter(h => h.일자 || h.내용 || h.징후);
+            const signs = history.map(h => h.징후);
+            const sign = signs.includes('Y') ? 'Y' : (signs.includes('N') ? 'N' : null);
+            const notes = history.map(h => h.내용).filter(Boolean);
+            const inPeriod = period ? (visit3q || visit2) : visit;
+            const dates = [visit, visit3q, visit2].filter(Boolean).sort();
             const contract = coreContract(g('계약번호'));
             let lat = null, lng = null, src = null;
             if (coordCol) { const v = cv(r[idx(coordCol)]); if (typeof v === 'string' && v.includes(',')) { const [a, b] = v.split(',').map(Number); if (a && b) { lat = a; lng = b; src = '파일'; } } }
@@ -4670,17 +5187,22 @@ document.addEventListener('DOMContentLoaded', initDashNav);
                 설치주소: g('설치주소'), 영업구역: g('영업구역'), 영업구역담당: g('영업구역담당'), 관리고객담당자: g('관리고객담당자'), 영업자: g('영업자'),
                 시설수: coreNum(g('시설수')), 월정료: coreNum(g('월정료')), 재계약대상시설수: coreNum(g('재계약대상시설수')),
                 재계약대상월정료: coreNum(g('재계약대상월정료')), 계약종료일: coreDate(g('계약종료일')), 방문일자: visit, '3Q방문일자': visit3q,
-                '2회방문일자': coreDate(g('2회방문일자')), 방문대상: g('방문대상'), 방문자: g('방문자'),
-                해지징후: sign === 'Y' ? 'Y' : (sign === 'N' ? 'N' : null), 불만요구: g('불만요구'), 요약정리: g('요약정리'), 약정여부: g('약정여부'),
-                해지건수: coreNum(g('해지건수')), 해지월정료: coreNum(g('해지월정료')), VOC: vocs[contract] || [],
-                활동상태: sign === 'Y' ? '해지징후' : ((visit3q || visit) ? '방문완료' : '미방문'), lat, lng, 좌표출처: src,
+                '2회방문일자': visit2, 방문대상: g('방문대상'), 방문자: g('방문자'),
+                해지징후: sign, 불만요구: notes.length ? notes[notes.length - 1] : null,  // 가장 최근 회차의 메모
+                방문이력: history, 최근방문: dates.length ? dates[dates.length - 1] : null,
+                요약정리: g('요약정리'), 약정여부: g('약정여부'), 약정시설수: coreNum(g('약정시설수')), 약정월정료: coreNum(g('약정월정료')),
+                해지건수: coreNum(g('해지건수')), 해지월정료: coreNum(g('해지월정료')), 해지일자: coreDate(g('해지일자')),
+                수동재계약: coreDate(g('수동재계약')), 만기비중: coreNum(g('만기비중')), 업셀링: note('업셀링'), 업셀링금액: coreNum(g('업셀링금액')),
+                VOC: vocs[contract] || [],
+                // 방문완료 = 이번 분기 안에 방문 (분기 열이 없는 파일은 방문일자 기준)
+                활동상태: sign === 'Y' ? '해지징후' : (inPeriod ? '방문완료' : '미방문'), lat, lng, 좌표출처: src,
             };
         });
         const rank = b => { const i = BRANCH_ORDER_WEB.indexOf(b); return i < 0 ? BRANCH_ORDER_WEB.length : i; };
         rows.sort((a, b) => (rank(a.지사) - rank(b.지사)) || String(a.지사).localeCompare(String(b.지사)) || String(a.관리고객명 || '').localeCompare(String(b.관리고객명 || '')));
         const noCoord = rows.filter(r => r.lat === null).length;
-        return { rows, coord_stats: { 파일: rows.length - noCoord, 카카오: 0, 없음: noCoord }, voc_matched: rows.filter(r => r.VOC.length).length,
-                 kakao_key_set: null, kakao_error: null, coord_note: noCoord ? '웹 업로드는 주소→좌표 변환을 하지 않음 -- 지도는 GUI 리포트(카카오 키)에서' : null };
+        return { rows, coord_stats: { 파일: rows.length - noCoord, 카카오: 0, 없음: noCoord }, voc_matched: rows.filter(r => r.VOC.length).length, period,
+                 kakao_key_set: null, kakao_error: null, coord_note: noCoord ? '웹 업로드는 주소→좌표 변환을 하지 않음 -- 지도는 데스크톱 GUI 리포트에서' : null };
     }
 
     // ---- file -> {columns, rows} (mirrors handlers.py load_data) ----
@@ -4777,7 +5299,7 @@ document.addEventListener('DOMContentLoaded', initDashNav);
     }
 
     runBtn.addEventListener('click', async () => {
-        if (!picked.db || missingRequired('db').length) return;
+        if (!canRun()) return;
         if (typeof XLSX === 'undefined') { progress.textContent = '엑셀 읽기 모듈을 불러오지 못했습니다. 인터넷 연결을 확인 후 새로고침하세요.'; return; }
         runBtn.disabled = true;
         const t0 = performance.now();
@@ -4806,17 +5328,21 @@ document.addEventListener('DOMContentLoaded', initDashNav);
                 loadedNames.push(p.name + ' (' + table.rows.length.toLocaleString('ko-KR') + '행)');
                 setStatus(key, p.name + ' · 시트 ' + p.sheet + ' · 헤더 ' + p.headerRow + '행 · ' + table.rows.length.toLocaleString('ko-KR') + '행', 'ok');
             }
-            if (!payload.db.rows.length) throw new Error('총괄DB 시트 "' + picked.db.sheet + '"에 데이터 행이 없습니다.');
+            const coreOnly = !payload.db;
+            payload.core = buildCorePayload(coreTables.core, coreTables.core_voc);
+            if (coreOnly && !payload.core) throw new Error('코어고객 시트에서 "관리고객 명" 또는 "계약번호" 열을 찾을 수 없습니다 (시트·헤더 행을 확인하세요).');
+            if (!coreOnly && !payload.db.rows.length) throw new Error('총괄DB 시트 "' + picked.db.sheet + '"에 데이터 행이 없습니다.');
             progress.textContent = '병합·집계 중...';
             await new Promise(r => setTimeout(r, 0));
+            document.body.classList.toggle('core-only', coreOnly);  // 코어고객 섹션만 보이게 (report.py CSS)
             document.getElementById('webDashboard').hidden = false;
             const adminWrap = document.getElementById('adminOnlyWrap');
             if (adminWrap) adminWrap.style.display = '';
-            payload.core = buildCorePayload(coreTables.core, coreTables.core_voc);
-            const res = window.DataIntelLoad(payload);
+            const res = coreOnly ? { rows: 0 } : window.DataIntelLoad(payload);
             if (window.DataIntelCore) window.DataIntelCore(payload.core);
             lastPayload = payload;
             document.getElementById('webShare').hidden = false;
+            updateShareMode();
             // 대시보드가 바로 보이게 업로드 칸은 한 줄로 접고 섹션 메뉴를 켠다
             document.getElementById('webUploadSummary').textContent = loadedNames.join(' · ');
             document.getElementById('webUpload').open = false;
@@ -4825,8 +5351,9 @@ document.addEventListener('DOMContentLoaded', initDashNav);
             const nav = document.getElementById('dashNav');
             if (nav) { nav.hidden = false; window.dispatchEvent(new Event('resize')); }
             const secs = ((performance.now() - t0) / 1000).toFixed(1);
-            progress.textContent = '✅ 완료 -- 관리계약 ' + res.rows.toLocaleString('ko-KR') + '건 (' + secs + '초). 파일을 바꾸면 다시 만들 수 있습니다.';
-            document.getElementById('reportMeta').textContent = '관리계약 ' + res.rows.toLocaleString('ko-KR') + '건 · 이 브라우저에서 계산됨';
+            const what = coreOnly ? '코어고객 ' + payload.core.rows.length.toLocaleString('ko-KR') + '곳' : '관리계약 ' + res.rows.toLocaleString('ko-KR') + '건';
+            progress.textContent = '✅ 완료 -- ' + what + ' (' + secs + '초). 파일을 바꾸면 다시 만들 수 있습니다.';
+            document.getElementById('reportMeta').textContent = what + ' · 이 브라우저에서 계산됨';
         } catch (e) {
             console.error(e);
             progress.textContent = '⚠️ 처리 실패: ' + (e && e.message ? e.message : e);
@@ -4852,6 +5379,21 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
     }
     $('shareExpiry').value = daysFromToday(30);
+    // 코어고객 현황만 공유: 9번이 있을 때만 고를 수 있고, 총괄DB 없이 만들었으면 항상 코어고객만.
+    // 종합 리포트(kbgw-report)를 덮어쓰지 않도록 배포 저장소도 따로 쓴다.
+    const CORE_TITLE = '코어고객 활동현황', CORE_REPO = 'kbgw-core-report', MAIN_REPO = 'kbgw-report';
+    const coreOnlyShare = () => !!(lastPayload && lastPayload.core && (!lastPayload.db || $('shareCoreOnly').checked));
+    function updateShareMode() {
+        const hasCore = !!(lastPayload && lastPayload.core), noDb = !!(lastPayload && !lastPayload.db);
+        $('shareCoreOnlyWrap').hidden = !hasCore;
+        if (noDb) $('shareCoreOnly').checked = true;
+        if (!hasCore) $('shareCoreOnly').checked = false;
+        $('shareCoreOnly').disabled = noDb;
+        const repo = $('ghRepo');
+        if (coreOnlyShare() && repo.value.trim() === MAIN_REPO) repo.value = CORE_REPO;
+        else if (!coreOnlyShare() && repo.value.trim() === CORE_REPO) repo.value = MAIN_REPO;
+    }
+    $('shareCoreOnly').addEventListener('change', updateShareMode);
     try { const t = localStorage.getItem('dataintel-gh-token'); if (t) { $('ghToken').value = t; $('ghRemember').checked = true; } } catch (e) {}
 
     function prefilterFiles(payload) {
@@ -4875,7 +5417,7 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         return '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
     }
     const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    async function buildReportHtml(userPwd, adminPwd, expiry) {
+    async function buildReportHtml(userPwd, adminPwd, expiry, coreOnly) {
         let src = await pageSource();
         const must = (from, to) => {
             if (!src.includes(from)) throw new Error('리포트 틀을 만들 수 없습니다 (페이지를 새로고침 후 다시 시도).');
@@ -4886,16 +5428,21 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         must('new Date("9999-12-31T23:59:59")', 'new Date("' + expiry + 'T23:59:59")');
         must('<style id="webVisibleStyle">#content { display: block; }</style>', '<style>#webUpload, #webShare { display: none !important; }</style>');
         const bodyAt = src.indexOf('<body>');
-        src = src.slice(0, bodyAt + 6) + '\n' + CFG.lockScreenHtml.replace('__EXPIRY_TEXT__', esc(expiry)) + src.slice(bodyAt + 6);
-        const data = prefilterFiles(lastPayload);
+        const lock = CFG.lockScreenHtml.replace('__EXPIRY_TEXT__', esc(expiry));
+        src = src.slice(0, bodyAt + 6) + '\n' + (coreOnly ? lock.replace('Data Intel PRO 보안 리포트', CORE_TITLE + ' 보안 리포트') : lock) + src.slice(bodyAt + 6);
+        // 코어고객만 공유할 때는 총괄DB·매칭 파일을 아예 싣지 않는다
+        const data = coreOnly ? { db: null, files: {}, zoneOwnerMap: {}, core: lastPayload.core } : prefilterFiles(lastPayload);
         const generated = new Date();
-        const meta = '생성일시 ' + generated.toLocaleString('ko-KR') + ' · 관리계약 ' + data.db.rows.length.toLocaleString('ko-KR') + '건 · 만료일 ' + expiry;
+        const meta = '생성일시 ' + generated.toLocaleString('ko-KR') + ' · '
+            + (coreOnly ? '코어고객 ' + data.core.rows.length.toLocaleString('ko-KR') + '곳' : '관리계약 ' + data.db.rows.length.toLocaleString('ko-KR') + '건') + ' · 만료일 ' + expiry;
         const boot = '<script type="application/json" id="webPreload">' + JSON.stringify(data).replace(/<\//g, '<\\/') + '<\/script>\n'
             + '<script>document.addEventListener("DOMContentLoaded", function () {'
             + ' var p = JSON.parse(document.getElementById("webPreload").textContent);'
             + ' document.getElementById("webDashboard").hidden = false;'
-            + ' var nav = document.getElementById("dashNav"); if (nav) nav.hidden = false;'
-            + ' window.DataIntelLoad(p);'
+            + (coreOnly
+                ? ' document.body.classList.add("core-only"); document.title = ' + JSON.stringify(CORE_TITLE) + ';'
+                  + ' var h = document.querySelector(".topbar h1"); if (h) h.textContent = ' + JSON.stringify(CORE_TITLE) + ';'
+                : ' document.body.classList.remove("core-only"); var nav = document.getElementById("dashNav"); if (nav) nav.hidden = false; window.DataIntelLoad(p);')
             + ' if (window.DataIntelCore) window.DataIntelCore(p.core || null);'
             + ' document.getElementById("reportMeta").textContent = ' + JSON.stringify(meta) + ';'
             + '});<\/script>\n';
@@ -4907,7 +5454,7 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
         return btoa(s);
     }
-    async function encryptReport(reportHtml, passwords, expiry) {
+    async function encryptReport(reportHtml, passwords, expiry, title) {
         // secure_report.py encrypt_report와 같은 형식: 본문은 랜덤 키로 AES-256-GCM, 그 키를 비밀번호별 PBKDF2 키로 감쌈
         const contentKey = crypto.getRandomValues(new Uint8Array(32));
         const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -4924,7 +5471,7 @@ document.addEventListener('DOMContentLoaded', initDashNav);
             slots.push({ salt: b64(salt), iv: b64(siv), key: b64(wrapped) });
         }
         const payload = JSON.stringify({ v: 1, iter: CFG.iterations, slots, iv: b64(iv), data: b64(data) });
-        return CFG.unlockTemplate.split('__TITLE__').join('Data Intel PRO 보안 리포트')
+        return CFG.unlockTemplate.split('__TITLE__').join(title)
             .replace('__EXPIRY__', '<p class="exp">만료일: ' + esc(expiry) + '</p>')
             .replace('__PAYLOAD__', payload);
     }
@@ -4935,15 +5482,16 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         const userPwd = $('shareUserPwd').value.trim() || strongPassword(12);
         const adminPwd = $('shareAdminPwd').value.trim() || strongPassword(12);
         if (userPwd === adminPwd) throw new Error('사용자 비밀번호와 관리자 비밀번호는 달라야 합니다.');
+        const coreOnly = coreOnlyShare();
         $('shareProgress').textContent = '리포트 만드는 중...';
-        const reportHtml = await buildReportHtml(userPwd, adminPwd, expiry);
+        const reportHtml = await buildReportHtml(userPwd, adminPwd, expiry, coreOnly);
         $('shareProgress').textContent = '암호화 중...';
-        const html = await encryptReport(reportHtml, [userPwd, adminPwd], expiry);
-        return { html, userPwd, adminPwd, expiry };
+        const html = await encryptReport(reportHtml, [userPwd, adminPwd], expiry, coreOnly ? CORE_TITLE + ' 보안 리포트' : 'Data Intel PRO 보안 리포트');
+        return { html, userPwd, adminPwd, expiry, coreOnly, file: coreOnly ? 'Core_Customer_Report.html' : 'Data_Intel_PRO_Report.html' };
     }
     function showShare(r, url) {
-        const lines = ['[Data Intel PRO 리포트]'];
-        lines.push(url ? '링크: ' + url : '첨부 파일: Data_Intel_PRO_Report.html (브라우저로 열기)');
+        const lines = [r.coreOnly ? '[' + CORE_TITLE + ' 리포트]' : '[Data Intel PRO 리포트]'];
+        lines.push(url ? '링크: ' + url : '첨부 파일: ' + r.file + ' (브라우저로 열기)');
         lines.push('비밀번호: ' + r.userPwd, '만료일: ' + r.expiry);
         $('shareText').textContent = lines.join('\n');
         $('shareAdminNote').textContent = '관리자 비밀번호(공유하지 마세요): ' + r.adminPwd;
@@ -4959,7 +5507,7 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         try {
             const r = await makeEncrypted();
             const url = URL.createObjectURL(new Blob([r.html], { type: 'text/html;charset=utf-8' }));
-            const a = document.createElement('a'); a.href = url; a.download = 'Data_Intel_PRO_Report.html'; a.click();
+            const a = document.createElement('a'); a.href = url; a.download = r.file; a.click();
             setTimeout(() => URL.revokeObjectURL(url), 5000);
             $('shareProgress').textContent = '✅ 다운로드 완료 -- 파일은 암호화되어 있어 메일·메신저로 보내도 됩니다.';
             showShare(r, null);
@@ -5021,7 +5569,7 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         const btn = $('shareDeployBtn'); btn.disabled = true; $('shareDownloadBtn').disabled = true;
         try {
             const token = $('ghToken').value.trim();
-            const repo = $('ghRepo').value.trim() || 'kbgw-report';
+            const repo = $('ghRepo').value.trim() || (coreOnlyShare() ? CORE_REPO : MAIN_REPO);
             if (!token) throw new Error('GitHub 토큰을 입력하세요.');
             if (!/^[A-Za-z0-9._-]+$/.test(repo)) throw new Error('저장소 이름은 영문·숫자·-·_ 만 쓸 수 있습니다.');
             try { if ($('ghRemember').checked) localStorage.setItem('dataintel-gh-token', token); else localStorage.removeItem('dataintel-gh-token'); } catch (e) {}

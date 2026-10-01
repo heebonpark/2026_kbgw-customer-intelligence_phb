@@ -39,6 +39,7 @@ _make_streams_safe()
 warnings.filterwarnings("ignore")
 
 import re
+from datetime import datetime
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from tkinter import ttk
@@ -48,9 +49,9 @@ import traceback
 # Ensure we can import from app.core
 sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
 from core.handlers import process_and_merge, load_data
-from core.report import generate_html_report
+from core.report import generate_html_report, generate_core_report, CORE_REPORT_TITLE
 from core.matching_config import load_matching_config
-from deploy_report import deploy, DeployError
+from deploy_report import deploy, DeployError, DEFAULT_REPO, CORE_REPO
 from core.secure_report import load_admin_password, save_admin_password
 from core.core_customers import load_kakao_key, save_kakao_key
 
@@ -123,7 +124,7 @@ class DataIntelGUI:
         saved_notes = load_file_notes()
         self.file_notes = {key: tk.StringVar(value=saved_notes.get(key, '')) for key in self.file_paths}
 
-        self.last_report = None  # (path, user password, expiry) of the latest generated report
+        self.last_report = None  # (path, user password, expiry, deploy repo, title) of the latest generated report
         self.report_password = tk.StringVar()
         self.admin_password = tk.StringVar(value=load_admin_password() or '')
         self.kakao_key = tk.StringVar(value=load_kakao_key() or '')
@@ -173,7 +174,7 @@ class DataIntelGUI:
         canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
         fields = [
-            ("1. 총괄관리DB", "필수, xlsx/xls", 'db'),
+            ("1. 총괄관리DB", "필수 (코어고객 리포트만 만들 때는 생략), xlsx/xls", 'db'),
             ("2. 월/일일 SP관리활동 (VOC)", "선택", 'voc'),
             ("3. 월/일일 SE,SG 정기점검", "선택", 'patrol'),
             ("4. 월 해지파이프라인", "선택, 독립 섹션", 'cancel'),
@@ -181,7 +182,7 @@ class DataIntelGUI:
             ("6. 시설현황", "선택, csv", 'facility'),
             ("7. 해지시설 내역", "선택, 고액 미등록 알림용", 'cancelled_facility'),
             ("8. 영업구역담당자", "선택, SP 구역번호→담당자명", 'zone_owner'),
-            ("9. 코어고객 활동관리", "선택, 독립 섹션·설치주소 지도", 'core'),
+            ("9. 코어고객 활동관리", "선택, 독립 섹션·지도 -- 이 파일만으로 코어고객 리포트 생성 가능", 'core'),
             ("9-1. 코어고객 VOC매칭", "선택, 9번과 계약번호로 연결", 'core_voc'),
         ]
 
@@ -237,6 +238,9 @@ class DataIntelGUI:
         self.deploy_btn = ttk.Button(action_row, text=ui("🌐 GitHub Pages 배포"), style="Ghost.TButton",
                                      command=self.deploy_report, state=tk.DISABLED)
         self.deploy_btn.pack(side=tk.RIGHT, padx=(0, 8))
+        self.core_btn = ttk.Button(action_row, text=ui("💎 코어고객 리포트만 생성"), style="Ghost.TButton",
+                                   command=self.run_core_only)
+        self.core_btn.pack(side=tk.RIGHT, padx=(0, 8))
 
         tk.Label(body, text="실행 로그", bg=BG, fg=TEXT_MUTED, font=("Helvetica", 10)).pack(anchor="w")
         log_frame = tk.Frame(body, bg=CARD_BG, highlightbackground=BORDER, highlightthickness=1)
@@ -309,7 +313,14 @@ class DataIntelGUI:
     def run_process(self):
         db_path = self.file_paths['db'].get()
         if not db_path or not os.path.exists(db_path):
-            messagebox.showerror("오류", "총괄관리DB 파일은 필수입니다.")
+            core_path = self.file_paths['core'].get()
+            if core_path and os.path.exists(core_path):
+                self.run_core_only()  # 9번만 넣었으면 코어고객 리포트
+                return
+            messagebox.showerror("오류", "총괄관리DB 파일은 필수입니다.\n(코어고객 리포트만 만들려면 9번 파일을 넣으세요)")
+            return
+        options = self._read_options()
+        if options is None:
             return
 
         self.save_notes(silent=True)  # 실행할 때마다 설명도 같이 저장
@@ -344,14 +355,7 @@ class DataIntelGUI:
 
             self.log("HTML 리포트를 생성합니다...")
 
-            pwd_val = self.report_password.get().strip() or None
-            admin_val = self.admin_password.get().strip() or None
-            kakao_val = self.kakao_key.get().strip() or None
-            if kakao_val != load_kakao_key():
-                save_kakao_key(kakao_val)  # 9번 지도 좌표용 -- 이 PC에만 저장
-            if admin_val != load_admin_password():
-                save_admin_password(admin_val)  # 다음 실행에도 같은 관리자 비밀번호 사용 (빈칸=매번 랜덤)
-            exp_val = self.report_expiry.get().strip() or None
+            pwd_val, admin_val, kakao_val, exp_val = options
 
             html_content, pwd, expiry, admin_pwd = generate_html_report(
                 merged_df,
@@ -383,7 +387,7 @@ class DataIntelGUI:
             self.log("=========================================")
 
             messagebox.showinfo("성공", f"리포트 생성 완료!\n만료일: {expiry}\n사용자용 암호: {pwd}\n관리자용 암호: {admin_pwd}")
-            self.last_report = (output_path, pwd, expiry)
+            self.last_report = (output_path, pwd, expiry, DEFAULT_REPO, "Data Intel PRO 리포트")
             self.deploy_btn.config(state=tk.NORMAL)
             webbrowser.open(f"file://{output_path}")
 
@@ -394,17 +398,91 @@ class DataIntelGUI:
         finally:
             self.run_btn.config(state=tk.NORMAL)
 
+    def _read_options(self):
+        """리포트 옵션 칸을 읽는다 -> (사용자 비밀번호, 관리자 비밀번호, 카카오 키, 만료일); 빈칸은 None.
+        만료일 형식이 틀리면 알리고 None을 돌려준다. 카카오 키·관리자 비밀번호는 이 PC에 저장."""
+        exp_val = self.report_expiry.get().strip() or None
+        if exp_val:
+            try:
+                datetime.strptime(exp_val, '%Y-%m-%d')
+            except ValueError:
+                messagebox.showerror("오류", "만료일은 YYYY-MM-DD 형식으로 입력하세요 (예: 2026-10-31).\n비워 두면 이번 달 말일입니다.")
+                return None
+        pwd_val = self.report_password.get().strip() or None
+        admin_val = self.admin_password.get().strip() or None
+        kakao_val = self.kakao_key.get().strip() or None
+        if kakao_val != load_kakao_key():
+            save_kakao_key(kakao_val)  # 9번 지도 좌표용 -- 이 PC에만 저장
+        if admin_val != load_admin_password():
+            save_admin_password(admin_val)  # 다음 실행에도 같은 관리자 비밀번호 사용 (빈칸=매번 랜덤)
+        return pwd_val, admin_val, kakao_val, exp_val
+
+    def run_core_only(self):
+        """9. 코어고객(+ 9-1 VOC매칭)만으로 코어고객 활동현황 리포트를 만든다 -- 총괄DB 없이.
+        종합 리포트와 다른 파일(Core_Customer_Report.html)·다른 배포 저장소를 쓴다."""
+        core_path = self.file_paths['core'].get()
+        if not core_path or not os.path.exists(core_path):
+            messagebox.showerror("오류", "9. 코어고객 활동관리 파일을 넣어 주세요.")
+            return
+        options = self._read_options()
+        if options is None:
+            return
+        pwd_val, admin_val, kakao_val, exp_val = options
+        self.save_notes(silent=True)
+        self.core_btn.config(state=tk.DISABLED)
+        self.run_btn.config(state=tk.DISABLED)
+        self.status_text.config(state=tk.NORMAL)
+        self.status_text.delete(1.0, tk.END)
+        self.status_text.config(state=tk.DISABLED)
+        try:
+            frames = {}
+            for key in ('core', 'core_voc'):
+                path = self.file_paths[key].get()
+                if path and os.path.exists(path):
+                    self.log(f"로드 중: {os.path.basename(path)}")
+                    frames[key] = load_data(path, is_csv=path.lower().endswith('.csv'))
+            self.log("코어고객 리포트를 생성합니다...")
+            html_content, pwd, expiry, admin_pwd, count = generate_core_report(
+                frames['core'], frames.get('core_voc'), password=pwd_val, admin_password=admin_val,
+                expiry_date=exp_val, kakao_key=kakao_val, log=self.log)
+
+            output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Core_Customer_Report.html")
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(html_content)
+
+            self.log("=========================================")
+            self.log(f"{CORE_REPORT_TITLE} 리포트가 생성되었습니다! (코어고객 {count:,}곳)")
+            self.log(f"저장 위치: {output_path}")
+            self.log(f"만료일: {expiry}")
+            self.log(f"비밀번호: {pwd}")
+            self.log("=========================================")
+            messagebox.showinfo("성공", f"코어고객 리포트 생성 완료!\n코어고객 {count:,}곳\n만료일: {expiry}\n비밀번호: {pwd}\n\n"
+                                        "'GitHub Pages 배포'를 누르면 공유 링크가 만들어집니다.")
+            self.last_report = (output_path, pwd, expiry, CORE_REPO, f"{CORE_REPORT_TITLE} 리포트")
+            self.deploy_btn.config(state=tk.NORMAL)
+            webbrowser.open(f"file://{output_path}")
+        except ValueError as e:
+            self.log(f"생성 실패: {e}")
+            messagebox.showerror("오류", str(e))
+        except Exception as e:
+            tb = traceback.format_exc()
+            self.log(f"예기치 않은 오류 발생: {str(e)}\n\n[상세 오류 내역]\n{tb}")
+            messagebox.showerror("오류", f"실행 중 오류가 발생했습니다: {str(e)}")
+        finally:
+            self.core_btn.config(state=tk.NORMAL)
+            self.run_btn.config(state=tk.NORMAL)
+
     def deploy_report(self):
         """Publishes the latest (encrypted) report to GitHub Pages and copies a
         ready-to-send share message (link + password + expiry) to the clipboard."""
         if not self.last_report:
             return
-        path, pwd, expiry = self.last_report
+        path, pwd, expiry, repo, title = self.last_report
         self.deploy_btn.config(state=tk.DISABLED)
         try:
             self.log("GitHub Pages 배포를 시작합니다...")
             try:
-                url = deploy(path, log=self.log)
+                url = deploy(path, repo_name=repo, log=self.log, description=f"{title} (암호화)")
             except DeployError as e:
                 if '비공개 저장소' not in str(e):
                     raise
@@ -414,8 +492,8 @@ class DataIntelGUI:
                         "리포트는 암호화되어 있어 비밀번호 없이는 내용을 볼 수 없습니다.\n\n공개 저장소로 배포할까요?"):
                     self.log("배포 취소됨")
                     return
-                url = deploy(path, public=True, log=self.log)
-            share = f"[Data Intel PRO 리포트]\n링크: {url}\n비밀번호: {pwd}\n만료일: {expiry}"
+                url = deploy(path, repo_name=repo, public=True, log=self.log, description=f"{title} (암호화)")
+            share = f"[{title}]\n링크: {url}\n비밀번호: {pwd}\n만료일: {expiry}"
             self.root.clipboard_clear()
             self.root.clipboard_append(share)
             self.log("=========================================")
