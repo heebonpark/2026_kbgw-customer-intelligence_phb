@@ -59,6 +59,7 @@ from core.secure_report import (load_admin_password, save_admin_password, load_s
                                 save_scope_passwords, ensure_scope_passwords)
 from core.core_customers import load_kakao_key, save_kakao_key, load_kakao_js_key, save_kakao_js_key, core_scope_names
 from core.visit_sync import load_visit_code, save_visit_code
+from core.pc_settings import export_settings, import_settings
 
 APP_DIR = os.path.expanduser("~/.dataintelligence_pro")
 NOTES_FILE = os.path.join(APP_DIR, "file_notes.json")
@@ -258,8 +259,13 @@ class DataIntelGUI:
         # ---- password / expiry ----
         opts_card = self._card(body)
         opts_card.pack(fill=tk.X, pady=(14, 0))
-        tk.Label(opts_card, text=ui("⚙️ 리포트 옵션"), bg=CARD_BG, fg=TEXT_DARK,
-                 font=("Helvetica", 11, "bold")).pack(anchor="w", padx=14, pady=(10, 6))
+        opts_head = tk.Frame(opts_card, bg=CARD_BG)
+        opts_head.pack(fill=tk.X, padx=14, pady=(10, 6))
+        tk.Label(opts_head, text=ui("⚙️ 리포트 옵션"), bg=CARD_BG, fg=TEXT_DARK,
+                 font=("Helvetica", 11, "bold")).pack(side=tk.LEFT)
+        # 아래 ★ 값들은 PC마다 따로 저장된다 -- 다른 PC(윈도우)에서 같은 값으로 쓰려면 파일로 옮긴다
+        ttk.Button(opts_head, text="설정 가져오기", style="Ghost.TButton", command=self.import_pc_settings).pack(side=tk.RIGHT)
+        ttk.Button(opts_head, text="설정 내보내기", style="Ghost.TButton", command=self.export_pc_settings).pack(side=tk.RIGHT, padx=(0, 6))
 
         pwd_row = tk.Frame(opts_card, bg=CARD_BG)
         pwd_row.pack(fill=tk.X, padx=14, pady=4)
@@ -509,6 +515,48 @@ class DataIntelGUI:
             if self.preview.port != 80:
                 self.log(f"  (카카오맵이 안 보이면 카카오 콘솔 사이트 도메인에 http://localhost:{self.preview.port} 를 추가하세요)")
         webbrowser.open(url)
+
+    def export_pc_settings(self):
+        """이 PC의 설정(키·비밀번호·연결 코드·좌표)을 암호화한 파일 하나로 -- 다른 PC에서 '설정 가져오기'."""
+        if self._read_options() is None:  # 칸에 방금 넣은 값도 저장한 뒤 내보낸다
+            return
+        passphrase = simpledialog.askstring("설정 내보내기", "파일을 잠글 암호를 정하세요.\n(다른 PC에서 가져올 때 같은 암호를 입력합니다)",
+                                            show="•", parent=self.root)
+        if not passphrase:
+            return
+        path = filedialog.asksaveasfilename(title="설정 파일 저장", defaultextension=".dipset", initialfile="DataIntel_설정.dipset",
+                                            filetypes=(("Data Intel 설정", "*.dipset"), ("All files", "*.*")))
+        if not path:
+            return
+        try:
+            items = export_settings(path, passphrase)
+        except (ValueError, OSError) as e:
+            messagebox.showerror("설정 내보내기", str(e))
+            return
+        self.log("설정을 내보냈습니다: " + ", ".join(items))
+        messagebox.showinfo("설정 내보내기", "저장했습니다:\n" + path + "\n\n담긴 항목: " + ", ".join(items)
+                            + "\n\n다른 PC의 '설정 가져오기'에서 이 파일과 방금 정한 암호를 사용하세요.")
+
+    def import_pc_settings(self):
+        path = filedialog.askopenfilename(title="설정 파일 선택", filetypes=(("Data Intel 설정", "*.dipset"), ("All files", "*.*")))
+        if not path:
+            return
+        passphrase = simpledialog.askstring("설정 가져오기", "내보낼 때 정한 암호를 입력하세요.", show="•", parent=self.root)
+        if passphrase is None:
+            return
+        try:
+            items = import_settings(path, passphrase)
+        except ValueError as e:
+            messagebox.showerror("설정 가져오기", str(e))
+            return
+        # 화면의 칸도 가져온 값으로 바꾼다 (그대로 두면 다음 실행 때 예전 값이 다시 저장된다)
+        self.admin_password.set(load_admin_password() or '')
+        self.kakao_key.set(load_kakao_key() or '')
+        self.kakao_js_key.set(load_kakao_js_key() or '')
+        self.visit_code.set(load_visit_code() or '')
+        self.deploy_owner.set(load_github_owner() or '')
+        self.log("설정을 가져왔습니다: " + ", ".join(items))
+        messagebox.showinfo("설정 가져오기", "이 PC에 적용했습니다:\n" + ", ".join(items))
 
     def edit_scope_passwords(self):
         """지사별 비밀번호 보기·수정 -- '이름=비밀번호' 한 줄씩. 다른 PC와 맞추려면 이 내용을 그대로 옮긴다."""
