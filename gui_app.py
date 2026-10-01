@@ -52,6 +52,7 @@ from core.report import generate_html_report
 from core.matching_config import load_matching_config
 from deploy_report import deploy, DeployError
 from core.secure_report import load_admin_password, save_admin_password
+from core.core_customers import load_kakao_key, save_kakao_key
 
 APP_DIR = os.path.expanduser("~/.dataintelligence_pro")
 NOTES_FILE = os.path.join(APP_DIR, "file_notes.json")
@@ -116,6 +117,8 @@ class DataIntelGUI:
             'facility': tk.StringVar(),
             'cancelled_facility': tk.StringVar(),
             'zone_owner': tk.StringVar(),
+            'core': tk.StringVar(),
+            'core_voc': tk.StringVar(),
         }
         saved_notes = load_file_notes()
         self.file_notes = {key: tk.StringVar(value=saved_notes.get(key, '')) for key in self.file_paths}
@@ -123,6 +126,7 @@ class DataIntelGUI:
         self.last_report = None  # (path, user password, expiry) of the latest generated report
         self.report_password = tk.StringVar()
         self.admin_password = tk.StringVar(value=load_admin_password() or '')
+        self.kakao_key = tk.StringVar(value=load_kakao_key() or '')
         self.report_expiry = tk.StringVar()
 
         self.create_widgets()
@@ -177,6 +181,8 @@ class DataIntelGUI:
             ("6. 시설현황", "선택, csv", 'facility'),
             ("7. 해지시설 내역", "선택, 고액 미등록 알림용", 'cancelled_facility'),
             ("8. 영업구역담당자", "선택, SP 구역번호→담당자명", 'zone_owner'),
+            ("9. 코어고객 활동관리", "선택, 독립 섹션·설치주소 지도", 'core'),
+            ("9-1. 코어고객 VOC매칭", "선택, 9번과 계약번호로 연결", 'core_voc'),
         ]
 
         for label_text, tag_text, key in fields:
@@ -195,6 +201,14 @@ class DataIntelGUI:
         pwd_ent = tk.Entry(pwd_row, textvariable=self.report_password, font=("Helvetica", 10))
         pwd_ent.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self._bind_autocorrect(pwd_ent, self.report_password)
+
+        kk_row = tk.Frame(opts_card, bg=CARD_BG)
+        kk_row.pack(fill=tk.X, padx=14, pady=4)
+        tk.Label(kk_row, text="★ 카카오 REST 키 (9번 지도 좌표, 이 PC에 저장)", bg=CARD_BG, width=26, anchor="w",
+                 font=("Helvetica", 10)).pack(side=tk.LEFT)
+        kk_ent = tk.Entry(kk_row, textvariable=self.kakao_key, font=("Helvetica", 10), show="•")
+        kk_ent.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self._bind_autocorrect(kk_ent, self.kakao_key)
 
         adm_row = tk.Frame(opts_card, bg=CARD_BG)
         adm_row.pack(fill=tk.X, padx=14, pady=4)
@@ -332,6 +346,9 @@ class DataIntelGUI:
 
             pwd_val = self.report_password.get().strip() or None
             admin_val = self.admin_password.get().strip() or None
+            kakao_val = self.kakao_key.get().strip() or None
+            if kakao_val != load_kakao_key():
+                save_kakao_key(kakao_val)  # 9번 지도 좌표용 -- 이 PC에만 저장
             if admin_val != load_admin_password():
                 save_admin_password(admin_val)  # 다음 실행에도 같은 관리자 비밀번호 사용 (빈칸=매번 랜덤)
             exp_val = self.report_expiry.get().strip() or None
@@ -346,7 +363,11 @@ class DataIntelGUI:
                 matching_config=matching_config,
                 password=pwd_val,
                 admin_password=admin_val,
-                expiry_date=exp_val
+                expiry_date=exp_val,
+                core_df=files_dict.get('core'),
+                core_voc_df=files_dict.get('core_voc'),
+                kakao_key=kakao_val,
+                log=self.log,
             )
 
             output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Data_Intel_PRO_Report.html")

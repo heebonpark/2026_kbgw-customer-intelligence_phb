@@ -80,6 +80,8 @@ def build_report(base_dir, matching_config=None, password=None, expiry_date=None
         expiry_date=expiry_date,
         admin_password=admin_password,
         eda_link=eda_link,
+        core_df=_load(base_dir, 'core'),          # 9. 코어고객 (독립 섹션, 지도 좌표는 이 PC의 카카오 키)
+        core_voc_df=_load(base_dir, 'core_voc'),
     )
     full_msg = msg + " (" + ", ".join(match_lines) + ")"
     return html_content, pwd, expiry, full_msg, merged_df, admin_pwd

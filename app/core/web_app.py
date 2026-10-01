@@ -58,6 +58,8 @@ SHEET_HINT_COLUMNS = {
     'original': ['계약번호'],
     'facility': ['계약번호'],
     'zone_owner': ['구역번호'],
+    'core': ['관리주체', '관리고객 명'],
+    'core_voc': ['VOC유형', 'VOC유형대'],
 }
 
 # The report lock screen (same markup as report.py), switched back on in the
@@ -102,6 +104,8 @@ WEB_UPLOAD_SLOTS = [
     ('original', '5. 2026년 관리고객원본', '선택'),
     ('facility', '6. 시설현황', '선택'),
     ('zone_owner', '8. 영업구역담당자', '선택 · SP 구역번호→담당자명'),
+    ('core', '9. 코어고객 활동관리', '선택 · 독립 섹션·지도'),
+    ('core_voc', '9-1. 코어고객 VOC매칭', '선택 · 9번과 계약번호로 연결'),
 ]
 
 
@@ -743,6 +747,82 @@ __DASH_SECTIONS__
     // 지난번에 고른 파일 기억 복원 -> 🔄 버튼이 바로 보인다
     if (canHandle) idbAll().then(all => Object.keys(all).forEach(k => { handles[k] = all[k]; showReload(k); }));
 
+    // ---- 9. 코어고객 -> 리포트의 코어고객 섹션 rows (core_customers.py build_core_payload와 같은 필드) ----
+    // 웹에서는 주소 -> 좌표 변환(카카오 키 필요)을 하지 않는다: 파일에 좌표 열이 있으면 그 좌표만 지도에 쓴다.
+    const CORE_FIELDS = {
+        계약번호: ['계약번호'], 관리고객명: ['관리고객 명', '관리고객명', '고객명', '상호'], 관리주체: ['관리주체'],
+        본부: ['본부', '관리본부'], 지사: ['지사', '관리지사'], 설치주소: ['설치주소', '주소'], 영업구역: ['영업구역', '영업구역정보'],
+        영업구역담당: ['영업구역담당'], 관리고객담당자: ['관리고객담당자'], 영업자: ['영업자'], 시설수: ['시설수'], 월정료: ['월정료'],
+        재계약대상시설수: ['재계약대상시설수'], 재계약대상월정료: ['재계약대상월정료'], 계약종료일: ['계약종료일'],
+        방문일자: ['방문일자'], '3Q방문일자': ['1회 방문일자'], '2회방문일자': ['2회 방문일자'], 방문대상: ['방문대상'], 방문자: ['방문자'],
+        해지징후: ['해지징후'], 불만요구: ['불만사항/요구사항/추가영업기회'], 요약정리: ['요약정리'], 약정여부: ['약정여부'],
+        해지건수: ['해지건수'], 해지월정료: ['해지월정료'],
+    };
+    const BRANCH_ORDER_WEB = ['중앙', '강북', '서대문', '고양', '의정부', '남양주', '강릉', '원주'];
+    function coreCol(columns, names) {
+        return columns.find(c => names.includes(c)) || columns.find(c => names.some(n => c.startsWith(n))) || null;
+    }
+    const cv = v => (v === null || v === undefined || (typeof v === 'string' && v.trim() === '')) ? null : (typeof v === 'string' ? v.trim() : v);
+    function coreDate(v) {
+        v = cv(v);
+        if (v === null) return null;
+        if (typeof v === 'number') return v > 20000 && v < 80000 ? new Date(Date.UTC(1899, 11, 30) + v * 86400000).toISOString().slice(0, 10) : String(v);
+        const s = String(v);
+        if (s.startsWith('9999')) return null;
+        const m = s.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})/);
+        if (m) return m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0');
+        const f = Number(s);
+        return !isNaN(f) && f > 20000 && f < 80000 ? new Date(Date.UTC(1899, 11, 30) + f * 86400000).toISOString().slice(0, 10) : s;
+    }
+    const coreNum = v => { v = cv(v); if (v === null) return null; const n = Number(String(v).replace(/,/g, '')); return isNaN(n) ? null : n; };
+    const coreContract = v => { v = cv(v); if (v === null) return null; const s = String(v); return s.endsWith('.0') ? s.slice(0, -2) : s; };
+    function buildCorePayload(core, voc) {
+        if (!core || !core.rows.length) return null;
+        const col = {};
+        Object.keys(CORE_FIELDS).forEach(k => { col[k] = coreCol(core.columns, CORE_FIELDS[k]); });
+        if (!col.관리고객명 && !col.계약번호) return null;
+        const coordCol = coreCol(core.columns, ['위치좌표(위도,경도)', '위치좌표', '좌표']);
+        const latCol = coreCol(core.columns, ['위도', 'lat', 'LAT']), lngCol = coreCol(core.columns, ['경도', 'lng', 'LNG', 'lon']);
+        const idx = c => core.columns.indexOf(c);
+        const vocs = {};
+        if (voc && voc.rows.length && voc.columns.includes('계약번호')) {
+            const vi = c => voc.columns.indexOf(c);
+            let last = null;
+            voc.rows.forEach(r => {
+                const get = c => vi(c) >= 0 ? cv(r[vi(c)]) : null;
+                const contract = coreContract(get('계약번호')) || last;  // 병합셀: 비어 있으면 바로 위 고객
+                last = contract;
+                const kind = get('VOC유형') || get('VOC유형대');
+                if (!kind && !get('상태')) return;
+                (vocs[contract] = vocs[contract] || []).push({ 상태: get('상태'), 유형: kind, 처리내용: get('처리내용'), 접수일: coreDate(get('접수일시')), 처리자: get('처리자') });
+            });
+        }
+        const rows = core.rows.map(r => {
+            const g = k => col[k] ? cv(r[idx(col[k])]) : null;
+            const visit3q = coreDate(g('3Q방문일자')), visit = coreDate(g('방문일자'));
+            const sign = String(g('해지징후') || '').toUpperCase();
+            const contract = coreContract(g('계약번호'));
+            let lat = null, lng = null, src = null;
+            if (coordCol) { const v = cv(r[idx(coordCol)]); if (typeof v === 'string' && v.includes(',')) { const [a, b] = v.split(',').map(Number); if (a && b) { lat = a; lng = b; src = '파일'; } } }
+            if (lat === null && latCol && lngCol) { const a = coreNum(r[idx(latCol)]), b = coreNum(r[idx(lngCol)]); if (a && b) { lat = a; lng = b; src = '파일'; } }
+            return {
+                계약번호: contract, 관리고객명: g('관리고객명'), 관리주체: g('관리주체') || '미지정', 본부: g('본부'), 지사: g('지사') || '미지정',
+                설치주소: g('설치주소'), 영업구역: g('영업구역'), 영업구역담당: g('영업구역담당'), 관리고객담당자: g('관리고객담당자'), 영업자: g('영업자'),
+                시설수: coreNum(g('시설수')), 월정료: coreNum(g('월정료')), 재계약대상시설수: coreNum(g('재계약대상시설수')),
+                재계약대상월정료: coreNum(g('재계약대상월정료')), 계약종료일: coreDate(g('계약종료일')), 방문일자: visit, '3Q방문일자': visit3q,
+                '2회방문일자': coreDate(g('2회방문일자')), 방문대상: g('방문대상'), 방문자: g('방문자'),
+                해지징후: sign === 'Y' ? 'Y' : (sign === 'N' ? 'N' : null), 불만요구: g('불만요구'), 요약정리: g('요약정리'), 약정여부: g('약정여부'),
+                해지건수: coreNum(g('해지건수')), 해지월정료: coreNum(g('해지월정료')), VOC: vocs[contract] || [],
+                활동상태: sign === 'Y' ? '해지징후' : ((visit3q || visit) ? '방문완료' : '미방문'), lat, lng, 좌표출처: src,
+            };
+        });
+        const rank = b => { const i = BRANCH_ORDER_WEB.indexOf(b); return i < 0 ? BRANCH_ORDER_WEB.length : i; };
+        rows.sort((a, b) => (rank(a.지사) - rank(b.지사)) || String(a.지사).localeCompare(String(b.지사)) || String(a.관리고객명 || '').localeCompare(String(b.관리고객명 || '')));
+        const noCoord = rows.filter(r => r.lat === null).length;
+        return { rows, coord_stats: { 파일: rows.length - noCoord, 카카오: 0, 없음: noCoord }, voc_matched: rows.filter(r => r.VOC.length).length,
+                 kakao_key_set: null, kakao_error: null, coord_note: noCoord ? '웹 업로드는 주소→좌표 변환을 하지 않음 -- 지도는 GUI 리포트(카카오 키)에서' : null };
+    }
+
     // ---- file -> {columns, rows} (mirrors handlers.py load_data) ----
     function decodeCsv(buf) {
         try { return new TextDecoder('utf-8', { fatal: true }).decode(buf).replace(/^﻿/, ''); }
@@ -844,6 +924,7 @@ __DASH_SECTIONS__
         try {
             const payload = { db: null, files: {}, zoneOwnerMap: {} };
             const loadedNames = [];
+            const coreTables = {};
             for (const key of Object.keys(picked)) {
                 const p = picked[key];
                 progress.textContent = p.name + ' 읽는 중...';
@@ -856,6 +937,8 @@ __DASH_SECTIONS__
                     const map = buildZoneOwnerMap(table);
                     if (!map) { setStatus(key, '시트 "' + p.sheet + '"에 구역번호/담당자명 컬럼이 없습니다', 'err'); continue; }
                     payload.zoneOwnerMap = map;
+                } else if (key === 'core' || key === 'core_voc') {
+                    coreTables[key] = table;
                 } else if (CFG.matchable.includes(key)) {
                     const wanted = Array.from(new Set(CFG.keyCandidates[key].concat(CFG.displayColumns[key])));
                     payload.files[key] = pickColumns(table, wanted);
@@ -869,7 +952,9 @@ __DASH_SECTIONS__
             document.getElementById('webDashboard').hidden = false;
             const adminWrap = document.getElementById('adminOnlyWrap');
             if (adminWrap) adminWrap.style.display = '';
+            payload.core = buildCorePayload(coreTables.core, coreTables.core_voc);
             const res = window.DataIntelLoad(payload);
+            if (window.DataIntelCore) window.DataIntelCore(payload.core);
             lastPayload = payload;
             document.getElementById('webShare').hidden = false;
             // 대시보드가 바로 보이게 업로드 칸은 한 줄로 접고 섹션 메뉴를 켠다
@@ -920,7 +1005,7 @@ __DASH_SECTIONS__
             const idx = (CFG.keyCandidates[k] || []).map(c => t.columns.indexOf(c)).filter(i => i >= 0);
             files[k] = { columns: t.columns, rows: idx.length ? t.rows.filter(r => idx.some(i => r[i] != null && keys.has(String(r[i])))) : [] };
         });
-        return { db, files, zoneOwnerMap: payload.zoneOwnerMap };
+        return { db, files, zoneOwnerMap: payload.zoneOwnerMap, core: payload.core || null };
     }
     async function pageSource() {
         try {
@@ -951,6 +1036,7 @@ __DASH_SECTIONS__
             + ' document.getElementById("webDashboard").hidden = false;'
             + ' var nav = document.getElementById("dashNav"); if (nav) nav.hidden = false;'
             + ' window.DataIntelLoad(p);'
+            + ' if (window.DataIntelCore) window.DataIntelCore(p.core || null);'
             + ' document.getElementById("reportMeta").textContent = ' + JSON.stringify(meta) + ';'
             + '});<\/script>\n';
         const endAt = src.lastIndexOf('</body>');

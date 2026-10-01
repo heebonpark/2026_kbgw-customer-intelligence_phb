@@ -251,6 +251,12 @@ def render_dashboard():
         zone_owner_file = st.file_uploader(
             "8. 영업구역담당자 (Excel/CSV) - SP 영업구역정보=구역번호 → 담당자명", type=['xlsx', 'xls', 'csv'],
         )
+        core_file = st.file_uploader("9. 코어고객 활동관리 (Excel/CSV) - 독립 섹션·지도", type=['xlsx', 'xls', 'csv'])
+        core_voc_file = st.file_uploader("9-1. 코어고객 VOC매칭 (Excel/CSV)", type=['xlsx', 'xls', 'csv'])
+        if core_file is not None:
+            st.session_state['raw_core_df'] = load_data(core_file, core_file.name.endswith('.csv'))
+        if core_voc_file is not None:
+            st.session_state['raw_core_voc_df'] = load_data(core_voc_file, core_voc_file.name.endswith('.csv'))
 
         process_btn = st.button("데이터 병합 및 처리")
 
@@ -520,6 +526,8 @@ def render_dashboard():
             cancelled_facility_df=st.session_state.get('raw_cancelled_facility_df'),
             raw_files=st.session_state.get('raw_files'),
             matching_config=st.session_state.get('used_matching_config'),
+            core_df=st.session_state.get('raw_core_df'),
+            core_voc_df=st.session_state.get('raw_core_voc_df'),
         )
 
         st.markdown("### HTML 리포트 생성")

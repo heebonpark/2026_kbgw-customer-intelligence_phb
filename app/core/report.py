@@ -1341,6 +1341,25 @@ body {
 @container (max-width: 38px) { .zl4 { display: none; } }
 @container (max-width: 46px) { .zl5 { display: none; } }
 /* ---- 구역별 고급 시각화 ---- */
+.core-filter-bar { margin-bottom: 14px; }
+.core-legend { margin: 6px 0 8px; align-items: center; }
+.core-coord-note { margin-left: auto; color: var(--text-muted); font-size: 12px; }
+.core-sign-key { border-radius: 50%; background: var(--surface-1); border: 3px solid var(--critical); box-sizing: border-box; }
+.core-map { height: 520px; border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 14px; background: var(--page-plane); }
+.core-map-empty { height: auto; padding: 18px 20px; font-size: 13px; color: var(--text-secondary); }
+.core-pop { font-size: 12px; line-height: 1.45; min-width: 220px; }
+.core-pop-title { font-weight: 800; font-size: 13.5px; margin-bottom: 4px; }
+.core-pop-note { margin: 4px 0; padding: 5px 7px; background: #f6f6f3; border-radius: 6px; color: #333; }
+.core-pop-addr { color: #666; margin: 2px 0 6px; }
+.core-table-scroll { max-height: 560px; }
+#coreTable td { vertical-align: top; }
+#coreTable tbody tr { cursor: pointer; }
+#coreTable tbody tr:hover td { background: var(--page-plane); }
+#coreTable tr.core-active td { background: color-mix(in srgb, var(--brand) 12%, var(--surface-1)); }
+#coreTable tr.core-sign td { background: color-mix(in srgb, var(--critical) 7%, var(--surface-1)); }
+#coreTable td.core-sign-cell { color: var(--critical); font-weight: 800; }
+#coreTable td.core-note { max-width: 360px; white-space: normal; font-size: 12px; color: var(--text-secondary); }
+#coreTable td.core-novisit { color: var(--text-muted); }
 .perf-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; align-items: start; margin-bottom: 16px; }
 .perf-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .perf-band { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 14px; font-weight: 700; font-size: 14.5px;
@@ -1847,7 +1866,7 @@ function initDashNav() {
         sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
         links.forEach(l => l.classList.toggle('active', l === a));
     });
-    links.forEach(l => { if (!document.getElementById(l.dataset.sec)) l.hidden = true; });
+    links.forEach(l => { const s = document.getElementById(l.dataset.sec); if (!s || s.hidden) l.hidden = true; });
     if ('IntersectionObserver' in window) {
         const io = new IntersectionObserver(entries => {
             entries.forEach(en => { if (en.isIntersecting) links.forEach(l => l.classList.toggle('active', l.dataset.sec === en.target.id)); });
@@ -1856,6 +1875,214 @@ function initDashNav() {
     }
 }
 document.addEventListener('DOMContentLoaded', initDashNav);
+
+// ===== 9. 코어고객 활동관리 -- 독립 섹션 (총괄DB 필터와 무관). core_customers.py build_core_payload의 rows를 그린다 =====
+(function () {
+    const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';
+    const LEAFLET_CSS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css';
+    const BRANCHES = ['중앙', '강북', '서대문', '고양', '의정부', '남양주', '강릉', '원주'];
+    const STATES = ['방문완료', '미방문', '해지징후'];
+    const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; };
+    const won = n => n == null ? '-' : (n >= 100000000 ? (n / 100000000).toFixed(1) + '억원' : n >= 10000 ? Math.round(n / 10000).toLocaleString('ko-KR') + '만원' : Math.round(n).toLocaleString('ko-KR') + '원');
+    const kakaoLink = a => a ? 'https://map.kakao.com/link/search/' + encodeURIComponent(a) : null;
+    const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    let state = { 관리주체: '', 지사: '', 활동상태: '' };
+    let payload = null, map = null, layer = null, markers = new Map();
+
+    function loadLeaflet(done) {
+        if (window.L) { done(); return; }
+        if (!document.querySelector('link[data-leaflet]')) {
+            const css = document.createElement('link');
+            css.rel = 'stylesheet'; css.href = LEAFLET_CSS; css.setAttribute('data-leaflet', '1');
+            document.head.appendChild(css);
+        }
+        const s = document.createElement('script');
+        s.src = LEAFLET_JS;
+        s.onload = done;
+        s.onerror = () => { const m = document.getElementById('coreMap'); if (m) m.textContent = '지도 모듈을 불러오지 못했습니다 (인터넷 연결 확인).'; };
+        document.head.appendChild(s);
+    }
+    const visible = () => payload.rows.filter(r =>
+        (!state.관리주체 || r.관리주체 === state.관리주체) && (!state.지사 || r.지사 === state.지사) && (!state.활동상태 || r.활동상태 === state.활동상태));
+
+    function pills(label, key, values) {
+        const g = el('div', 'filter-group');
+        g.appendChild(el('span', 'filter-group-label', label));
+        const row = el('div', 'filter-pill-row');
+        [''].concat(values).forEach(v => {
+            const b = el('button', 'filter-pill' + (state[key] === v ? ' active' : ''), v === '' ? '전체' : v);
+            b.type = 'button'; b.dataset.coreKey = key; b.dataset.coreValue = v;
+            row.appendChild(b);
+        });
+        g.appendChild(row);
+        return g;
+    }
+    function tile(label, value, sub) {
+        const t = el('div', 'stat-tile');
+        t.appendChild(el('div', 'stat-label', label));
+        t.appendChild(el('div', 'stat-value', value));
+        t.appendChild(el('div', 'stat-sub', sub));
+        return t;
+    }
+    function popupEl(r) {
+        const box = el('div', 'core-pop');
+        box.appendChild(el('div', 'core-pop-title', r.관리고객명 || '-'));
+        const lines = [
+            r.지사 + ' · ' + r.관리주체 + (r.관리고객담당자 ? ' · 담당 ' + r.관리고객담당자 : ''),
+            '최근 방문: ' + (r['3Q방문일자'] || r.방문일자 || '없음') + (r.방문자 ? ' (' + r.방문자 + ')' : ''),
+            '해지징후: ' + (r.해지징후 || '-') + ' · 월정료 ' + won(r.월정료),
+        ];
+        if (r.VOC && r.VOC.length) lines.push('VOC ' + r.VOC.length + '건: ' + r.VOC.map(v => (v.상태 || '-') + ' ' + (v.유형 || '')).join(', '));
+        lines.forEach(t => box.appendChild(el('div', 'core-pop-line', t)));
+        if (r.불만요구) box.appendChild(el('div', 'core-pop-note', r.불만요구));
+        box.appendChild(el('div', 'core-pop-line core-pop-addr', r.설치주소 || ''));
+        const link = kakaoLink(r.설치주소);
+        if (link) { const a = el('a', 'pending-map-link', '🗺 카카오맵'); a.href = link; a.target = '_blank'; a.rel = 'noopener'; box.appendChild(a); }
+        return box;
+    }
+    function drawMap(rows) {
+        const holder = document.getElementById('coreMap');
+        if (!holder) return;
+        const pts = rows.filter(r => r.lat != null && r.lng != null);
+        if (!payload.rows.some(r => r.lat != null)) {
+            holder.className = 'core-map core-map-empty';
+            holder.textContent = '지도 좌표가 없습니다 -- GUI의 "카카오 REST 키" 칸에 키를 넣고 리포트를 다시 만들면 설치주소가 지도에 표시됩니다. (표의 🗺 링크로 카카오맵 바로가기)';
+            return;
+        }
+        loadLeaflet(() => {
+            if (!map) {
+                holder.textContent = '';
+                map = L.map(holder, { scrollWheelZoom: false });
+                // Esri 거리지도: 키 없이 파일(file://)로 열어도 보이고 지명이 한글 (CARTO는 키 필요로 바뀜)
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+                    maxZoom: 19, attribution: 'Tiles &copy; Esri',
+                }).addTo(map);
+                layer = L.layerGroup().addTo(map);
+            }
+            layer.clearLayers(); markers.clear();
+            const color = { 본부장: cssVar('--s7') || '#4a3aa7', 지사장: cssVar('--s1') || '#2a78d6' };
+            const ring = cssVar('--surface-1') || '#fff', danger = cssVar('--critical') || '#d03b3b';
+            pts.forEach(r => {
+                const sign = r.해지징후 === 'Y';
+                const m = L.circleMarker([r.lat, r.lng], {
+                    radius: sign ? 9 : 7, weight: sign ? 3 : 2, color: sign ? danger : ring,
+                    fillColor: color[r.관리주체] || cssVar('--baseline') || '#888', fillOpacity: 0.9,
+                }).bindPopup(popupEl(r), { maxWidth: 320 });
+                m.bindTooltip(r.관리고객명 || '', { direction: 'top', offset: [0, -6] });
+                m.on('click', () => highlightRow(r.계약번호));
+                m.addTo(layer);
+                markers.set(r.계약번호, m);
+            });
+            if (pts.length) map.fitBounds(L.latLngBounds(pts.map(r => [r.lat, r.lng])), { padding: [24, 24], maxZoom: 14 });
+            setTimeout(() => map.invalidateSize(), 50);
+        });
+    }
+    function highlightRow(key) {
+        document.querySelectorAll('#coreTable tr.core-active').forEach(tr => tr.classList.remove('core-active'));
+        const tr = document.querySelector('#coreTable tr[data-core-key="' + key + '"]');
+        if (tr) { tr.classList.add('core-active'); tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+    }
+    function table(rows) {
+        const wrap = el('div', 'table-scroll core-table-scroll');
+        const t = el('table'); t.id = 'coreTable';
+        const head = el('tr');
+        ['지사', '관리주체', '관리고객 명', '담당', '최근 방문', '방문대상 / 방문자', '해지징후', '불만·요구·추가영업기회', 'VOC', '월정료', '지도']
+            .forEach(h => head.appendChild(el('th', null, h)));
+        const thead = el('thead'); thead.appendChild(head); t.appendChild(thead);
+        const tb = el('tbody');
+        rows.forEach(r => {
+            const tr = el('tr'); tr.dataset.coreKey = r.계약번호 || '';
+            if (r.해지징후 === 'Y') tr.className = 'core-sign';
+            const cells = [r.지사, r.관리주체, r.관리고객명, r.관리고객담당자 || r.영업구역담당,
+                (r['3Q방문일자'] || r.방문일자 || '미방문'), [r.방문대상, r.방문자].filter(Boolean).join(' / '),
+                r.해지징후 === 'Y' ? '▲ Y' : (r.해지징후 || '-'), r.불만요구 || '',
+                r.VOC && r.VOC.length ? r.VOC.map(v => (v.상태 || '-') + (v.유형 ? ' · ' + v.유형 : '')).join(' / ') : '', won(r.월정료)];
+            cells.forEach((c, i) => {
+                const td = el('td', i === 7 ? 'core-note' : (i === 9 ? 'cell-num' : null), c || '-');
+                if (i === 4 && !(r['3Q방문일자'] || r.방문일자)) td.classList.add('core-novisit');
+                if (i === 6 && r.해지징후 === 'Y') td.classList.add('core-sign-cell');
+                tr.appendChild(td);
+            });
+            const mapTd = el('td');
+            const link = kakaoLink(r.설치주소);
+            if (link) { const a = el('a', 'pending-map-link', '🗺'); a.href = link; a.target = '_blank'; a.rel = 'noopener'; a.title = r.설치주소; mapTd.appendChild(a); }
+            tr.appendChild(mapTd);
+            tr.addEventListener('click', e => {
+                if (e.target.closest('a')) return;
+                highlightRow(r.계약번호);
+                const m = markers.get(r.계약번호);
+                if (m && map) { map.setView(m.getLatLng(), Math.max(map.getZoom(), 15)); m.openPopup(); document.getElementById('coreMap').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+            });
+            tb.appendChild(tr);
+        });
+        t.appendChild(tb); wrap.appendChild(t);
+        return wrap;
+    }
+    function render() {
+        const wrap = document.getElementById('coreSectionWrap');
+        if (!wrap || !payload) return;
+        const rows = visible();
+        map = null;  // 지도 컨테이너를 새로 만드므로 지도도 새로
+        wrap.innerHTML = '';
+        const all = payload.rows;
+        const branches = BRANCHES.filter(b => all.some(r => r.지사 === b)).concat(Array.from(new Set(all.map(r => r.지사))).filter(b => !BRANCHES.includes(b)));
+        const bar = el('div', 'global-filter-bar core-filter-bar');
+        bar.appendChild(pills('관리주체', '관리주체', Array.from(new Set(all.map(r => r.관리주체))).sort()));
+        bar.appendChild(pills('지사', '지사', branches));
+        bar.appendChild(pills('활동', '활동상태', STATES.filter(s => all.some(r => r.활동상태 === s))));
+        bar.appendChild(el('span', 'filter-summary', rows.length.toLocaleString('ko-KR') + ' / ' + all.length.toLocaleString('ko-KR') + '곳'));
+        wrap.appendChild(bar);
+
+        const sum = (k) => rows.reduce((n, r) => n + (r[k] || 0), 0);
+        const vocs = rows.flatMap(r => r.VOC || []);
+        const grid = el('div', 'stat-grid');
+        grid.appendChild(tile('코어고객', rows.length.toLocaleString('ko-KR') + '곳', '본부장 ' + rows.filter(r => r.관리주체 === '본부장').length + ' · 지사장 ' + rows.filter(r => r.관리주체 === '지사장').length));
+        grid.appendChild(tile('3분기 방문 완료', rows.filter(r => r['3Q방문일자']).length + '곳', '미방문 ' + rows.filter(r => r.활동상태 === '미방문').length + '곳'));
+        grid.appendChild(tile('해지징후', rows.filter(r => r.해지징후 === 'Y').length + '곳', '불만·요구 기록 ' + rows.filter(r => r.불만요구).length + '곳'));
+        grid.appendChild(tile('월정료 합계', won(sum('월정료')), '재계약대상 ' + won(sum('재계약대상월정료'))));
+        grid.appendChild(tile('VOC (매칭)', vocs.length + '건', '처리완료 ' + vocs.filter(v => v.상태 === '처리완료').length + ' · 접수 ' + vocs.filter(v => v.상태 === '접수').length + ' · 미접수 ' + vocs.filter(v => v.상태 === '미접수').length));
+        wrap.appendChild(grid);
+
+        const cs = payload.coord_stats || {};
+        const legend = el('div', 'legend-grid core-legend');
+        [['본부장', '--s7'], ['지사장', '--s1']].forEach(([n, v]) => {
+            const it = el('div', 'legend-item'); const sw = el('span', 'legend-swatch'); sw.style.background = cssVar(v); sw.style.borderRadius = '50%';
+            it.appendChild(sw); it.appendChild(el('span', 'legend-label', n)); legend.appendChild(it);
+        });
+        const it = el('div', 'legend-item'); const sw = el('span', 'legend-swatch core-sign-key'); it.appendChild(sw); it.appendChild(el('span', 'legend-label', '해지징후 (빨간 테두리)')); legend.appendChild(it);
+        legend.appendChild(el('span', 'legend-value core-coord-note', '지도 표시 ' + all.filter(r => r.lat != null).length + '/' + all.length + '곳'
+            + (cs.없음 ? ' · 좌표 없음 ' + cs.없음 + '곳' + (payload.coord_note ? ' (' + payload.coord_note + ')'
+                : payload.kakao_error ? ' (카카오 오류: ' + payload.kakao_error + ')' : (payload.kakao_key_set === false ? ' (카카오 키 미설정)' : '')) : '')));
+        wrap.appendChild(legend);
+        const mapBox = el('div', 'core-map'); mapBox.id = 'coreMap';
+        wrap.appendChild(mapBox);
+        wrap.appendChild(el('p', 'section-desc', '활동내역 -- 행을 누르면 지도에서 위치를 보여줍니다 · ▲ 해지징후 · 회색 날짜 = 방문 기록 없음'));
+        wrap.appendChild(table(rows));
+        drawMap(rows);
+    }
+    document.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-core-key][data-core-value]');
+        if (!b) return;
+        state[b.dataset.coreKey] = b.dataset.coreValue;
+        map = null;
+        render();
+    });
+    // GUI 리포트는 내장 JSON(#coreData)으로, 웹 업로드는 window.DataIntelCore(payload)로 들어온다
+    window.DataIntelCore = function (p) {
+        payload = p && p.rows && p.rows.length ? p : null;
+        state = { 관리주체: '', 지사: '', 활동상태: '' };
+        map = null;
+        const sec = document.getElementById('secCore');
+        const link = document.querySelector('#dashNav a[data-sec="secCore"]');
+        if (sec) sec.hidden = !payload;
+        if (link) link.hidden = !payload;
+        render();
+    };
+    document.addEventListener('DOMContentLoaded', () => {
+        const d = document.getElementById('coreData');
+        if (d) { try { window.DataIntelCore(JSON.parse(d.textContent)); } catch (e) { console.error(e); } }
+    });
+})();
 
 
 // ===== Client-side matching + dashboard engine =====
@@ -4818,6 +5045,7 @@ DASH_NAV_ITEMS = [
     ('secZone', '🗺️ 구역·담당자'),
     ('secPerf', '📋 실적현황표'),
     ('secAction', '🎯 조치 대상'),
+    ('secCore', '💎 코어고객'),
     ('secContract', '📑 계약·고객'),
     ('secDetail', '🔎 상세 데이터'),
 ]
@@ -4877,6 +5105,12 @@ def render_dashboard_sections(p):
         </details>
         </details>
 
+        <details class="section-collapse dash-sec" id="secCore" open{"" if g("core") else " hidden"}>
+        <summary class="section-title">💎 코어고객 활동관리 <span class="badge">독립 데이터</span> <span class="sec-hint">관리주체 · 지사 · 활동내역 · 설치주소 지도 (위 필터와 무관)</span></summary>
+        <div id="coreSectionWrap"></div>
+        {g("core_json")}
+        </details>
+
         <details class="section-collapse dash-sec" id="secContract" open>
         <summary class="section-title">📑 계약·고객 현황 <span class="sec-hint">계약 · 금액 · VOC · 재계약 · 분포</span></summary>
         {g("eda_button")}
@@ -4908,7 +5142,7 @@ def render_dashboard_sections(p):
 def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
                           cancelled_facility_df=None, raw_files=None, matching_config=None,
                           password=None, admin_password=None, expiry_date=None, encrypt=True,
-                          eda_link=False):
+                          eda_link=False, core_df=None, core_voc_df=None, kakao_key=None, log=print):
     """Generates the password-protected HTML dashboard report.
 
     df: already-merged 총괄DB dataframe (server-rendered initial dashboard).
@@ -4936,6 +5170,9 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
         needed for anything hosted on the web. Blank passwords then become
         strong random ones (the fixed DEFAULT_ADMIN_PASSWORD is public in
         this repo, so it must never be a decryption key).
+    core_df / core_voc_df: 9. 코어고객 활동관리 (+ 9-1 VOC매칭) -- independent
+        section with a 설치주소 map (see core_customers.py). kakao_key: Kakao
+        REST key for geocoding; None -> this PC's saved key.
     eda_link: show the '딥 다이브 EDA' button, which opens a sibling
         Data_Intel_PRO_EDA.html. Only generate_report.py's CLI writes that
         file (unencrypted, full data) -- the GUI and a deployed page never
@@ -4996,6 +5233,13 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
         <div class="eda-btn-wrap">
             <a href="Data_Intel_PRO_EDA.html" target="_blank" class="eda-btn">🚀 딥 다이브 EDA 분석기 열기 (별도 창)</a>
         </div>""" if eda_link else ""
+    core_json = ""
+    if core_df is not None:
+        from .core_customers import build_core_payload, load_kakao_key
+        core_payload = build_core_payload(core_df, core_voc_df, kakao_key=kakao_key or load_kakao_key(), log=log)
+        if core_payload:
+            core_json = ('<script type="application/json" id="coreData">'
+                         + json.dumps(core_payload, ensure_ascii=False).replace('<', '\\u003c') + '</script>')
     dash_nav_html = render_dashboard_nav(
         extra_items=[('secCancel', '⚠️ 해지')] if (cancel_section_html or nudge_section_html) else [])
     dash_sections_html = render_dashboard_sections({
@@ -5006,6 +5250,7 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
         "sp_pending": sp_pending_section_html, "stat": stat_html, "chart_grid": chart_grid_html,
         "recontract": recontract_section_html, "eda": eda_section_html, "table": table_html,
         "cancel": cancel_section_html, "nudge": nudge_section_html, "eda_button": eda_button_html,
+        "core": bool(core_json), "core_json": core_json,
     })
     generated_at = datetime.now().strftime('%Y-%m-%d %H:%M')
 
