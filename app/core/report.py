@@ -2537,10 +2537,16 @@ const DataIntelMapLib = (function () {
     // holder에 지도를 연다 -> Promise<지도 객체>. opts: { cluster: 가까운 마커를 숫자 원으로 묶을지 }
     function open(holder, opts) {
         opts = opts || {};
-        if (!config.kakaoJsKey) return leafletMap(holder, opts, '');
-        if (location.protocol === 'file:') return leafletMap(holder, opts, '카카오맵은 공유 링크로 열면 표시됩니다');
+        // 기본 지도로 넘어갈 때는 이유를 지도 옆에 적는다 (어디서 막혔는지 화면만 보고 알 수 있게)
+        if (!config.kakaoJsKey) return leafletMap(holder, opts, document.getElementById('mapConfig') ? '' : '기본 지도 (리포트에 카카오 JavaScript 키 없음)');
+        if (location.protocol === 'file:') return leafletMap(holder, opts, '기본 지도 (파일로 열림 -- 카카오맵은 공유 링크나 GUI 미리보기 주소에서 표시)');
         return kakao().then(() => kakaoMap(holder, opts))
-            .catch(() => leafletMap(holder, opts, '카카오맵을 불러오지 못해 기본 지도로 표시 (JavaScript 키와 카카오 콘솔의 사이트 도메인 등록 확인)'));
+            .catch(e => {
+                const why = String((e && e.message) || e);
+                const reason = why.indexOf('dapi.kakao.com') >= 0 || why === 'kakao sdk' ? '카카오가 이 주소를 거절: ' + location.origin + ' -- 카카오 콘솔 사이트 도메인 등록 확인'
+                    : why === 'kakao timeout' ? '카카오 응답 지연' : '오류: ' + why.slice(0, 80);
+                return leafletMap(holder, opts, '기본 지도 (' + reason + ')');
+            });
     }
     return { open };
 })();
