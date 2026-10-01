@@ -156,7 +156,7 @@ class DataIntelGUI:
         list_container = tk.Frame(body, bg=BG)
         list_container.pack(fill=tk.BOTH, expand=True)
 
-        canvas = tk.Canvas(list_container, bg=BG, highlightthickness=0, height=360)
+        canvas = tk.Canvas(list_container, bg=BG, highlightthickness=0, height=190)
         scrollbar = ttk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
         self.scroll_frame = tk.Frame(canvas, bg=BG)
         self.scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
