@@ -16,8 +16,11 @@ customer name or contract number -- and each address only once (cached).
 import json
 import os
 import re
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -188,8 +191,15 @@ def _save_cache(cache):
 def _kakao_get(endpoint, query, key):
     url = f"https://dapi.kakao.com/v2/local/search/{endpoint}.json?" + urllib.parse.urlencode({'query': query, 'size': 1})
     req = urllib.request.Request(url, headers={'Authorization': f'KakaoAK {key}'})
-    with urllib.request.urlopen(req, timeout=8) as resp:
-        docs = json.loads(resp.read().decode('utf-8')).get('documents') or []
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                docs = json.loads(resp.read().decode('utf-8')).get('documents') or []
+            break
+        except urllib.error.HTTPError as e:
+            if e.code != 429 or attempt == 3:  # 429 = 요청이 너무 빠름 -> 잠깐 쉬고 다시
+                raise
+            time.sleep(1.0 + attempt)
     if docs:
         return float(docs[0]['y']), float(docs[0]['x'])
     return None
@@ -246,6 +256,57 @@ def geocode_kakao(address, key):
         if hit:
             return hit[0], hit[1], '동 단위'
     return None
+
+
+def _geocode_into_cache(addresses, kakao_key, log=print, workers=4, chunk=80):
+    """아직 좌표가 없는 주소만 카카오로 변환해 이 PC의 캐시에 더한다 -> (cache, 오류문구 또는 None).
+    못 찾았던 주소(None)는 다시 시도한다 -- 주소 정리 규칙이 보강될 수 있음. 키 오류·네트워크
+    오류는 한 번만 알리고 멈춘다. 진행 상황은 이 함수를 부른 스레드에서만 log 한다 (GUI 안전)."""
+    cache = _load_cache()
+    need = sorted({a for a in addresses if a and not cache.get(a)})
+    if not need or not kakao_key:
+        return cache, None
+    if len(need) > chunk:
+        log(f"카카오 주소검색: 새 주소 {len(need):,}건 변환 시작 (처음 한 번만, 다음부터는 저장된 좌표 사용)")
+    fetched, failed, error = 0, 0, None
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        for start in range(0, len(need), chunk):
+            part = need[start:start + chunk]
+            try:
+                hits = list(pool.map(lambda a: geocode_kakao(a, kakao_key), part))
+            except Exception as e:
+                error = str(e)
+                log(f"카카오 주소검색 실패: {error} -- 지도 좌표 변환을 건너뜁니다.")
+                break
+            for addr, hit in zip(part, hits):
+                cache[addr] = [hit[0], hit[1], hit[2]] if hit else None
+                failed += 0 if hit else 1
+            fetched += len(part)
+            _save_cache(cache)
+            if len(need) > chunk:
+                log(f"  주소 좌표 변환 {fetched:,}/{len(need):,}")
+    if fetched:
+        log(f"카카오 주소검색: {fetched:,}건 변환 (못 찾음 {failed:,}건), 이 PC에 저장")
+    return cache, error
+
+
+def geocode_addresses(addresses, kakao_key=None, log=print):
+    """설치주소 목록 -> ({주소: [위도, 경도] 또는 [위도, 경도, 1(동 단위 위치)]}, 안내문구 또는 None).
+    리포트의 '지도로 보기'가 쓰는 좌표표 -- 주소 문자열만 카카오에 보낸다 (상호·계약번호는 보내지 않음)."""
+    wanted = {str(a).replace('\xa0', ' ').strip() for a in addresses if a is not None and not (isinstance(a, float) and pd.isna(a))}
+    wanted.discard('')
+    cache, error = _geocode_into_cache(wanted, kakao_key, log)
+    geo = {}
+    for addr in wanted:
+        hit = cache.get(addr)
+        if hit:
+            point = [round(hit[0], 6), round(hit[1], 6)]
+            geo[addr] = point + [1] if len(hit) > 2 and hit[2] == '동 단위' else point
+    missing = len(wanted) - len(geo)
+    note = None
+    if missing:
+        note = (f"카카오 오류: {error}" if error else "카카오 REST 키 미설정" if not kakao_key else "주소를 찾지 못함")
+    return geo, note
 
 
 # ---------------------------------------------------------------- payload
@@ -325,27 +386,7 @@ def build_core_payload(core_df, voc_df=None, kakao_key=None, log=print):
         rows.append(row)
 
     # 좌표: 캐시 -> 카카오 (주소 하나당 한 번)
-    cache = _load_cache()
-    need = sorted({row['설치주소'] for row in rows if row['lat'] is None and row['설치주소']})
-    fetched, failed, error = 0, 0, None
-    for addr in need:
-        if cache.get(addr):  # 못 찾았던 주소(None)는 다음에 다시 시도 -- 주소 정리 규칙이 보강될 수 있음
-            continue
-        if not kakao_key or error:
-            continue
-        try:
-            hit = geocode_kakao(addr, kakao_key)
-        except Exception as e:  # 키 오류·네트워크 -- 한 번만 알리고 나머지는 건너뜀
-            error = str(e)
-            log(f"카카오 주소검색 실패: {error} -- 지도 좌표 변환을 건너뜁니다.")
-            continue
-        cache[addr] = [hit[0], hit[1], hit[2]] if hit else None
-        fetched += 1
-        if not hit:
-            failed += 1
-    if fetched:
-        _save_cache(cache)
-        log(f"카카오 주소검색: {fetched}건 변환 (못 찾음 {failed}건), 이 PC에 저장")
+    cache, error = _geocode_into_cache([row['설치주소'] for row in rows if row['lat'] is None and row['설치주소']], kakao_key, log)
     for row in rows:
         hit = cache.get(row['설치주소']) if row['lat'] is None and row['설치주소'] else None
         if hit:

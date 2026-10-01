@@ -205,7 +205,7 @@ class DataIntelGUI:
 
         kk_row = tk.Frame(opts_card, bg=CARD_BG)
         kk_row.pack(fill=tk.X, padx=14, pady=4)
-        tk.Label(kk_row, text="★ 카카오 REST 키 (9번 지도 좌표, 이 PC에 저장)", bg=CARD_BG, width=26, anchor="w",
+        tk.Label(kk_row, text="★ 카카오 REST 키 (지도 좌표용, 이 PC에 저장)", bg=CARD_BG, width=26, anchor="w",
                  font=("Helvetica", 10)).pack(side=tk.LEFT)
         kk_ent = tk.Entry(kk_row, textvariable=self.kakao_key, font=("Helvetica", 10), show="•")
         kk_ent.pack(side=tk.LEFT, fill=tk.X, expand=True)
