@@ -44,7 +44,7 @@ import http.server
 from urllib.parse import quote, unquote
 from datetime import datetime
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, simpledialog
 from tkinter import ttk
 import webbrowser
 import traceback
@@ -54,7 +54,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
 from core.handlers import process_and_merge, load_data
 from core.report import generate_html_report, generate_core_report, CORE_REPORT_TITLE
 from core.matching_config import load_matching_config
-from deploy_report import deploy, DeployError, DEFAULT_REPO, CORE_REPO
+from deploy_report import deploy, DeployError, OwnerNeeded, save_github_owner, DEFAULT_REPO, CORE_REPO
 from core.secure_report import load_admin_password, save_admin_password
 from core.core_customers import load_kakao_key, save_kakao_key, load_kakao_js_key, save_kakao_js_key
 
@@ -564,7 +564,18 @@ class DataIntelGUI:
         try:
             self.log("GitHub Pages 배포를 시작합니다...")
             try:
-                url = deploy(path, repo_name=repo, log=self.log, description=f"{title} (암호화)")
+                try:
+                    url = deploy(path, repo_name=repo, log=self.log, description=f"{title} (암호화)")
+                except OwnerNeeded as e:
+                    # zip으로 받은 폴더 + gh 없음: 계정 이름을 한 번 물어 이 PC에 저장하고 다시 시도
+                    owner = simpledialog.askstring(
+                        "GitHub 계정", f"{e}\n\n리포트를 올릴 GitHub 계정 이름(아이디)을 입력하세요.\n"
+                        "예: 주소가 https://github.com/abc 이면 abc\n(이 PC에 저장되어 다음부터는 묻지 않습니다)", parent=self.root)
+                    if not owner or not owner.strip():
+                        self.log("배포 취소됨 (GitHub 계정 이름 없음)")
+                        return
+                    save_github_owner(owner.strip())
+                    url = deploy(path, repo_name=repo, log=self.log, description=f"{title} (암호화)")
             except DeployError as e:
                 if '비공개 저장소' not in str(e):
                     raise

@@ -34,8 +34,36 @@ CORE_REPO = "kbgw-core-report"  # 코어고객 전용 리포트 -- 종합 리포
 ENCRYPTED_MARKER = 'id="encPayload"'
 
 
+SETTINGS_PATH = os.path.join(os.path.expanduser("~/.dataintelligence_pro"), "report_settings.json")
+
+
 class DeployError(Exception):
     pass
+
+
+class OwnerNeeded(DeployError):
+    """gh도 없고 git 저장소도 아니라(zip으로 받은 폴더) 어느 GitHub 계정으로 올릴지 모를 때.
+    GUI는 이때 계정 이름을 물어 save_github_owner()로 저장한 뒤 다시 배포한다."""
+
+
+def load_github_owner():
+    try:
+        with open(SETTINGS_PATH, encoding='utf-8') as f:
+            return json.load(f).get('github_owner') or None
+    except (FileNotFoundError, ValueError, OSError):
+        return None
+
+
+def save_github_owner(owner):
+    os.makedirs(os.path.dirname(SETTINGS_PATH), exist_ok=True)
+    try:
+        with open(SETTINGS_PATH, encoding='utf-8') as f:
+            settings = json.load(f)
+    except (FileNotFoundError, ValueError, OSError):
+        settings = {}
+    settings['github_owner'] = owner or None
+    with open(SETTINGS_PATH, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, ensure_ascii=False, indent=2)
 
 
 def _run(cmd, cwd=None, check=True):
@@ -76,16 +104,20 @@ def _push_single_commit(html_path, full, log):
 
 
 def _deploy_without_gh(html_path, repo_name, log):
-    owner = _owner_from_source_repo()
+    # 계정: 이 PC에 저장해 둔 이름 -> 이 폴더를 받은 저장소(origin)
+    owner = load_github_owner() or _owner_from_source_repo()
     if not owner:
-        raise DeployError("'gh' 명령이 없고 GitHub 계정도 알 수 없습니다 (이 폴더가 git으로 받은 저장소가 아님). " + GH_INSTALL_HINT)
+        raise OwnerNeeded("배포할 GitHub 계정 이름이 필요합니다 (gh가 없고, 이 폴더가 zip으로 받은 폴더라 계정을 알 수 없음).")
+    if not re.fullmatch(r'[A-Za-z0-9-]{1,39}', owner):
+        raise OwnerNeeded(f"GitHub 계정 이름이 올바르지 않습니다: {owner}")
     full = f"{owner}/{repo_name}"
     log(f"gh 없이 배포합니다: {full} (처음이면 GitHub 로그인 창이 뜹니다)")
     pushed = _push_single_commit(html_path, full, log)
     if pushed.returncode != 0:
         msg = (pushed.stderr or pushed.stdout).strip()
         if 'not found' in msg.lower():
-            raise DeployError(f"배포 저장소 {full} 가 아직 없습니다. 저장소를 처음 만들 때는 gh가 필요합니다. " + GH_INSTALL_HINT)
+            raise DeployError(f"배포 저장소 {full} 를 찾을 수 없습니다 (계정 이름이 맞는지, 로그인한 계정에 권한이 있는지 확인). "
+                              "저장소를 처음 만들 때는 gh가 필요합니다. " + GH_INSTALL_HINT)
         raise DeployError(f"업로드 실패 (GitHub 로그인·권한 확인): {msg[:300]}  " + GH_INSTALL_HINT)
     return f"https://{owner.lower()}.github.io/{repo_name}/"
 
