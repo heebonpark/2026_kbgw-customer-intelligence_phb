@@ -1958,6 +1958,16 @@ document.addEventListener('DOMContentLoaded', initDashNav);
                     maxZoom: 19, attribution: 'Tiles &copy; Esri',
                 }).addTo(map);
                 layer = L.layerGroup().addTo(map);
+                // 잠금 화면 뒤(숨김, 크기 0)에서 그려지면 확대 수준이 틀어진다 -- 보이는 크기가 생기면 다시 맞춘다
+                if (window.ResizeObserver) {
+                    let wasHidden = !holder.offsetWidth;
+                    new ResizeObserver(() => {
+                        if (!holder.offsetWidth) { wasHidden = true; return; }
+                        map.invalidateSize();
+                        if (wasHidden && map._coreBounds) map.fitBounds(map._coreBounds, { padding: [24, 24], maxZoom: 14 });
+                        wasHidden = false;
+                    }).observe(holder);
+                }
             }
             layer.clearLayers(); markers.clear();
             const color = { 본부장: cssVar('--s7') || '#4a3aa7', 지사장: cssVar('--s1') || '#2a78d6' };
@@ -1973,7 +1983,9 @@ document.addEventListener('DOMContentLoaded', initDashNav);
                 m.addTo(layer);
                 markers.set(r.계약번호, m);
             });
-            if (pts.length) map.fitBounds(L.latLngBounds(pts.map(r => [r.lat, r.lng])), { padding: [24, 24], maxZoom: 14 });
+            map._coreBounds = pts.length ? L.latLngBounds(pts.map(r => [r.lat, r.lng])) : null;
+            if (map._coreBounds && holder.offsetWidth) map.fitBounds(map._coreBounds, { padding: [24, 24], maxZoom: 14 });
+            else if (!holder.offsetWidth) map.setView([37.6, 127.2], 8);
             setTimeout(() => map.invalidateSize(), 50);
         });
     }
@@ -2051,6 +2063,7 @@ document.addEventListener('DOMContentLoaded', initDashNav);
         });
         const it = el('div', 'legend-item'); const sw = el('span', 'legend-swatch core-sign-key'); it.appendChild(sw); it.appendChild(el('span', 'legend-label', '해지징후 (빨간 테두리)')); legend.appendChild(it);
         legend.appendChild(el('span', 'legend-value core-coord-note', '지도 표시 ' + all.filter(r => r.lat != null).length + '/' + all.length + '곳'
+            + (cs.동단위 ? ' · 동 단위 위치 ' + cs.동단위 + '곳' : '')
             + (cs.없음 ? ' · 좌표 없음 ' + cs.없음 + '곳' + (payload.coord_note ? ' (' + payload.coord_note + ')'
                 : payload.kakao_error ? ' (카카오 오류: ' + payload.kakao_error + ')' : (payload.kakao_key_set === false ? ' (카카오 키 미설정)' : '')) : '')));
         wrap.appendChild(legend);

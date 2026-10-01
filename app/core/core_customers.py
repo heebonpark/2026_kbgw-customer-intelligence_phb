@@ -182,16 +182,57 @@ def _kakao_get(endpoint, query, key):
     return None
 
 
+_REGION_STARTS = ('서울', '경기', '강원', '인천', '충북', '충남', '충청', '전북', '전남', '전라', '경북', '경남', '경상',
+                  '부산', '대구', '광주', '대전', '울산', '세종', '제주')
+_LOT_RE = re.compile(r'^(산)?\d+(-\d+)?$')
+_AREA_RE = re.compile(r'(동|리|가|읍|면)$')
+
+
+def _clean_address(address):
+    """'280-9번지' -> '280-9', 괄호 메모('구)터미널자리') 제거, 주소가 두 번 들어간 경우
+    ('서울 마포구 상암동 서울특별시 마포구 상암동 713') 뒤쪽 온전한 주소만."""
+    tokens = [t.replace('번지', '') for t in address.split()]
+    tokens = [t for t in tokens if t and '(' not in t and ')' not in t]
+    starts = [i for i, t in enumerate(tokens) if i > 0 and t.startswith(_REGION_STARTS)]
+    if starts:
+        tokens = tokens[starts[-1]:]
+    return tokens
+
+
+def _address_candidates(address):
+    tokens = _clean_address(address)
+    cands = []
+    lot = next((i for i, t in enumerate(tokens) if _LOT_RE.match(t)), None)
+    if lot is not None:
+        head = tokens[:lot + 1]
+        cands.append(' '.join(head))
+        # 동/리가 두 개 이상이면(예: 당동리 문산리 7-6) 하나씩만 남겨서도
+        areas = [i for i, t in enumerate(head[:-1]) if _AREA_RE.search(t) and i >= 2]
+        if len(areas) > 1:
+            for keep in areas:
+                cands.append(' '.join(t for i, t in enumerate(head) if i not in areas or i == keep))
+    cands += [' '.join(tokens[:n]) for n in range(len(tokens), max(2, len(tokens) - 3), -1)]
+    seen = set()
+    return [c for c in cands if c and not (c in seen or seen.add(c))]
+
+
 def geocode_kakao(address, key):
-    """주소 -> (위도, 경도). 전체 주소로 못 찾으면 뒤쪽(건물명·층 등)을 한 단어씩 떼며
-    다시 찾고, 그래도 없으면 키워드 검색. 못 찾으면 None. 키 오류는 예외로 올린다."""
-    tokens = address.split()
-    tries = [' '.join(tokens[:n]) for n in range(len(tokens), max(2, len(tokens) - 3), -1)]
-    for q in tries:
+    """주소 -> (위도, 경도, 정밀도). 정리한 주소 후보들로 주소검색 -> 키워드검색 -> 그래도 없으면
+    동·리 단위 위치('동 단위'). 못 찾으면 None. 키 오류는 예외로 올린다."""
+    for q in _address_candidates(address):
         hit = _kakao_get('address', q, key)
         if hit:
-            return hit
-    return _kakao_get('keyword', address, key)
+            return hit[0], hit[1], '정확'
+    hit = _kakao_get('keyword', ' '.join(_clean_address(address)), key)
+    if hit:
+        return hit[0], hit[1], '정확'
+    tokens = _clean_address(address)
+    area = max((i for i, t in enumerate(tokens) if _AREA_RE.search(t) and i >= 1), default=None)
+    if area is not None:
+        hit = _kakao_get('address', ' '.join(tokens[:area + 1]), key)
+        if hit:
+            return hit[0], hit[1], '동 단위'
+    return None
 
 
 # ---------------------------------------------------------------- payload
@@ -253,7 +294,7 @@ def build_core_payload(core_df, voc_df=None, kakao_key=None, log=print):
     need = sorted({row['설치주소'] for row in rows if row['lat'] is None and row['설치주소']})
     fetched, failed, error = 0, 0, None
     for addr in need:
-        if addr in cache:
+        if cache.get(addr):  # 못 찾았던 주소(None)는 다음에 다시 시도 -- 주소 정리 규칙이 보강될 수 있음
             continue
         if not kakao_key or error:
             continue
@@ -263,7 +304,7 @@ def build_core_payload(core_df, voc_df=None, kakao_key=None, log=print):
             error = str(e)
             log(f"카카오 주소검색 실패: {error} -- 지도 좌표 변환을 건너뜁니다.")
             continue
-        cache[addr] = list(hit) if hit else None
+        cache[addr] = [hit[0], hit[1], hit[2]] if hit else None
         fetched += 1
         if not hit:
             failed += 1
@@ -271,14 +312,16 @@ def build_core_payload(core_df, voc_df=None, kakao_key=None, log=print):
         _save_cache(cache)
         log(f"카카오 주소검색: {fetched}건 변환 (못 찾음 {failed}건), 이 PC에 저장")
     for row in rows:
-        if row['lat'] is None and row['설치주소'] and cache.get(row['설치주소']):
-            row['lat'], row['lng'] = cache[row['설치주소']]
-            row['좌표출처'] = '카카오'
+        hit = cache.get(row['설치주소']) if row['lat'] is None and row['설치주소'] else None
+        if hit:
+            row['lat'], row['lng'] = hit[0], hit[1]
+            row['좌표출처'] = '카카오(동 단위)' if len(hit) > 2 and hit[2] == '동 단위' else '카카오'
 
     branch_rank = {b: i for i, b in enumerate(BRANCH_ORDER)}
     rows.sort(key=lambda x: (branch_rank.get(x['지사'], len(BRANCH_ORDER)), x['지사'], str(x['관리고객명'] or '')))
     stats = {'파일': sum(1 for x in rows if x['좌표출처'] == '파일'),
              '카카오': sum(1 for x in rows if x['좌표출처'] == '카카오'),
+             '동단위': sum(1 for x in rows if x['좌표출처'] == '카카오(동 단위)'),
              '없음': sum(1 for x in rows if x['lat'] is None)}
     return {"rows": rows, "coord_stats": stats, "voc_matched": sum(1 for x in rows if x['VOC']),
             "kakao_key_set": bool(kakao_key), "kakao_error": error}
