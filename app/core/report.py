@@ -1423,6 +1423,8 @@ body {
 .cust-map-toggle { font-weight: 700; padding: 8px 16px; border-color: var(--brand); color: var(--brand); background: var(--surface-1); }
 .cust-map-toggle.active { color: white; }
 .cust-map { height: 600px; }
+.core-map-tall { height: min(680px, 72vh); min-height: 420px; }
+#coreSectionWrap { scroll-margin-top: calc(var(--stick-top, 64px) + 58px); }
 .cust-map[hidden] { display: none; }
 .cust-cluster-wrap { background: none; border: 0; }
 .cust-cluster { width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 5px rgba(0,0,0,0.4); }
@@ -2010,6 +2012,7 @@ const DataIntelMapLib = (function () {
     const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     const fresh = () => ({ 관리주체: '', 지사: '', 활동상태: '', 담당자: '', 영업구역: '', q: '', color: '활동상태', sort: null, dir: 1, open: null });
     let state = fresh();
+    let view = '현황';  // '현황'(요약·조치·차트·지도·표) / '지도'(지도 크게 + 표) -- 필터를 바꿔도 유지
     let payload = null, map = null, layer = null, markers = new Map(), period = '';
 
     // ---- 날짜 ----
@@ -2310,8 +2313,11 @@ const DataIntelMapLib = (function () {
     }
 
     // ---- 지도 ----
+    const POP_SKIP = ['_i', 'lat', 'lng', '좌표출처', '설치주소', '불만요구', '방문일자', '3Q방문일자', '2회방문일자'];
+    const POP_LABEL = { 관리고객명: '관리고객 명', 영업구역담당: '영업구역 담당', 최근방문: '최근 방문', 만기비중: '만기도래 비중', 재계약대상시설수: '재계약대상 시설수', 재계약대상월정료: '재계약대상 월정료' };
+    const POP_MONEY = ['월정료', '재계약대상월정료', '약정월정료', '해지월정료', '업셀링금액'];
     function popupEl(r) {
-        const box = el('div', 'core-pop');
+        const box = el('div', 'core-pop cust-pop');
         box.appendChild(el('div', 'core-pop-title', r.관리고객명 || '-'));
         const lines = [
             r.지사 + ' · ' + r.관리주체 + ' · 담당 ' + owner(r),
@@ -2322,6 +2328,19 @@ const DataIntelMapLib = (function () {
         if (r.VOC && r.VOC.length) lines.push('VOC ' + r.VOC.length + '건: ' + r.VOC.map(v => (v.상태 || '-') + ' ' + (v.유형 || '')).join(', '));
         lines.forEach(t => box.appendChild(el('div', 'core-pop-line', t)));
         if (r.불만요구) box.appendChild(el('div', 'core-pop-note', r.불만요구));
+        // 전체 컬럼 -- 값이 있는 항목만
+        const det = document.createElement('details');
+        det.className = 'cust-pop-all';
+        det.appendChild(el('summary', null, '전체 컬럼 보기'));
+        const dl = el('dl', 'core-kv');
+        Object.keys(r).forEach(k => {
+            const v = r[k];
+            if (v === null || v === undefined || v === '' || typeof v === 'object' || POP_SKIP.includes(k)) return;
+            kv(dl, POP_LABEL[k] || k, typeof v === 'number' && POP_MONEY.includes(k) ? Math.round(v).toLocaleString('ko-KR') + '원' : String(v));
+        });
+        (r.방문이력 || []).forEach(h => kv(dl, '방문 ' + h.회차, [h.일자, h.징후 ? '징후 ' + h.징후 : null, h.내용].filter(Boolean).join(' · ')));
+        det.appendChild(dl);
+        box.appendChild(det);
         box.appendChild(el('div', 'core-pop-line core-pop-addr', r.설치주소 || ''));
         const link = kakaoLink(r.설치주소);
         if (link) { const a = el('a', 'pending-map-link', '🗺 카카오맵'); a.href = link; a.target = '_blank'; a.rel = 'noopener'; box.appendChild(a); }
@@ -2524,6 +2543,10 @@ const DataIntelMapLib = (function () {
         map = null;  // 지도 컨테이너를 새로 만드므로 지도도 새로
         wrap.textContent = '';
         const bar = el('div', 'global-filter-bar core-filter-bar');
+        const mapView = view === '지도';
+        const vb = el('button', 'filter-pill cust-map-toggle' + (mapView ? ' active' : ''), mapView ? '📊 현황으로 보기' : '🗺️ 지도로 보기');
+        vb.type = 'button'; vb.dataset.coreView = mapView ? '현황' : '지도'; vb.setAttribute('aria-pressed', mapView ? 'true' : 'false');
+        bar.appendChild(vb);
         bar.appendChild(pills('관리주체', '관리주체', Array.from(new Set(all.map(r => r.관리주체))).sort()));
         bar.appendChild(pills('지사', '지사', branchList(all)));
         bar.appendChild(pills('활동', '활동상태', STATES.filter(s => all.some(r => r.활동상태 === s))));
@@ -2545,16 +2568,18 @@ const DataIntelMapLib = (function () {
         grid.appendChild(tile('월정료 합계', won(sum('월정료')), '재계약대상 ' + won(sum('재계약대상월정료')) + ' (' + pct(sum('재계약대상월정료'), sum('월정료')) + '%)'));
         grid.appendChild(tile('계약종료 3개월 이내', soon.length + '곳', '월정료 ' + won(soon.reduce((s, r) => s + (r.월정료 || 0), 0))));
         grid.appendChild(tile('VOC (매칭)', vocs.length + '건', VOC_STATES.map(s => s + ' ' + vocs.filter(x => x.상태 === s).length).join(' · ')));
-        wrap.appendChild(grid);
-
-        const t1 = el('h3', 'core-block-title', '우선 조치 대상'); t1.appendChild(el('small', null, '고객을 누르면 아래 표에서 방문 이력·VOC·계약 정보를 펼칩니다'));
-        wrap.appendChild(t1);
-        wrap.appendChild(actions(rows));
-        const t2 = el('h3', 'core-block-title', '현황 분석'); t2.appendChild(el('small', null, '막대에 마우스를 올리면 자세한 수치가 보입니다'));
-        wrap.appendChild(t2);
-        wrap.appendChild(charts(rows));
+        if (!mapView) {  // 지도로 보기에서는 지도를 바로 위에 크게 -- 지표·조치·차트는 접는다
+            wrap.appendChild(grid);
+            const t1 = el('h3', 'core-block-title', '우선 조치 대상'); t1.appendChild(el('small', null, '고객을 누르면 아래 표에서 방문 이력·VOC·계약 정보를 펼칩니다'));
+            wrap.appendChild(t1);
+            wrap.appendChild(actions(rows));
+            const t2 = el('h3', 'core-block-title', '현황 분석'); t2.appendChild(el('small', null, '막대에 마우스를 올리면 자세한 수치가 보입니다'));
+            wrap.appendChild(t2);
+            wrap.appendChild(charts(rows));
+        }
 
         const t3 = el('h3', 'core-block-title', '설치주소 지도');
+        t3.appendChild(el('small', null, '마커를 누르면 고객 정보와 전체 컬럼 내역이 보입니다 · 위에서 관리주체·지사·담당자·영업구역을 고르면 지도도 바뀝니다'));
         wrap.appendChild(t3);
         const cs = payload.coord_stats || {};
         const mh = el('div', 'core-map-head');
@@ -2565,7 +2590,7 @@ const DataIntelMapLib = (function () {
             + (cs.없음 ? ' · 좌표 없음 ' + cs.없음 + '곳' + (payload.coord_note ? ' (' + payload.coord_note + ')'
                 : payload.kakao_error ? ' (' + payload.kakao_error + ')' : (payload.kakao_key_set === false ? ' (카카오 키 미설정)' : '')) : '')));
         wrap.appendChild(mh);
-        const mapBox = el('div', 'core-map'); mapBox.id = 'coreMap';
+        const mapBox = el('div', 'core-map' + (mapView ? ' core-map-tall' : '')); mapBox.id = 'coreMap';
         wrap.appendChild(mapBox);
 
         const t4 = el('h3', 'core-block-title', '활동내역'); t4.appendChild(el('small', null, '행을 누르면 방문 이력·VOC·계약 정보가 펼쳐집니다 (지도에도 표시) · 제목을 누르면 정렬'));
@@ -2589,6 +2614,14 @@ const DataIntelMapLib = (function () {
     document.addEventListener('click', (e) => {
         if (!payload || !e.target.closest) return;
         if (e.target.closest('#coreCsvBtn')) { downloadCsv(); return; }
+        const vbtn = e.target.closest('[data-core-view]');
+        if (vbtn) {
+            view = vbtn.dataset.coreView;
+            render();
+            const top = document.getElementById('coreSectionWrap');
+            if (top) top.scrollIntoView({ block: 'start', behavior: 'smooth' });
+            return;
+        }
         const focus = e.target.closest('[data-core-focus]');
         if (focus) { openRow(Number(focus.dataset.coreFocus), 'list'); return; }
         const sort = e.target.closest('#coreTable th[data-core-sort]');
