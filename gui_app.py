@@ -634,9 +634,15 @@ class DataIntelGUI:
             else:
                 self.log(f"비밀번호: {pwd}")
                 summary = f"비밀번호: {pwd}"
+            # 연결 코드가 없는 PC에서 만들면 지도 마커·표의 '조치결과 등록'과 관리자 현황이 통째로 빠진다 -- 조용히 빠지지 않게 알린다
+            no_visit = not self.visit_code.get().strip()
+            if no_visit:
+                self.log("※ 주의: '방문등록 연결 코드' 칸이 비어 있어 방문 조치결과 등록 기능 없이 만들어졌습니다.")
+                self.log("   코드가 있는 PC의 같은 칸 옆 '복사'로 코드를 가져와 넣고 다시 생성하세요.")
             self.log("=========================================")
             messagebox.showinfo("성공", f"코어고객 리포트 생성 완료!\n코어고객 {count:,}곳\n만료일: {expiry}\n{summary}\n\n"
-                                        "'GitHub Pages 배포'를 누르면 공유 링크가 만들어집니다.")
+                                        + ("※ '방문등록 연결 코드'가 비어 있어 조치결과 등록 기능은 빠졌습니다.\n\n" if no_visit else "")
+                                        + "'GitHub Pages 배포'를 누르면 공유 링크가 만들어집니다.")
             self.last_report = (output_path, pwd, expiry, CORE_REPO, f"{CORE_REPORT_TITLE} 리포트")
             self.deploy_btn.config(state=tk.NORMAL)
             self._open_report(output_path)
