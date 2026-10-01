@@ -2116,8 +2116,8 @@ const DataIntelMapLib = (function () {
             try {  // 풍선이 지도 안에 들어오도록 마커를 화면 아래쪽 1/3 지점으로
                 const proj = map.getProjection(), pt = proj.containerPointFromCoords(h.getPosition());
                 pt.y -= Math.round(holder.offsetHeight * 0.22);
-                map.panTo(proj.coordsFromContainerPoint(pt));
-            } catch (e) { map.panTo(h.getPosition()); }
+                map.setCenter(proj.coordsFromContainerPoint(pt));
+            } catch (e) { map.setCenter(h.getPosition()); }
         }
         const api = {
             kind: 'kakao', note: '',
