@@ -174,6 +174,36 @@ def save_kakao_key(key):
         json.dump(settings, f, ensure_ascii=False, indent=2)
 
 
+def _load_setting(name):
+    try:
+        with open(SETTINGS_PATH, encoding='utf-8') as f:
+            return json.load(f).get(name) or None
+    except (FileNotFoundError, ValueError, OSError):
+        return None
+
+
+def _save_setting(name, value):
+    os.makedirs(APP_DIR, exist_ok=True)
+    try:
+        with open(SETTINGS_PATH, encoding='utf-8') as f:
+            settings = json.load(f)
+    except (FileNotFoundError, ValueError, OSError):
+        settings = {}
+    settings[name] = value or None
+    with open(SETTINGS_PATH, 'w', encoding='utf-8') as f:
+        json.dump(settings, f, ensure_ascii=False, indent=2)
+
+
+def load_kakao_js_key():
+    """카카오 JavaScript 키 (지도 배경을 카카오맵으로) -- REST 키와 다른 키. 이 PC에만 저장.
+    브라우저에서 쓰는 키라 리포트 안에 실린다; 카카오 콘솔에 등록한 도메인에서만 동작한다."""
+    return _load_setting('kakao_js_key')
+
+
+def save_kakao_js_key(key):
+    _save_setting('kakao_js_key', key)
+
+
 def _load_cache():
     try:
         with open(GEOCODE_CACHE_PATH, encoding='utf-8') as f:

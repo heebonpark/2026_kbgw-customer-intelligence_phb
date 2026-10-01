@@ -53,7 +53,7 @@ from core.report import generate_html_report, generate_core_report, CORE_REPORT_
 from core.matching_config import load_matching_config
 from deploy_report import deploy, DeployError, DEFAULT_REPO, CORE_REPO
 from core.secure_report import load_admin_password, save_admin_password
-from core.core_customers import load_kakao_key, save_kakao_key
+from core.core_customers import load_kakao_key, save_kakao_key, load_kakao_js_key, save_kakao_js_key
 
 APP_DIR = os.path.expanduser("~/.dataintelligence_pro")
 NOTES_FILE = os.path.join(APP_DIR, "file_notes.json")
@@ -98,7 +98,7 @@ class DataIntelGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Data Intel PRO - Admin Uploader")
-        self.root.geometry("820x760")
+        self.root.geometry("820x800")
         self.root.configure(bg=BG)
 
         style = ttk.Style()
@@ -128,6 +128,7 @@ class DataIntelGUI:
         self.report_password = tk.StringVar()
         self.admin_password = tk.StringVar(value=load_admin_password() or '')
         self.kakao_key = tk.StringVar(value=load_kakao_key() or '')
+        self.kakao_js_key = tk.StringVar(value=load_kakao_js_key() or '')
         self.report_expiry = tk.StringVar()
 
         self.create_widgets()
@@ -210,6 +211,14 @@ class DataIntelGUI:
         kk_ent = tk.Entry(kk_row, textvariable=self.kakao_key, font=("Helvetica", 10), show="•")
         kk_ent.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self._bind_autocorrect(kk_ent, self.kakao_key)
+
+        kj_row = tk.Frame(opts_card, bg=CARD_BG)
+        kj_row.pack(fill=tk.X, padx=14, pady=4)
+        tk.Label(kj_row, text="★ 카카오 JavaScript 키 (카카오맵 배경, 선택)", bg=CARD_BG, width=26, anchor="w",
+                 font=("Helvetica", 10)).pack(side=tk.LEFT)
+        kj_ent = tk.Entry(kj_row, textvariable=self.kakao_js_key, font=("Helvetica", 10), show="•")
+        kj_ent.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self._bind_autocorrect(kj_ent, self.kakao_js_key)
 
         adm_row = tk.Frame(opts_card, bg=CARD_BG)
         adm_row.pack(fill=tk.X, padx=14, pady=4)
@@ -412,7 +421,10 @@ class DataIntelGUI:
         admin_val = self.admin_password.get().strip() or None
         kakao_val = self.kakao_key.get().strip() or None
         if kakao_val != load_kakao_key():
-            save_kakao_key(kakao_val)  # 9번 지도 좌표용 -- 이 PC에만 저장
+            save_kakao_key(kakao_val)  # 지도 좌표용 -- 이 PC에만 저장
+        js_val = self.kakao_js_key.get().strip() or None
+        if js_val != load_kakao_js_key():
+            save_kakao_js_key(js_val)  # 지도 배경을 카카오맵으로 (리포트 생성 때 저장된 값을 읽는다)
         if admin_val != load_admin_password():
             save_admin_password(admin_val)  # 다음 실행에도 같은 관리자 비밀번호 사용 (빈칸=매번 랜덤)
         return pwd_val, admin_val, kakao_val, exp_val
@@ -530,5 +542,5 @@ def _show_on_screen(root, width, height):
 if __name__ == "__main__":
     root = tk.Tk()
     app = DataIntelGUI(root)
-    _show_on_screen(root, 820, 760)
+    _show_on_screen(root, 820, 800)
     root.mainloop()

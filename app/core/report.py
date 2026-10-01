@@ -1,5 +1,6 @@
 import html
 import json
+import re
 import math
 import random
 import string
@@ -1427,6 +1428,14 @@ body {
 #coreSectionWrap { scroll-margin-top: calc(var(--stick-top, 64px) + 58px); }
 .cust-map[hidden] { display: none; }
 .cust-cluster-wrap { background: none; border: 0; }
+/* 카카오맵용 마커·풍선 (Leaflet은 자체 스타일) */
+.dim-kmarker { border-radius: 50%; box-sizing: border-box; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.45); opacity: 0.94; }
+.dim-kpop { cursor: default; }
+.dim-kpop-box { position: relative; min-width: 250px; max-width: 340px; background: #fff; color: #222; border-radius: 12px; padding: 13px 16px 12px;
+                box-shadow: 0 3px 14px rgba(0,0,0,0.4); font-size: 12px; text-align: left; white-space: normal; }
+.dim-kpop-box::after { content: ''; position: absolute; left: 50%; bottom: -8px; margin-left: -8px; border: 8px solid transparent; border-top-color: #fff; border-bottom: 0; }
+.dim-kpop-close { position: absolute; top: 4px; right: 6px; border: 0; background: none; font-size: 18px; line-height: 1; color: #777; cursor: pointer; padding: 4px; }
+.dim-kpop-box .core-pop-title { padding-right: 18px; }
 .cust-cluster { width: 100%; height: 100%; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 5px rgba(0,0,0,0.4); }
 .cust-cluster span { width: calc(100% - 12px); height: calc(100% - 12px); border-radius: 50%; background: #fff; color: #111; display: flex; align-items: center; justify-content: center;
                      font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -1964,10 +1973,15 @@ function initDashNav() {
 }
 document.addEventListener('DOMContentLoaded', initDashNav);
 
-// ===== 지도(Leaflet) 지연 로딩 -- 코어고객 지도와 '지도로 보기'가 같이 쓴다 =====
+// ===== 지도 -- 코어고객 지도와 '지도로 보기'가 같이 쓴다 =====
+// 배경 지도는 두 가지: 카카오맵(리포트에 JavaScript 키가 실려 있고, 카카오에 등록한 도메인에서 열었을 때)
+// 또는 Leaflet + Esri 거리지도(키 없음 / PC에서 파일로 직접 열었을 때 / 카카오 로딩 실패). 화면 쪽 코드는
+// open()이 돌려주는 같은 모양의 객체(setMarkers / fit / focus / resize / destroy)만 쓴다.
 const DataIntelMapLib = (function () {
     const BASE = 'https://cdnjs.cloudflare.com/ajax/libs/';
+    const DEFAULT_CENTER = [37.6, 127.2];
     const pending = {};
+    const config = (function () { const e = document.getElementById('mapConfig'); if (!e) return {}; try { return JSON.parse(e.textContent) || {}; } catch (err) { return {}; } })();
     function css(href) {
         if (document.querySelector('link[href="' + href + '"]')) return;
         const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = href; document.head.appendChild(l);
@@ -1983,15 +1997,186 @@ const DataIntelMapLib = (function () {
         return pending[name];
     }
     const leaflet = () => once('leaflet', () => { css(BASE + 'leaflet/1.9.4/leaflet.css'); return window.L ? Promise.resolve() : script(BASE + 'leaflet/1.9.4/leaflet.js'); });
-    // 마커 묶음(숫자 원) 모듈
     const cluster = () => once('cluster', () => leaflet().then(() => {
         css(BASE + 'leaflet.markercluster/1.5.3/MarkerCluster.css');
         return script(BASE + 'leaflet.markercluster/1.5.3/leaflet.markercluster.js');
     }));
-    // Esri 거리지도: 키 없이 파일(file://)로 열어도 보이고 지명이 한글 (CARTO는 키 필요로 바뀜)
-    const tiles = map => L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19, attribution: 'Tiles &copy; Esri' }).addTo(map);
-    return { leaflet, cluster, tiles };
+    // 카카오맵 SDK: 등록 안 된 도메인·파일(file://)에서는 스크립트가 거절된다 -> 실패로 처리해 Leaflet으로 넘어간다
+    const kakao = () => once('kakao', () => new Promise((resolve, reject) => {
+        const ready = () => { try { window.kakao.maps.load(() => resolve()); } catch (e) { reject(e); } };
+        setTimeout(() => reject(new Error('kakao timeout')), 8000);  // 이미 끝났으면 아무 일도 없다
+        if (window.kakao && window.kakao.maps) { ready(); return; }
+        script('https://dapi.kakao.com/v2/maps/sdk.js?appkey=' + encodeURIComponent(config.kakaoJsKey) + '&autoload=false&libraries=clusterer')
+            .then(ready, () => reject(new Error('kakao sdk')));
+    }));
+
+    // 묶음(숫자 원): 테두리 = 묶인 항목의 비율(ringOf가 CSS 배경을 만든다), 가운데 숫자 = 건수
+    function sumItems(items) {
+        const counts = {};
+        let rows = 0;
+        items.forEach(it => { Object.keys(it.counts || {}).forEach(k => { counts[k] = (counts[k] || 0) + it.counts[k]; }); rows += it.rows || 1; });
+        return { counts, rows, size: rows >= 300 ? 54 : rows >= 50 ? 46 : 38 };
+    }
+    function clusterEl(sum, ringOf) {
+        const d = document.createElement('div');
+        d.className = 'cust-cluster';
+        d.style.background = (ringOf && ringOf(sum.counts)) || '#898781';
+        d.style.width = sum.size + 'px'; d.style.height = sum.size + 'px';
+        const s = document.createElement('span'); s.textContent = sum.rows.toLocaleString('ko-KR');
+        d.appendChild(s);
+        return d;
+    }
+
+    // ---- Leaflet + Esri (키 없이, 파일로 열어도 보인다) ----
+    function leafletMap(holder, opts, note) {
+        return (opts.cluster ? cluster().catch(() => leaflet()) : leaflet()).then(() => {
+            holder.textContent = '';
+            const map = L.map(holder, { scrollWheelZoom: false, preferCanvas: !!opts.cluster });
+            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Tiles &copy; Esri' }).addTo(map);
+            const clustered = !!opts.cluster && typeof L.markerClusterGroup === 'function';
+            let ringOf = null, handles = [], waiting = null;
+            const layer = clustered ? L.markerClusterGroup({ maxClusterRadius: 46, showCoverageOnHover: false, disableClusteringAtZoom: 15,
+                iconCreateFunction: c => {
+                    const sum = sumItems(c.getAllChildMarkers().map(m => m.options.item));
+                    return L.divIcon({ html: clusterEl(sum, ringOf), className: 'cust-cluster-wrap', iconSize: [sum.size, sum.size] });
+                } }) : L.layerGroup();
+            layer.addTo(map);
+            map.setView(DEFAULT_CENTER, 8);
+            const api = {
+                kind: 'leaflet', note: note || '',
+                setMarkers(items, o) {
+                    ringOf = (o && o.ringOf) || null;
+                    layer.clearLayers();
+                    handles = items.map(it => {
+                        const m = L.circleMarker([it.lat, it.lng], { radius: it.r, weight: it.ringW || 2, color: it.ring, fillColor: it.fill, fillOpacity: 0.9, item: it });
+                        m.bindPopup(() => it.popup(), { maxWidth: 340 });
+                        if (it.tip) m.bindTooltip(it.tip, { direction: 'top', offset: [0, -6] });
+                        if (it.onClick) m.on('click', it.onClick);
+                        return m;
+                    });
+                    if (clustered) layer.addLayers(handles); else handles.forEach(m => m.addTo(layer));
+                },
+                fit(maxZoom) {
+                    if (!handles.length) { map.setView(DEFAULT_CENTER, 8); return; }
+                    if (!holder.offsetWidth) { waiting = maxZoom; return; }  // 잠금 화면 뒤(크기 0): 보이게 되면 맞춘다
+                    waiting = null;
+                    map.invalidateSize();
+                    map.fitBounds(L.latLngBounds(handles.map(m => m.getLatLng())), { padding: [28, 28], maxZoom });
+                },
+                focus(i, minZoom) {
+                    const m = handles[i];
+                    if (!m) return;
+                    if (clustered && layer.zoomToShowLayer) { layer.zoomToShowLayer(m, () => m.openPopup()); return; }
+                    map.setView(m.getLatLng(), Math.max(map.getZoom(), minZoom));
+                    m.openPopup();
+                },
+                resize() { map.invalidateSize(); },
+                destroy() { try { map.remove(); } catch (e) { /* 이미 치워짐 */ } },
+            };
+            if (window.ResizeObserver) new ResizeObserver(() => { if (!holder.offsetWidth) return; map.invalidateSize(); if (waiting != null) api.fit(waiting); }).observe(holder);
+            return api;
+        });
+    }
+
+    // ---- 카카오맵 ----
+    // 확대 단계가 반대다: 카카오 level 1 = 가장 가까움. Leaflet zoom z ~ 카카오 level (20 - z).
+    function kakaoMap(holder, opts) {
+        const K = window.kakao.maps;
+        holder.textContent = '';
+        const map = new K.Map(holder, { center: new K.LatLng(DEFAULT_CENTER[0], DEFAULT_CENTER[1]), level: 11 });
+        map.setZoomable(false);  // 휠로 페이지를 내리다 지도가 확대되지 않게 -- 확대는 오른쪽 +/- 와 묶음 클릭으로
+        map.addControl(new K.ZoomControl(), K.ControlPosition.RIGHT);
+        let ringOf = null, handles = [], waiting = null, popup = null;
+        const closePopup = () => { if (popup) { popup.setMap(null); popup = null; } };
+        K.event.addListener(map, 'click', closePopup);
+        let clusterer = null;
+        if (opts.cluster && K.MarkerClusterer) {
+            try {
+                clusterer = new K.MarkerClusterer({ map, averageCenter: true, minLevel: 6, gridSize: 60, disableClickZoom: true });
+                K.event.addListener(clusterer, 'clustered', clusters => clusters.forEach(c => {
+                    const el = clusterEl(sumItems(c.getMarkers().map(m => m.dimItem).filter(Boolean)), ringOf);
+                    el.style.cursor = 'pointer';
+                    el.addEventListener('click', () => { closePopup(); map.setLevel(Math.max(1, map.getLevel() - 2), { anchor: c.getCenter() }); });
+                    c.getClusterMarker().setContent(el);
+                }));
+            } catch (e) { clusterer = null; }
+        }
+        function openPopup(h) {
+            closePopup();
+            const it = h.dimItem;
+            const wrap = document.createElement('div'); wrap.className = 'dim-kpop';
+            wrap.style.paddingBottom = (it.r + 10) + 'px';
+            const box = document.createElement('div'); box.className = 'dim-kpop-box';
+            const x = document.createElement('button'); x.type = 'button'; x.className = 'dim-kpop-close'; x.textContent = '×'; x.setAttribute('aria-label', '닫기');
+            x.addEventListener('click', closePopup);
+            box.appendChild(x); box.appendChild(it.popup());
+            wrap.appendChild(box);
+            popup = new K.CustomOverlay({ position: h.getPosition(), content: wrap, xAnchor: 0.5, yAnchor: 1, zIndex: 50, clickable: true });
+            popup.setMap(map);
+            try {  // 풍선이 지도 안에 들어오도록 마커를 화면 아래쪽 1/3 지점으로
+                const proj = map.getProjection(), pt = proj.containerPointFromCoords(h.getPosition());
+                pt.y -= Math.round(holder.offsetHeight * 0.22);
+                map.panTo(proj.coordsFromContainerPoint(pt));
+            } catch (e) { map.panTo(h.getPosition()); }
+        }
+        const api = {
+            kind: 'kakao', note: '',
+            setMarkers(items, o) {
+                ringOf = (o && o.ringOf) || null;
+                closePopup();
+                if (clusterer) clusterer.clear(); else handles.forEach(h => h.setMap(null));
+                handles = items.map(it => {
+                    const d = document.createElement('div');
+                    d.className = 'dim-kmarker';
+                    d.style.width = d.style.height = (it.r * 2) + 'px';
+                    d.style.background = it.fill;
+                    d.style.border = (it.ringW || 2) + 'px solid ' + it.ring;
+                    if (it.tip) d.title = it.tip;
+                    const h = new K.CustomOverlay({ position: new K.LatLng(it.lat, it.lng), content: d, xAnchor: 0.5, yAnchor: 0.5, zIndex: 3, clickable: true });
+                    h.dimItem = it;
+                    d.addEventListener('click', () => { if (it.onClick) it.onClick(); openPopup(h); });
+                    return h;
+                });
+                if (clusterer) {
+                    try { clusterer.addMarkers(handles); return; } catch (e) { clusterer = null; }  // 묶음이 안 되면 그냥 다 찍는다
+                }
+                handles.forEach(h => h.setMap(map));
+            },
+            fit(maxZoom) {
+                if (!handles.length) { map.setCenter(new K.LatLng(DEFAULT_CENTER[0], DEFAULT_CENTER[1])); map.setLevel(11); return; }
+                if (!holder.offsetWidth) { waiting = maxZoom; return; }
+                waiting = null;
+                map.relayout();
+                const b = new K.LatLngBounds();
+                handles.forEach(h => b.extend(h.getPosition()));
+                map.setBounds(b, 28, 28, 28, 28);
+                const closest = 20 - maxZoom;
+                if (map.getLevel() < closest) map.setLevel(closest);
+            },
+            focus(i, minZoom) {
+                const h = handles[i];
+                if (!h) return;
+                const level = 20 - minZoom;
+                if (map.getLevel() > level) map.setLevel(clusterer ? Math.min(level, 5) : level, { anchor: h.getPosition() });
+                map.setCenter(h.getPosition());
+                openPopup(h);
+            },
+            resize() { map.relayout(); },
+            destroy() { closePopup(); if (clusterer) { try { clusterer.clear(); } catch (e) { /* ignore */ } } handles.forEach(h => h.setMap(null)); holder.textContent = ''; },
+        };
+        if (window.ResizeObserver) new ResizeObserver(() => { if (!holder.offsetWidth) return; map.relayout(); if (waiting != null) api.fit(waiting); }).observe(holder);
+        return api;
+    }
+
+    // holder에 지도를 연다 -> Promise<지도 객체>. opts: { cluster: 가까운 마커를 숫자 원으로 묶을지 }
+    function open(holder, opts) {
+        opts = opts || {};
+        if (!config.kakaoJsKey) return leafletMap(holder, opts, '');
+        if (location.protocol === 'file:') return leafletMap(holder, opts, '카카오맵은 공유 링크로 열면 표시됩니다');
+        return kakao().then(() => kakaoMap(holder, opts))
+            .catch(() => leafletMap(holder, opts, '카카오맵을 불러오지 못해 기본 지도로 표시 (JavaScript 키와 카카오 콘솔의 사이트 도메인 등록 확인)'));
+    }
+    return { open };
 })();
 
 // ===== 9. 코어고객 활동관리 -- 독립 섹션 (총괄DB 필터와 무관). core_customers.py build_core_payload의 rows를 그린다 =====
@@ -2013,7 +2198,7 @@ const DataIntelMapLib = (function () {
     const fresh = () => ({ 관리주체: '', 지사: '', 활동상태: '', 담당자: '', 영업구역: '', q: '', color: '활동상태', sort: null, dir: 1, open: null });
     let state = fresh();
     let view = '현황';  // '현황'(요약·조치·차트·지도·표) / '지도'(지도 크게 + 표) -- 필터를 바꿔도 유지
-    let payload = null, map = null, layer = null, markers = new Map(), period = '';
+    let payload = null, map = null, mapToken = null, markerIndex = new Map(), period = '';
 
     // ---- 날짜 ----
     const today0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
@@ -2026,9 +2211,6 @@ const DataIntelMapLib = (function () {
     const owner = r => r.관리고객담당자 || r.영업구역담당 || '담당 미지정';
     const pendingVoc = r => (r.VOC || []).filter(v => v.상태 === '접수' || v.상태 === '미접수');
 
-    function loadLeaflet(done) {
-        DataIntelMapLib.leaflet().then(done, () => { const m = document.getElementById('coreMap'); if (m) m.textContent = '지도 모듈을 불러오지 못했습니다 (인터넷 연결 확인).'; });
-    }
     const visible = () => payload.rows.filter(r =>
         (!state.관리주체 || r.관리주체 === state.관리주체) && (!state.지사 || r.지사 === state.지사) && (!state.활동상태 || r.활동상태 === state.활동상태)
         && (!state.담당자 || owner(r) === state.담당자) && (!state.영업구역 || r.영업구역 === state.영업구역));
@@ -2369,46 +2551,32 @@ const DataIntelMapLib = (function () {
             holder.textContent = '지도 좌표가 없습니다 -- 데스크톱 GUI의 "카카오 REST 키" 칸에 키를 넣고 리포트를 만들면 설치주소가 지도에 표시됩니다. (표에서 행을 열면 카카오맵 바로가기가 있습니다)';
             return;
         }
-        loadLeaflet(() => {
-            if (!map) {
-                holder.textContent = '';
-                map = L.map(holder, { scrollWheelZoom: false });
-                DataIntelMapLib.tiles(map);
-                layer = L.layerGroup().addTo(map);
-                map._coreFit = false;
-                // 잠금 화면 뒤(숨김, 크기 0)에서 그려지면 확대 수준이 틀어진다 -- 보이는 크기가 생기면 다시 맞춘다
-                if (window.ResizeObserver) {
-                    const m = map;
-                    new ResizeObserver(() => {
-                        if (!holder.offsetWidth || map !== m) return;
-                        m.invalidateSize();
-                        if (!m._coreFit && m._coreBounds) { m.fitBounds(m._coreBounds, { padding: [24, 24], maxZoom: 14 }); m._coreFit = true; }
-                    }).observe(holder);
-                }
-            }
-            layer.clearLayers(); markers.clear();
+        const paint = (M, fit) => {
             const owners = { 본부장: cssVar('--s7') || '#4a3aa7', 지사장: cssVar('--s1') || '#2a78d6' };
             const ring = cssVar('--surface-1') || '#fff', danger = cssVar('--critical') || '#d03b3b';
             const maxFee = Math.max(1, ...pts.map(r => r.월정료 || 0));
-            pts.forEach(r => {
-                const sign = r.해지징후 === 'Y', byState = state.color === '활동상태';
-                const fill = byState ? (cssVar(STATE_VAR[r.활동상태]) || '#888') : (owners[r.관리주체] || cssVar('--baseline') || '#888');
-                const m = L.circleMarker([r.lat, r.lng], {
-                    radius: 6 + 7 * Math.sqrt((r.월정료 || 0) / maxFee), weight: !byState && sign ? 3 : 2, color: !byState && sign ? danger : ring,
-                    fillColor: fill, fillOpacity: 0.88,
-                }).bindPopup(popupEl(r), { maxWidth: 320 });
-                m.bindTooltip((r.관리고객명 || '') + ' · ' + r.활동상태, { direction: 'top', offset: [0, -6] });
-                m.on('click', () => openRow(r._i, 'map'));
-                m.addTo(layer);
-                markers.set(r._i, m);
-            });
-            map._coreBounds = pts.length ? L.latLngBounds(pts.map(r => [r.lat, r.lng])) : null;
-            if (!map._coreFit) {
-                if (map._coreBounds && holder.offsetWidth) { map.invalidateSize(); map.fitBounds(map._coreBounds, { padding: [24, 24], maxZoom: 14 }); map._coreFit = true; }
-                else map.setView([37.6, 127.2], 8);
-            }
-            setTimeout(() => { if (map) map.invalidateSize(); }, 50);
-        });
+            const byState = state.color === '활동상태';
+            markerIndex = new Map();
+            M.setMarkers(pts.map((r, i) => {
+                const sign = r.해지징후 === 'Y';
+                markerIndex.set(r._i, i);
+                return { lat: r.lat, lng: r.lng, r: Math.round(6 + 7 * Math.sqrt((r.월정료 || 0) / maxFee)),
+                    fill: byState ? (cssVar(STATE_VAR[r.활동상태]) || '#888') : (owners[r.관리주체] || cssVar('--baseline') || '#888'),
+                    ring: !byState && sign ? danger : ring, ringW: !byState && sign ? 3 : 2,
+                    tip: (r.관리고객명 || '') + ' · ' + r.활동상태, popup: () => popupEl(r), onClick: () => openRow(r._i, 'map') };
+            }));
+            if (fit) M.fit(14);
+        };
+        if (map) { paint(map, false); return; }   // 색상 기준·테마만 바뀜: 마커만 다시
+        const token = {};
+        mapToken = token;
+        DataIntelMapLib.open(holder, { cluster: false }).then(M => {
+            if (mapToken !== token) { M.destroy(); return; }  // 그 사이 화면이 다시 그려짐
+            map = M;
+            const note = document.getElementById('coreMapNote');
+            if (note && M.note) note.textContent += ' · ' + M.note;
+            paint(M, true);
+        }, () => { holder.textContent = '지도 모듈을 불러오지 못했습니다 (인터넷 연결 확인).'; });
     }
 
     // ---- 활동내역 표 ----
@@ -2523,8 +2691,7 @@ const DataIntelMapLib = (function () {
         const tr = document.querySelector('#coreTable tr[data-core-row="' + i + '"]');
         if (tr && src === 'list') tr.scrollIntoView({ block: 'center', behavior: 'smooth' });
         if (tr && src === 'map') { const box = tr.closest('.table-scroll'); if (box) box.scrollTop = Math.max(0, tr.offsetTop - 44); }
-        const m = markers.get(i);
-        if (m && map && src !== 'map' && state.open === i) { map.setView(m.getLatLng(), Math.max(map.getZoom(), 13)); m.openPopup(); }
+        if (map && markerIndex.has(i) && src !== 'map' && state.open === i) map.focus(markerIndex.get(i), 13);
     }
     function downloadCsv() {
         const head = ['지사', '관리주체', '관리고객명', '계약번호', '담당', '활동상태', '최근방문', '해지징후', '계약종료일', '월정료', '재계약대상월정료', 'VOC건수', '미처리VOC', '최근메모', '설치주소'];
@@ -2540,7 +2707,8 @@ const DataIntelMapLib = (function () {
         const wrap = document.getElementById('coreSectionWrap');
         if (!wrap || !payload) return;
         const all = payload.rows;
-        map = null;  // 지도 컨테이너를 새로 만드므로 지도도 새로
+        if (map) map.destroy();
+        map = null; mapToken = null;  // 지도 컨테이너를 새로 만드므로 지도도 새로
         wrap.textContent = '';
         const bar = el('div', 'global-filter-bar core-filter-bar');
         const mapView = view === '지도';
@@ -2585,10 +2753,11 @@ const DataIntelMapLib = (function () {
         const mh = el('div', 'core-map-head');
         mh.appendChild(pills('색상 기준', 'color', ['활동상태', '관리주체'], true));
         const lg = el('div', 'legend-grid core-legend'); lg.id = 'coreMapLegend'; mh.appendChild(lg);
-        mh.appendChild(el('span', 'core-coord-note', '지도 표시 ' + rows.filter(r => r.lat != null).length + '/' + rows.length + '곳'
+        const cn = mh.appendChild(el('span', 'core-coord-note')); cn.id = 'coreMapNote';
+        cn.textContent = ('지도 표시 ' + rows.filter(r => r.lat != null).length + '/' + rows.length + '곳'
             + (cs.동단위 ? ' · 동 단위 위치 ' + cs.동단위 + '곳' : '')
             + (cs.없음 ? ' · 좌표 없음 ' + cs.없음 + '곳' + (payload.coord_note ? ' (' + payload.coord_note + ')'
-                : payload.kakao_error ? ' (' + payload.kakao_error + ')' : (payload.kakao_key_set === false ? ' (카카오 키 미설정)' : '')) : '')));
+                : payload.kakao_error ? ' (' + payload.kakao_error + ')' : (payload.kakao_key_set === false ? ' (카카오 키 미설정)' : '')) : ''));
         wrap.appendChild(mh);
         const mapBox = el('div', 'core-map' + (mapView ? ' core-map-tall' : '')); mapBox.id = 'coreMap';
         wrap.appendChild(mapBox);
@@ -5299,7 +5468,7 @@ const DataIntelMapLib = (function () {
     const MAP_TYPE_VAR = { SP: '--s3', SE: '--s2', SG: '--s1' };
     const MAP_HIDE_COLS = ['활동유무_원래열', '영업구역담당자_출처'];
     const NBSP = String.fromCharCode(160);
-    const custMap = { open: false, 지사: '', 대상: '', 상태: '', 관리주체: '', 담당자: '', 구역: '', color: '활동유무', map: null, layer: null, fitKey: null, clustered: false };
+    const custMap = { open: false, 지사: '', 대상: '', 상태: '', 관리주체: '', 담당자: '', 구역: '', color: '활동유무', map: null, fitKey: null, loading: false, latest: null, note: '' };
     const mapCssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
     const mapText = v => (v === null || v === undefined) ? '' : String(v).split(NBSP).join(' ').trim();
     const mapStatus = r => { const v = r['활동유무']; return (v === '미접수' || v === '접수' || v === '처리완료') ? v : '미처리'; };
@@ -5380,68 +5549,49 @@ const DataIntelMapLib = (function () {
         }
         return box;
     }
-    // 묶음 아이콘: 테두리 = 묶인 계약의 상태(또는 대상구분) 비율, 가운데 숫자 = 관리계약 수
-    function custClusterIcon(cluster) {
-        const byStatus = custMap.color === '활동유무';
-        const keys = byStatus ? MAP_STATUS.slice().reverse() : PROGRESS_TYPES;
-        const vars = byStatus ? MAP_STATUS_VAR : MAP_TYPE_VAR;
-        const counts = {};
-        let rows = 0;
-        cluster.getAllChildMarkers().forEach(m => {
-            const c = m.options.mapCounts[byStatus ? 'status' : 'type'];
-            keys.forEach(k => { counts[k] = (counts[k] || 0) + (c[k] || 0); });
-            rows += m.options.mapRows;
-        });
-        const total = keys.reduce((n, k) => n + counts[k], 0);
-        let at = 0;
-        const stops = [];
-        keys.forEach(k => {
-            if (!counts[k]) return;
-            const from = at; at += counts[k] / total * 100;
-            stops.push(mapCssVar(vars[k]) + ' ' + from.toFixed(1) + '% ' + at.toFixed(1) + '%');
-        });
-        const size = rows >= 300 ? 54 : rows >= 50 ? 46 : 38;
-        const ring = stops.length ? 'conic-gradient(' + stops.join(',') + ')' : mapCssVar('--text-muted');
-        return L.divIcon({ html: '<div class="cust-cluster" style="background:' + ring + '"><span>' + rows.toLocaleString('ko-KR') + '</span></div>',
-            className: 'cust-cluster-wrap', iconSize: [size, size] });
-    }
     function drawCustMap(groups, fitKey) {
         const holder = document.getElementById('custMapBox');
         if (!holder || !custMap.open) return;
-        const ready = () => {
-            if (!custMap.open) return;
-            if (!custMap.map) {
-                holder.textContent = '';
-                custMap.map = L.map(holder, { scrollWheelZoom: false, preferCanvas: true });
-                DataIntelMapLib.tiles(custMap.map);
-                custMap.clustered = typeof L.markerClusterGroup === 'function';
-                // 가까운 주소는 숫자 묶음으로 -- 확대하면 풀린다 (묶음 모듈을 못 불러오면 그냥 다 찍는다)
-                custMap.layer = custMap.clustered
-                    ? L.markerClusterGroup({ maxClusterRadius: 46, showCoverageOnHover: false, disableClusteringAtZoom: 15, iconCreateFunction: custClusterIcon })
-                    : L.layerGroup();
-                custMap.layer.addTo(custMap.map);
-                custMap.fitKey = null;
-                if (window.ResizeObserver) new ResizeObserver(() => { if (holder.offsetWidth && custMap.map) custMap.map.invalidateSize(); }).observe(holder);
-            }
-            custMap.layer.clearLayers();
+        custMap.latest = [groups, fitKey];
+        const paint = M => {
+            const [gs, key] = custMap.latest;
+            const byStatus = custMap.color === '활동유무';
+            const keys = byStatus ? MAP_STATUS.slice().reverse() : PROGRESS_TYPES;
+            const vars = byStatus ? MAP_STATUS_VAR : MAP_TYPE_VAR;
             const ring = mapCssVar('--surface-1') || '#fff';
-            const markers = groups.map(g => {
-                const byStatus = custMap.color === '활동유무';
-                const fill = byStatus ? mapCssVar(MAP_STATUS_VAR[g.status]) : (mapCssVar(MAP_TYPE_VAR[g.type]) || mapCssVar('--text-muted'));
-                const m = L.circleMarker([g.lat, g.lng], { radius: 6 + Math.min(7, 2 * Math.sqrt(g.rows.length - 1)), weight: 2, color: ring, fillColor: fill || '#888', fillOpacity: 0.9,
-                    mapRows: g.rows.length, mapCounts: { status: g.statusCounts, type: g.typeCounts } });
-                m.bindPopup(() => mapPopupEl(g), { maxWidth: 340 });
-                m.bindTooltip(mapName(g.rows[0]) + (g.rows.length > 1 ? ' 외 ' + (g.rows.length - 1) + '건' : '') + ' · ' + g.status, { direction: 'top', offset: [0, -6] });
-                return m;
-            });
-            if (custMap.clustered) custMap.layer.addLayers(markers); else markers.forEach(m => m.addTo(custMap.layer));
-            if (groups.length && custMap.fitKey !== fitKey && holder.offsetWidth) {
-                custMap.map.invalidateSize();
-                custMap.map.fitBounds(L.latLngBounds(groups.map(g => [g.lat, g.lng])), { padding: [28, 28], maxZoom: 15 });
-                custMap.fitKey = fitKey;
-            } else if (!custMap.fitKey && !groups.length) custMap.map.setView([37.6, 127.2], 8);
+            // 묶음 테두리: 묶인 계약의 상태(또는 대상구분) 비율
+            const ringOf = counts => {
+                const total = keys.reduce((n, k) => n + (counts[k] || 0), 0);
+                if (!total) return null;
+                let at = 0;
+                const stops = [];
+                keys.forEach(k => {
+                    if (!counts[k]) return;
+                    const from = at; at += counts[k] / total * 100;
+                    stops.push(mapCssVar(vars[k]) + ' ' + from.toFixed(1) + '% ' + at.toFixed(1) + '%');
+                });
+                return 'conic-gradient(' + stops.join(',') + ')';
+            };
+            M.setMarkers(gs.map(g => ({
+                lat: g.lat, lng: g.lng, r: Math.round(6 + Math.min(7, 2 * Math.sqrt(g.rows.length - 1))), ring,
+                fill: (byStatus ? mapCssVar(MAP_STATUS_VAR[g.status]) : (mapCssVar(MAP_TYPE_VAR[g.type]) || mapCssVar('--text-muted'))) || '#888',
+                tip: mapName(g.rows[0]) + (g.rows.length > 1 ? ' 외 ' + (g.rows.length - 1) + '건' : '') + ' · ' + g.status,
+                popup: () => mapPopupEl(g), counts: byStatus ? g.statusCounts : g.typeCounts, rows: g.rows.length,
+            })), { ringOf });
+            if (custMap.fitKey !== key) { M.fit(15); custMap.fitKey = key; }
         };
-        DataIntelMapLib.cluster().then(ready, () => DataIntelMapLib.leaflet().then(ready, () => { holder.textContent = '지도 모듈을 불러오지 못했습니다 (인터넷 연결 확인).'; }));
+        if (custMap.map) { paint(custMap.map); return; }
+        if (custMap.loading) return;  // 열리는 중 -- 끝나면 가장 마지막 조건(custMap.latest)으로 그린다
+        custMap.loading = true;
+        DataIntelMapLib.open(holder, { cluster: true }).then(M => {
+            custMap.loading = false;
+            custMap.map = M;
+            custMap.fitKey = null;
+            custMap.note = M.note || '';
+            const note = document.getElementById('custMapNote');
+            if (note && custMap.note) note.textContent += ' · ' + custMap.note;
+            if (custMap.open) paint(M);
+        }, () => { custMap.loading = false; holder.textContent = '지도 모듈을 불러오지 못했습니다 (인터넷 연결 확인).'; });
     }
     function renderCustomerMap() {
         const wrap = document.getElementById('custMapWrap');
@@ -5534,8 +5684,10 @@ const DataIntelMapLib = (function () {
             info.appendChild(lg);
         }
         const approx = list.filter(g => g.approx).length;
-        info.appendChild(mkEl('span', 'core-coord-note', '관리계약 ' + fmtInt(rows.length) + '건 · 지도 표시 ' + fmtInt(rows.length - noCoord) + '건 (주소 ' + fmtInt(list.length) + '곳)'
-            + (approx ? ' · 동 단위 위치 ' + approx + '곳' : '') + (noCoord ? ' · 좌표 없음 ' + fmtInt(noCoord) + '건' : '')));
+        const cnote = mkEl('span', 'core-coord-note', '관리계약 ' + fmtInt(rows.length) + '건 · 지도 표시 ' + fmtInt(rows.length - noCoord) + '건 (주소 ' + fmtInt(list.length) + '곳)'
+            + (approx ? ' · 동 단위 위치 ' + approx + '곳' : '') + (noCoord ? ' · 좌표 없음 ' + fmtInt(noCoord) + '건' : '') + (custMap.open && custMap.note ? ' · ' + custMap.note : ''));
+        cnote.id = 'custMapNote';
+        info.appendChild(cnote);
         controls.appendChild(info);
 
         box.hidden = !custMap.open;
@@ -6021,7 +6173,7 @@ def render_dashboard_sections(p):
 def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
                           cancelled_facility_df=None, raw_files=None, matching_config=None,
                           password=None, admin_password=None, expiry_date=None, encrypt=True,
-                          eda_link=False, core_df=None, core_voc_df=None, kakao_key=None, log=print):
+                          eda_link=False, core_df=None, core_voc_df=None, kakao_key=None, kakao_js_key=None, log=print):
     """Generates the password-protected HTML dashboard report.
 
     df: already-merged 총괄DB dataframe (server-rendered initial dashboard).
@@ -6052,6 +6204,8 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
     core_df / core_voc_df: 9. 코어고객 활동관리 (+ 9-1 VOC매칭) -- independent
         section with a 설치주소 map (see core_customers.py). kakao_key: Kakao
         REST key for geocoding; None -> this PC's saved key.
+    kakao_js_key: Kakao JavaScript key -- map background becomes 카카오맵 (see
+        render_map_config). None -> this PC's saved key.
     eda_link: show the '딥 다이브 EDA' button, which opens a sibling
         Data_Intel_PRO_EDA.html. Only generate_report.py's CLI writes that
         file (unencrypted, full data) -- the GUI and a deployed page never
@@ -6185,6 +6339,7 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
 </div>
 
 {embedded_script}
+{render_map_config(kakao_js_key) if (geo_json or core_json) else ""}
 <script>{script}</script>
 </body>
 </html>"""
@@ -6196,13 +6351,26 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
     return html_out, password, expiry_date, admin_password
 
 
+def render_map_config(kakao_js_key=None):
+    """<script id="mapConfig"> for DataIntelMapLib: the Kakao JavaScript key
+    (this PC's saved one by default) switches the map background to 카카오맵 on
+    domains registered in the Kakao console. No key -> "" and the Leaflet map."""
+    if kakao_js_key is None:
+        from .core_customers import load_kakao_js_key
+        kakao_js_key = load_kakao_js_key()
+    key = re.sub(r'[^0-9A-Za-z]', '', str(kakao_js_key or ''))
+    if not key:
+        return ""
+    return '<script type="application/json" id="mapConfig">' + json.dumps({"kakaoJsKey": key}) + '</script>'
+
+
 CORE_REPORT_TITLE = "코어고객 활동현황"
 # 코어고객 전용 리포트는 총괄DB 엔진(매칭·집계)이 필요 없다 -- 잠금/테마/코어 섹션까지만 싣는다
 CORE_SCRIPT_TEMPLATE = APP_SCRIPT_TEMPLATE.split('// ===== Client-side matching + dashboard engine =====')[0]
 
 
 def generate_core_report(core_df, core_voc_df=None, password=None, admin_password=None, expiry_date=None,
-                         encrypt=True, kakao_key=None, log=print):
+                         encrypt=True, kakao_key=None, kakao_js_key=None, log=print):
     """9. 코어고객 활동관리(+ 9-1 VOC매칭)만으로 만드는 독립 리포트 -- 총괄DB 없이.
 
     Same lock/encryption as generate_html_report: a blank password becomes a
@@ -6274,6 +6442,7 @@ def generate_core_report(core_df, core_voc_df=None, password=None, admin_passwor
     </div>
 </div>
 
+{render_map_config(kakao_js_key)}
 <script>{script}</script>
 </body>
 </html>"""
