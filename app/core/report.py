@@ -1448,6 +1448,22 @@ body {
 .dim-map-near-item:hover, .dim-map-near-item:focus-visible { background: #f1f5f9; outline: none; }
 .dim-map-near-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dim-map-near-dist { color: #1d4ed8; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dim-route-wrap { background: none; border: 0; }
+/* 순번: 마커 위쪽에 얹는다 (마커 색이 보이게). 구간 거리: 점선 가운데 */
+.dim-route-no { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 10px;
+                background: #1d4ed8; color: #fff; font-size: 11.5px; font-weight: 800; font-variant-numeric: tabular-nums; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.45); }
+.dim-route-pin { transform: translate(-50%, -165%); pointer-events: none; }
+.dim-route-leg { display: inline-block; transform: translate(-50%, -50%); background: #fff; color: #1d4ed8; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+                 border: 1px solid #1d4ed8; white-space: nowrap; font-variant-numeric: tabular-nums; box-shadow: 0 1px 3px rgba(0,0,0,0.25); pointer-events: none; }
+.dim-route-panel { width: 280px; }
+.dim-route-pick { display: flex; align-items: center; gap: 5px; padding: 0 4px 6px; color: #555; font-size: 11.5px; }
+.dim-route-n { border: 1px solid #cbd5e1; background: #fff; color: #222; font: inherit; font-size: 11.5px; padding: 2px 8px; border-radius: 999px; cursor: pointer; }
+.dim-route-n.on { background: #1d4ed8; border-color: #1d4ed8; color: #fff; font-weight: 700; }
+.dim-route-list { max-height: 200px; overflow-y: auto; }
+.dim-route-list .dim-map-near-item { justify-content: flex-start; align-items: center; }
+.dim-route-list .dim-route-no { border: 0; box-shadow: none; flex: none; }
+.dim-route-list .dim-map-near-name { flex: 1; }
+.dim-route-foot { padding: 6px 4px 0; color: #777; font-size: 11px; }
 .dim-pop-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
 .dim-pop-actions button.pending-map-link { background: #fff; font-family: inherit; cursor: pointer; }
 .dim-pop-actions button.pending-map-link:hover { background: var(--brand); }
@@ -2025,6 +2041,7 @@ const DataIntelMapLib = (function () {
     const DEFAULT_CENTER = [37.6, 127.2];
     const pending = {};
     let lastHere = null;  // 한 번 잡은 현위치 -- 조건을 바꿔 지도를 새로 그려도 표시와 '가까운 곳'을 유지한다
+    const lastRoute = { on: false, n: 10 };  // 방문 루트 켜짐 / 몇 곳까지 -- 지도를 새로 그려도 유지
     const config = (function () { const e = document.getElementById('mapConfig'); if (!e) return {}; try { return JSON.parse(e.textContent) || {}; } catch (err) { return {}; } })();
     const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; };
     function css(href) {
@@ -2130,6 +2147,54 @@ const DataIntelMapLib = (function () {
         ui.holder.appendChild(box);
         ui.near = box;
     }
+    // 방문 루트: 현위치에서 가장 가까운 곳 -> 거기서 가장 가까운 곳 ... 순서로 n곳 (직선거리 기준)
+    function routeStops(items, here, n) {
+        const left = items.map((it, i) => ({ it, i }));
+        const out = [];
+        let cur = here, total = 0;
+        while (left.length && out.length < n) {
+            let best = 0, bd = Infinity;
+            left.forEach((x, k) => { const d = km(cur.lat, cur.lng, x.it.lat, x.it.lng); if (d < bd) { bd = d; best = k; } });
+            const x = left.splice(best, 1)[0];
+            total += bd;
+            out.push({ i: x.i, it: x.it, leg: bd, cum: total, from: cur });
+            cur = x.it;
+        }
+        return out;
+    }
+    const routeNoEl = n => mk('div', 'dim-route-no dim-route-pin', String(n));
+    const routeLegEl = d => mk('div', 'dim-route-leg', distText(d));
+    // 방문 순서 목록: 번호 · 이름 · 앞 지점에서의 거리. 몇 곳까지 볼지 고를 수 있다.
+    function routePanel(ui, stops, total, focus, onCount, onClose) {
+        if (ui.near) ui.near.remove();
+        const box = mk('div', 'dim-map-near dim-route-panel');
+        const head = mk('div', 'dim-map-near-head', '방문 루트 · 총 ' + (stops.length ? distText(stops[stops.length - 1].cum) : '0m'));
+        const x = mk('button', 'dim-kpop-close', '×'); x.type = 'button'; x.setAttribute('aria-label', '방문 루트 끄기');
+        x.addEventListener('click', onClose);
+        head.appendChild(x); box.appendChild(head);
+        const pick = mk('div', 'dim-route-pick');
+        pick.appendChild(mk('span', null, '가까운 순'));
+        const shown = Math.min(lastRoute.n, total);
+        [5, 10, 20].filter(n => n < total).concat([total]).forEach(n => {
+            const b = mk('button', 'dim-route-n' + (shown === n ? ' on' : ''), n === total ? '전체 ' + total + '곳' : n + '곳'); b.type = 'button';
+            b.addEventListener('click', () => onCount(n));
+            pick.appendChild(b);
+        });
+        box.appendChild(pick);
+        const list = mk('div', 'dim-route-list');
+        stops.forEach((s, k) => {
+            const b = mk('button', 'dim-map-near-item'); b.type = 'button';
+            b.appendChild(mk('span', 'dim-route-no', String(k + 1)));
+            b.appendChild(mk('span', 'dim-map-near-name', s.it.name || s.it.tip || '(이름 없음)'));
+            b.appendChild(mk('span', 'dim-map-near-dist', '+' + distText(s.leg)));
+            b.addEventListener('click', () => focus(s.i));
+            list.appendChild(b);
+        });
+        box.appendChild(list);
+        box.appendChild(mk('div', 'dim-route-foot', '직선거리 기준 · 현위치에서 가까운 곳부터 차례로'));
+        ui.holder.appendChild(box);
+        ui.near = box;
+    }
     // 풍선 내용 = 화면 쪽이 만든 내용 + (현위치를 잡았으면 거리) + 로드뷰 / 길찾기
     function popupContent(it, here, onRoadview) {
         const box = it.popup();
@@ -2178,7 +2243,33 @@ const DataIntelMapLib = (function () {
                 me = [L.circle([p.lat, p.lng], { radius: Math.min(p.acc, 2000), weight: 1, color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.12, interactive: false }).addTo(map),
                       L.circleMarker([p.lat, p.lng], { radius: 7, weight: 3, color: '#fff', fillColor: '#2563eb', fillOpacity: 1, interactive: false }).addTo(map)];
                 if (move) map.setView([p.lat, p.lng], Math.max(map.getZoom(), 12));
-                nearPanel(ui, items, here, api.focus);
+                refreshNear(false);
+            }
+            // 현위치 기준 목록: 방문 루트가 켜져 있으면 루트(점선 + 순번 + 구간 거리), 아니면 가까운 5곳
+            let routeLayer = null;
+            function clearRoute() { if (routeLayer) { routeLayer.remove(); routeLayer = null; } }
+            function refreshNear(fit) {
+                clearRoute();
+                if (!here) return;
+                if (!lastRoute.on) { nearPanel(ui, items, here, api.focus); return; }
+                const stops = routeStops(items, here, lastRoute.n);
+                const path = [[here.lat, here.lng]].concat(stops.map(s => [s.it.lat, s.it.lng]));
+                routeLayer = L.layerGroup().addTo(map);
+                L.polyline(path, { color: '#1d4ed8', weight: 4, opacity: 0.95, dashArray: '7 9', lineCap: 'round', interactive: false }).addTo(routeLayer);
+                stops.forEach((s, k) => {
+                    L.marker([(s.from.lat + s.it.lat) / 2, (s.from.lng + s.it.lng) / 2], { icon: L.divIcon({ html: routeLegEl(s.leg), className: 'dim-route-wrap', iconSize: [0, 0] }), interactive: false, keyboard: false }).addTo(routeLayer);
+                    L.marker([s.it.lat, s.it.lng], { icon: L.divIcon({ html: routeNoEl(k + 1), className: 'dim-route-wrap', iconSize: [0, 0] }), interactive: false, keyboard: false, zIndexOffset: 500 }).addTo(routeLayer);
+                });
+                routePanel(ui, stops, items.length, api.focus, n => { lastRoute.n = n; refreshNear(true); }, () => setRoute(false));
+                if (fit && stops.length && holder.offsetWidth) map.fitBounds(L.latLngBounds(path), { padding: [48, 48], maxZoom: 16 });
+            }
+            function setRoute(on) {
+                lastRoute.on = on;
+                press(routeBtn, on);
+                if (!on) { clearRoute(); if (ui.near) { ui.near.remove(); ui.near = null; } if (here) nearPanel(ui, items, here, api.focus); return; }
+                if (here) { refreshNear(true); return; }
+                routeBtn.disabled = true;  // 현위치가 먼저 필요하다
+                locate().then(p => { showMe(p, false); refreshNear(true); }, m => { say(ui, m); lastRoute.on = false; press(routeBtn, false); }).then(() => { routeBtn.disabled = false; });
             }
             const layer = clustered ? L.markerClusterGroup({ maxClusterRadius: 46, showCoverageOnHover: false, disableClusteringAtZoom: 15,
                 iconCreateFunction: c => {
@@ -2201,7 +2292,7 @@ const DataIntelMapLib = (function () {
                         return m;
                     });
                     if (clustered) layer.addLayers(handles); else handles.forEach(m => m.addTo(layer));
-                    if (here) nearPanel(ui, items, here, api.focus);
+                    refreshNear(false);
                 },
                 fit(maxZoom) {
                     lastZoom = maxZoom;
@@ -2225,6 +2316,8 @@ const DataIntelMapLib = (function () {
                 b.disabled = true;
                 locate().then(p => showMe(p, true), m => say(ui, m)).then(() => { b.disabled = false; });
             });
+            const routeBtn = tool(ui, '🚩 방문 루트', '현위치에서 가까운 순으로 방문 순서를 정해 점선과 거리로 보여줍니다', () => setRoute(!lastRoute.on));
+            press(routeBtn, lastRoute.on);
             tool(ui, '🧭 전체', '표시된 곳이 모두 보이게 맞춥니다', () => api.fit(lastZoom));
             const big = bigTool(ui, on => { if (on) map.scrollWheelZoom.enable(); else map.scrollWheelZoom.disable(); setTimeout(() => map.invalidateSize(), 60); });
             L.DomEvent.disableClickPropagation(ui.bar);
@@ -2254,7 +2347,39 @@ const DataIntelMapLib = (function () {
                   new K.CustomOverlay({ position: pos, content: mk('div', 'dim-me'), xAnchor: 0.5, yAnchor: 0.5, zIndex: 45 })];
             me.forEach(x => x.setMap(map));
             if (move) { if (map.getLevel() > 8) map.setLevel(8); map.setCenter(pos); }
-            nearPanel(ui, items, here, api.focus);
+            refreshNear(false);
+        }
+        // 현위치 기준 목록: 방문 루트가 켜져 있으면 루트(점선 + 순번 + 구간 거리), 아니면 가까운 5곳
+        let routeObjs = [];
+        function clearRoute() { routeObjs.forEach(o => o.setMap(null)); routeObjs = []; }
+        function refreshNear(fit) {
+            clearRoute();
+            if (!here) return;
+            if (!lastRoute.on) { nearPanel(ui, items, here, api.focus); return; }
+            const stops = routeStops(items, here, lastRoute.n);
+            const path = [new K.LatLng(here.lat, here.lng)].concat(stops.map(s => new K.LatLng(s.it.lat, s.it.lng)));
+            routeObjs.push(new K.Polyline({ path, strokeWeight: 5, strokeColor: '#1d4ed8', strokeOpacity: 0.95, strokeStyle: 'shortdash' }));
+            stops.forEach((s, k) => {
+                routeObjs.push(new K.CustomOverlay({ position: new K.LatLng((s.from.lat + s.it.lat) / 2, (s.from.lng + s.it.lng) / 2), content: routeLegEl(s.leg), xAnchor: 0, yAnchor: 0, zIndex: 20 }));
+                routeObjs.push(new K.CustomOverlay({ position: new K.LatLng(s.it.lat, s.it.lng), content: routeNoEl(k + 1), xAnchor: 0, yAnchor: 0, zIndex: 30 }));
+            });
+            routeObjs.forEach(o => o.setMap(map));
+            routePanel(ui, stops, items.length, api.focus, n => { lastRoute.n = n; refreshNear(true); }, () => setRoute(false));
+            if (fit && stops.length && holder.offsetWidth) {
+                const b = new K.LatLngBounds();
+                path.forEach(pt => b.extend(pt));
+                map.setBounds(b, 60, 48, 48, 48);
+                if (map.getLevel() < 3) map.setLevel(3);
+            }
+        }
+        function setRoute(on) {
+            lastRoute.on = on;
+            press(routeBtn, on);
+            closePopup();
+            if (!on) { clearRoute(); if (ui.near) { ui.near.remove(); ui.near = null; } if (here) nearPanel(ui, items, here, api.focus); return; }
+            if (here) { refreshNear(true); return; }
+            routeBtn.disabled = true;  // 현위치가 먼저 필요하다
+            locate().then(p => { showMe(p, false); refreshNear(true); }, m => { say(ui, m); lastRoute.on = false; press(routeBtn, false); }).then(() => { routeBtn.disabled = false; });
         }
         let clusterer = null;
         if (opts.cluster && K.MarkerClusterer) {
@@ -2346,7 +2471,7 @@ const DataIntelMapLib = (function () {
                     d.addEventListener('click', () => { if (it.onClick) it.onClick(); openPopup(h); });
                     return h;
                 });
-                if (here) nearPanel(ui, items, here, api.focus);
+                refreshNear(false);
                 if (clusterer) {
                     try { clusterer.addMarkers(handles); return; } catch (e) { clusterer = null; }  // 묶음이 안 되면 그냥 다 찍는다
                 }
@@ -2373,13 +2498,15 @@ const DataIntelMapLib = (function () {
                 openPopup(h);
             },
             resize() { map.relayout(); if (rv && rvPanel && !rvPanel.hidden) rv.relayout(); },
-            destroy() { big.close(); closePopup(); if (clusterer) { try { clusterer.clear(); } catch (e) { /* ignore */ } } handles.forEach(h => h.setMap(null)); holder.textContent = ''; holder.classList.remove('dim-rv-open'); },
+            destroy() { big.close(); closePopup(); clearRoute(); if (clusterer) { try { clusterer.clear(); } catch (e) { /* ignore */ } } handles.forEach(h => h.setMap(null)); holder.textContent = ''; holder.classList.remove('dim-rv-open'); },
         };
 
         tool(ui, '📍 현위치', '내 위치로 이동하고 가까운 곳을 보여줍니다', b => {
             b.disabled = true;
             locate().then(p => showMe(p, true), m => say(ui, m)).then(() => { b.disabled = false; });
         });
+        const routeBtn = tool(ui, '🚩 방문 루트', '현위치에서 가까운 순으로 방문 순서를 정해 점선과 거리로 보여줍니다', () => setRoute(!lastRoute.on));
+        press(routeBtn, lastRoute.on);
         tool(ui, '🧭 전체', '표시된 곳이 모두 보이게 맞춥니다', () => { closePopup(); api.fit(lastZoom); });
         tool(ui, '🛰 스카이뷰', '항공사진으로 보기', b => {
             const on = !b.classList.contains('on');

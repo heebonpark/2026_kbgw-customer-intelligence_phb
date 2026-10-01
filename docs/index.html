@@ -254,6 +254,22 @@ body {
 .dim-map-near-item:hover, .dim-map-near-item:focus-visible { background: #f1f5f9; outline: none; }
 .dim-map-near-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dim-map-near-dist { color: #1d4ed8; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dim-route-wrap { background: none; border: 0; }
+/* 순번: 마커 위쪽에 얹는다 (마커 색이 보이게). 구간 거리: 점선 가운데 */
+.dim-route-no { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 10px;
+                background: #1d4ed8; color: #fff; font-size: 11.5px; font-weight: 800; font-variant-numeric: tabular-nums; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.45); }
+.dim-route-pin { transform: translate(-50%, -165%); pointer-events: none; }
+.dim-route-leg { display: inline-block; transform: translate(-50%, -50%); background: #fff; color: #1d4ed8; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+                 border: 1px solid #1d4ed8; white-space: nowrap; font-variant-numeric: tabular-nums; box-shadow: 0 1px 3px rgba(0,0,0,0.25); pointer-events: none; }
+.dim-route-panel { width: 280px; }
+.dim-route-pick { display: flex; align-items: center; gap: 5px; padding: 0 4px 6px; color: #555; font-size: 11.5px; }
+.dim-route-n { border: 1px solid #cbd5e1; background: #fff; color: #222; font: inherit; font-size: 11.5px; padding: 2px 8px; border-radius: 999px; cursor: pointer; }
+.dim-route-n.on { background: #1d4ed8; border-color: #1d4ed8; color: #fff; font-weight: 700; }
+.dim-route-list { max-height: 200px; overflow-y: auto; }
+.dim-route-list .dim-map-near-item { justify-content: flex-start; align-items: center; }
+.dim-route-list .dim-route-no { border: 0; box-shadow: none; flex: none; }
+.dim-route-list .dim-map-near-name { flex: 1; }
+.dim-route-foot { padding: 6px 4px 0; color: #777; font-size: 11px; }
 .dim-pop-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
 .dim-pop-actions button.pending-map-link { background: #fff; font-family: inherit; cursor: pointer; }
 .dim-pop-actions button.pending-map-link:hover { background: var(--brand); }
@@ -1014,12 +1030,12 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
 </div>
 
 <script type="application/json" id="embeddedData">{"db": {"columns": [], "rows": []}, "files": {"original": {"columns": [], "rows": []}, "facility": {"columns": [], "rows": []}, "patrol": {"columns": [], "rows": []}, "voc": {"columns": [], "rows": []}, "cancel": {"columns": [], "rows": []}, "cancelled_facility": {"columns": [], "rows": []}}, "matchingConfig": {"original": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "facility": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "patrol": [{"db_col": "서비스번호", "file_col": "고객번호", "enabled": true}], "voc": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "cancel": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "cancelled_facility": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}]}, "fileLabels": {"original": "2026년 관리고객원본", "facility": "시설현황", "patrol": "순찰 정기점검 내역", "voc": "VOC정보조회", "cancel": "해지 파이프라인", "cancelled_facility": "해지시설 내역"}, "dbKeyCandidates": ["계약번호", "서비스번호"], "fileKeyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "hqOrder": ["강북/강원", "강남/서부", "대구/경북", "부산/경남", "충남/충북", "전남/전북"], "branchOrder": ["중앙", "강북", "서대문", "고양", "의정부", "남양주", "강릉", "원주"], "zoneOwnerMap": {}}</script>
-<script type="application/json" id="uploadConfig">{"matchable": ["original", "facility", "patrol", "voc", "cancel", "cancelled_facility"], "keyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "sheetHints": {"db": ["활동대상구분", "담당채널"], "voc": ["VOC유형대", "계약번호"], "patrol": ["고객번호"], "original": ["계약번호"], "facility": ["계약번호"], "zone_owner": ["구역번호"], "core": ["관리주체", "관리고객 명"], "core_voc": ["VOC유형", "VOC유형대"]}, "fieldSpecs": {"db": [{"name": "활동대상구분", "aliases": ["활동대상구분", "담당채널"], "required": true}, {"name": "지사", "aliases": ["지사", "관리지사명", "관리지사"], "required": true}, {"name": "계약번호", "aliases": ["계약번호"]}, {"name": "서비스번호", "aliases": ["서비스번호"]}, {"name": "상호", "aliases": ["상호", "상호명", "고객명"]}, {"name": "설치주소", "aliases": ["설치주소", "주소"]}, {"name": "영업구역정보", "aliases": ["영업구역정보", "영업구역번호", "영업구역"], "zone": true, "fuzzy": ["영업구역"]}, {"name": "기술구역정보", "aliases": ["기술구역정보", "기술구역번호", "기술구역"], "zone": true, "fuzzy": ["기술구역"]}, {"name": "구역정보", "aliases": ["구역정보", "구역"], "zone": true, "fuzzy": ["출동구역", "구역정보"], "fuzzyExclude": ["영업", "기술"]}, {"name": "활동유무", "aliases": ["활동유무", "활동유무(o,x)"], "prefix": "활동유무", "required": true}, {"name": "SP담당", "aliases": ["SP담당", "SP_담당", "SP 담당", "SP담당자", "SP_담당자", "SP 담당자"]}], "zone_owner": [{"name": "구역번호", "aliases": ["구역번호", "영업구역번호"], "required": true}, {"name": "담당자명", "aliases": ["담당자명", "담당자", "사원명", "(신규)사원명"], "required": true}]}, "dbKeyCandidates": ["계약번호", "서비스번호"], "unlockTemplate": "\u003c!DOCTYPE html>\n\u003chtml lang=\"ko\">\n\u003chead>\n\u003cmeta charset=\"UTF-8\">\n\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n\u003cmeta name=\"robots\" content=\"noindex, nofollow\">\n\u003ctitle>__TITLE__\u003c/title>\n\u003cstyle>\n:root { --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; --brand: #2563eb; --error: #d03b3b; }\n@media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --muted: #94a3b8; --border: #334155; } }\n* { box-sizing: border-box; }\nbody { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--text);\n       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; padding: 16px; }\n.card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; text-align: center; }\nh1 { font-size: 20px; margin: 0 0 6px; }\n.exp, .hint { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }\ninput { width: 100%; font-size: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }\nbutton { width: 100%; margin-top: 12px; font-size: 15px; font-weight: 700; padding: 12px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; }\nbutton:disabled { opacity: .6; cursor: progress; }\n.err { min-height: 18px; margin-top: 10px; font-size: 13px; color: var(--error); }\n\u003c/style>\n\u003c/head>\n\u003cbody>\n\u003cform class=\"card\" id=\"unlockForm\" autocomplete=\"off\">\n    \u003ch1>🔒 __TITLE__\u003c/h1>\n    __EXPIRY__\n    \u003cp class=\"hint\">공유받은 비밀번호를 입력하세요. 데이터는 암호화되어 있습니다.\u003c/p>\n    \u003cinput type=\"password\" id=\"unlockPwd\" placeholder=\"비밀번호\" autofocus>\n    \u003cbutton type=\"submit\" id=\"unlockBtn\">열기\u003c/button>\n    \u003cdiv class=\"err\" id=\"unlockErr\">\u003c/div>\n\u003c/form>\n\u003cscript type=\"application/json\" id=\"encPayload\">__PAYLOAD__\u003c/script>\n\u003cscript>\n(function () {\n    const payload = JSON.parse(document.getElementById('encPayload').textContent);\n    const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));\n    const form = document.getElementById('unlockForm');\n    const btn = document.getElementById('unlockBtn');\n    const err = document.getElementById('unlockErr');\n\n    async function unwrapContentKey(pwd) {\n        const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);\n        for (const slot of payload.slots) {\n            const kek = await crypto.subtle.deriveKey(\n                { name: 'PBKDF2', salt: b64(slot.salt), iterations: payload.iter, hash: 'SHA-256' },\n                base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);\n            try {\n                return await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(slot.iv) }, kek, b64(slot.key));\n            } catch (e) { /* not this slot -- try the next password slot */ }\n        }\n        return null;\n    }\n\n    form.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        const pwd = document.getElementById('unlockPwd').value;\n        if (!pwd) return;\n        if (!window.crypto || !crypto.subtle) {\n            err.textContent = '이 브라우저에서는 열 수 없습니다 (https 주소 또는 최신 브라우저가 필요합니다).';\n            return;\n        }\n        btn.disabled = true; btn.textContent = '여는 중...'; err.textContent = '';\n        try {\n            const rawKey = await unwrapContentKey(pwd);\n            if (!rawKey) throw new Error('bad password');\n            const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);\n            const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(payload.iv) }, key, b64(payload.data));\n            const reportHtml = new TextDecoder().decode(plain);\n            document.open();\n            document.write(reportHtml);\n            document.close();\n            // Hand the same password to the report's own lock screen: it still\n            // enforces the expiry date and decides user vs admin view.\n            const unlock = () => {\n                const input = document.getElementById('pwd');\n                if (input && typeof window.checkPassword === 'function') { input.value = pwd; window.checkPassword(); }\n            };\n            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', unlock); else unlock();\n        } catch (ex) {\n            btn.disabled = false; btn.textContent = '열기';\n            err.textContent = '비밀번호가 올바르지 않습니다.';\n        }\n    });\n})();\n\u003c/script>\n\u003c/body>\n\u003c/html>", "lockScreenHtml": "\u003cdiv id=\"lockScreen\" class=\"lock-screen\">\n    \u003ch2>Data Intel PRO 보안 리포트\u003c/h2>\n    \u003cp>만료일: __EXPIRY_TEXT__\u003c/p>\n    \u003cinput type=\"password\" id=\"pwd\" placeholder=\"비밀번호 입력\" autocomplete=\"off\">\n    \u003cbutton onclick=\"checkPassword()\">확인\u003c/button>\n    \u003cdiv id=\"errorMsg\" class=\"error\">\u003c/div>\n\u003c/div>", "iterations": 310000, "filler": "EixkjMLMSHLQaaUvXOEnPAxU"}</script>
+<script type="application/json" id="uploadConfig">{"matchable": ["original", "facility", "patrol", "voc", "cancel", "cancelled_facility"], "keyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "sheetHints": {"db": ["활동대상구분", "담당채널"], "voc": ["VOC유형대", "계약번호"], "patrol": ["고객번호"], "original": ["계약번호"], "facility": ["계약번호"], "zone_owner": ["구역번호"], "core": ["관리주체", "관리고객 명"], "core_voc": ["VOC유형", "VOC유형대"]}, "fieldSpecs": {"db": [{"name": "활동대상구분", "aliases": ["활동대상구분", "담당채널"], "required": true}, {"name": "지사", "aliases": ["지사", "관리지사명", "관리지사"], "required": true}, {"name": "계약번호", "aliases": ["계약번호"]}, {"name": "서비스번호", "aliases": ["서비스번호"]}, {"name": "상호", "aliases": ["상호", "상호명", "고객명"]}, {"name": "설치주소", "aliases": ["설치주소", "주소"]}, {"name": "영업구역정보", "aliases": ["영업구역정보", "영업구역번호", "영업구역"], "zone": true, "fuzzy": ["영업구역"]}, {"name": "기술구역정보", "aliases": ["기술구역정보", "기술구역번호", "기술구역"], "zone": true, "fuzzy": ["기술구역"]}, {"name": "구역정보", "aliases": ["구역정보", "구역"], "zone": true, "fuzzy": ["출동구역", "구역정보"], "fuzzyExclude": ["영업", "기술"]}, {"name": "활동유무", "aliases": ["활동유무", "활동유무(o,x)"], "prefix": "활동유무", "required": true}, {"name": "SP담당", "aliases": ["SP담당", "SP_담당", "SP 담당", "SP담당자", "SP_담당자", "SP 담당자"]}], "zone_owner": [{"name": "구역번호", "aliases": ["구역번호", "영업구역번호"], "required": true}, {"name": "담당자명", "aliases": ["담당자명", "담당자", "사원명", "(신규)사원명"], "required": true}]}, "dbKeyCandidates": ["계약번호", "서비스번호"], "unlockTemplate": "\u003c!DOCTYPE html>\n\u003chtml lang=\"ko\">\n\u003chead>\n\u003cmeta charset=\"UTF-8\">\n\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n\u003cmeta name=\"robots\" content=\"noindex, nofollow\">\n\u003ctitle>__TITLE__\u003c/title>\n\u003cstyle>\n:root { --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; --brand: #2563eb; --error: #d03b3b; }\n@media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --muted: #94a3b8; --border: #334155; } }\n* { box-sizing: border-box; }\nbody { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--text);\n       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; padding: 16px; }\n.card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; text-align: center; }\nh1 { font-size: 20px; margin: 0 0 6px; }\n.exp, .hint { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }\ninput { width: 100%; font-size: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }\nbutton { width: 100%; margin-top: 12px; font-size: 15px; font-weight: 700; padding: 12px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; }\nbutton:disabled { opacity: .6; cursor: progress; }\n.err { min-height: 18px; margin-top: 10px; font-size: 13px; color: var(--error); }\n\u003c/style>\n\u003c/head>\n\u003cbody>\n\u003cform class=\"card\" id=\"unlockForm\" autocomplete=\"off\">\n    \u003ch1>🔒 __TITLE__\u003c/h1>\n    __EXPIRY__\n    \u003cp class=\"hint\">공유받은 비밀번호를 입력하세요. 데이터는 암호화되어 있습니다.\u003c/p>\n    \u003cinput type=\"password\" id=\"unlockPwd\" placeholder=\"비밀번호\" autofocus>\n    \u003cbutton type=\"submit\" id=\"unlockBtn\">열기\u003c/button>\n    \u003cdiv class=\"err\" id=\"unlockErr\">\u003c/div>\n\u003c/form>\n\u003cscript type=\"application/json\" id=\"encPayload\">__PAYLOAD__\u003c/script>\n\u003cscript>\n(function () {\n    const payload = JSON.parse(document.getElementById('encPayload').textContent);\n    const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));\n    const form = document.getElementById('unlockForm');\n    const btn = document.getElementById('unlockBtn');\n    const err = document.getElementById('unlockErr');\n\n    async function unwrapContentKey(pwd) {\n        const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);\n        for (const slot of payload.slots) {\n            const kek = await crypto.subtle.deriveKey(\n                { name: 'PBKDF2', salt: b64(slot.salt), iterations: payload.iter, hash: 'SHA-256' },\n                base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);\n            try {\n                return await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(slot.iv) }, kek, b64(slot.key));\n            } catch (e) { /* not this slot -- try the next password slot */ }\n        }\n        return null;\n    }\n\n    form.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        const pwd = document.getElementById('unlockPwd').value;\n        if (!pwd) return;\n        if (!window.crypto || !crypto.subtle) {\n            err.textContent = '이 브라우저에서는 열 수 없습니다 (https 주소 또는 최신 브라우저가 필요합니다).';\n            return;\n        }\n        btn.disabled = true; btn.textContent = '여는 중...'; err.textContent = '';\n        try {\n            const rawKey = await unwrapContentKey(pwd);\n            if (!rawKey) throw new Error('bad password');\n            const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);\n            const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(payload.iv) }, key, b64(payload.data));\n            const reportHtml = new TextDecoder().decode(plain);\n            document.open();\n            document.write(reportHtml);\n            document.close();\n            // Hand the same password to the report's own lock screen: it still\n            // enforces the expiry date and decides user vs admin view.\n            const unlock = () => {\n                const input = document.getElementById('pwd');\n                if (input && typeof window.checkPassword === 'function') { input.value = pwd; window.checkPassword(); }\n            };\n            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', unlock); else unlock();\n        } catch (ex) {\n            btn.disabled = false; btn.textContent = '열기';\n            err.textContent = '비밀번호가 올바르지 않습니다.';\n        }\n    });\n})();\n\u003c/script>\n\u003c/body>\n\u003c/html>", "lockScreenHtml": "\u003cdiv id=\"lockScreen\" class=\"lock-screen\">\n    \u003ch2>Data Intel PRO 보안 리포트\u003c/h2>\n    \u003cp>만료일: __EXPIRY_TEXT__\u003c/p>\n    \u003cinput type=\"password\" id=\"pwd\" placeholder=\"비밀번호 입력\" autocomplete=\"off\">\n    \u003cbutton onclick=\"checkPassword()\">확인\u003c/button>\n    \u003cdiv id=\"errorMsg\" class=\"error\">\u003c/div>\n\u003c/div>", "iterations": 310000, "filler": "PTKbFNgzLbsNQKOuusxkezZj"}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // ===== Lock screen =====
-const CORRECT_PWD = "EixkjMLMSHLQaaUvXOEnPAxU";
-const ADMIN_PWD = "EixkjMLMSHLQaaUvXOEnPAxU";
+const CORRECT_PWD = "PTKbFNgzLbsNQKOuusxkezZj";
+const ADMIN_PWD = "PTKbFNgzLbsNQKOuusxkezZj";
 const EXPIRY_DATE = new Date("9999-12-31T23:59:59");
 let isAdminUnlocked = false;
 
@@ -1181,6 +1197,7 @@ const DataIntelMapLib = (function () {
     const DEFAULT_CENTER = [37.6, 127.2];
     const pending = {};
     let lastHere = null;  // 한 번 잡은 현위치 -- 조건을 바꿔 지도를 새로 그려도 표시와 '가까운 곳'을 유지한다
+    const lastRoute = { on: false, n: 10 };  // 방문 루트 켜짐 / 몇 곳까지 -- 지도를 새로 그려도 유지
     const config = (function () { const e = document.getElementById('mapConfig'); if (!e) return {}; try { return JSON.parse(e.textContent) || {}; } catch (err) { return {}; } })();
     const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined && text !== null) e.textContent = text; return e; };
     function css(href) {
@@ -1286,6 +1303,54 @@ const DataIntelMapLib = (function () {
         ui.holder.appendChild(box);
         ui.near = box;
     }
+    // 방문 루트: 현위치에서 가장 가까운 곳 -> 거기서 가장 가까운 곳 ... 순서로 n곳 (직선거리 기준)
+    function routeStops(items, here, n) {
+        const left = items.map((it, i) => ({ it, i }));
+        const out = [];
+        let cur = here, total = 0;
+        while (left.length && out.length < n) {
+            let best = 0, bd = Infinity;
+            left.forEach((x, k) => { const d = km(cur.lat, cur.lng, x.it.lat, x.it.lng); if (d < bd) { bd = d; best = k; } });
+            const x = left.splice(best, 1)[0];
+            total += bd;
+            out.push({ i: x.i, it: x.it, leg: bd, cum: total, from: cur });
+            cur = x.it;
+        }
+        return out;
+    }
+    const routeNoEl = n => mk('div', 'dim-route-no dim-route-pin', String(n));
+    const routeLegEl = d => mk('div', 'dim-route-leg', distText(d));
+    // 방문 순서 목록: 번호 · 이름 · 앞 지점에서의 거리. 몇 곳까지 볼지 고를 수 있다.
+    function routePanel(ui, stops, total, focus, onCount, onClose) {
+        if (ui.near) ui.near.remove();
+        const box = mk('div', 'dim-map-near dim-route-panel');
+        const head = mk('div', 'dim-map-near-head', '방문 루트 · 총 ' + (stops.length ? distText(stops[stops.length - 1].cum) : '0m'));
+        const x = mk('button', 'dim-kpop-close', '×'); x.type = 'button'; x.setAttribute('aria-label', '방문 루트 끄기');
+        x.addEventListener('click', onClose);
+        head.appendChild(x); box.appendChild(head);
+        const pick = mk('div', 'dim-route-pick');
+        pick.appendChild(mk('span', null, '가까운 순'));
+        const shown = Math.min(lastRoute.n, total);
+        [5, 10, 20].filter(n => n < total).concat([total]).forEach(n => {
+            const b = mk('button', 'dim-route-n' + (shown === n ? ' on' : ''), n === total ? '전체 ' + total + '곳' : n + '곳'); b.type = 'button';
+            b.addEventListener('click', () => onCount(n));
+            pick.appendChild(b);
+        });
+        box.appendChild(pick);
+        const list = mk('div', 'dim-route-list');
+        stops.forEach((s, k) => {
+            const b = mk('button', 'dim-map-near-item'); b.type = 'button';
+            b.appendChild(mk('span', 'dim-route-no', String(k + 1)));
+            b.appendChild(mk('span', 'dim-map-near-name', s.it.name || s.it.tip || '(이름 없음)'));
+            b.appendChild(mk('span', 'dim-map-near-dist', '+' + distText(s.leg)));
+            b.addEventListener('click', () => focus(s.i));
+            list.appendChild(b);
+        });
+        box.appendChild(list);
+        box.appendChild(mk('div', 'dim-route-foot', '직선거리 기준 · 현위치에서 가까운 곳부터 차례로'));
+        ui.holder.appendChild(box);
+        ui.near = box;
+    }
     // 풍선 내용 = 화면 쪽이 만든 내용 + (현위치를 잡았으면 거리) + 로드뷰 / 길찾기
     function popupContent(it, here, onRoadview) {
         const box = it.popup();
@@ -1334,7 +1399,33 @@ const DataIntelMapLib = (function () {
                 me = [L.circle([p.lat, p.lng], { radius: Math.min(p.acc, 2000), weight: 1, color: '#2563eb', fillColor: '#2563eb', fillOpacity: 0.12, interactive: false }).addTo(map),
                       L.circleMarker([p.lat, p.lng], { radius: 7, weight: 3, color: '#fff', fillColor: '#2563eb', fillOpacity: 1, interactive: false }).addTo(map)];
                 if (move) map.setView([p.lat, p.lng], Math.max(map.getZoom(), 12));
-                nearPanel(ui, items, here, api.focus);
+                refreshNear(false);
+            }
+            // 현위치 기준 목록: 방문 루트가 켜져 있으면 루트(점선 + 순번 + 구간 거리), 아니면 가까운 5곳
+            let routeLayer = null;
+            function clearRoute() { if (routeLayer) { routeLayer.remove(); routeLayer = null; } }
+            function refreshNear(fit) {
+                clearRoute();
+                if (!here) return;
+                if (!lastRoute.on) { nearPanel(ui, items, here, api.focus); return; }
+                const stops = routeStops(items, here, lastRoute.n);
+                const path = [[here.lat, here.lng]].concat(stops.map(s => [s.it.lat, s.it.lng]));
+                routeLayer = L.layerGroup().addTo(map);
+                L.polyline(path, { color: '#1d4ed8', weight: 4, opacity: 0.95, dashArray: '7 9', lineCap: 'round', interactive: false }).addTo(routeLayer);
+                stops.forEach((s, k) => {
+                    L.marker([(s.from.lat + s.it.lat) / 2, (s.from.lng + s.it.lng) / 2], { icon: L.divIcon({ html: routeLegEl(s.leg), className: 'dim-route-wrap', iconSize: [0, 0] }), interactive: false, keyboard: false }).addTo(routeLayer);
+                    L.marker([s.it.lat, s.it.lng], { icon: L.divIcon({ html: routeNoEl(k + 1), className: 'dim-route-wrap', iconSize: [0, 0] }), interactive: false, keyboard: false, zIndexOffset: 500 }).addTo(routeLayer);
+                });
+                routePanel(ui, stops, items.length, api.focus, n => { lastRoute.n = n; refreshNear(true); }, () => setRoute(false));
+                if (fit && stops.length && holder.offsetWidth) map.fitBounds(L.latLngBounds(path), { padding: [48, 48], maxZoom: 16 });
+            }
+            function setRoute(on) {
+                lastRoute.on = on;
+                press(routeBtn, on);
+                if (!on) { clearRoute(); if (ui.near) { ui.near.remove(); ui.near = null; } if (here) nearPanel(ui, items, here, api.focus); return; }
+                if (here) { refreshNear(true); return; }
+                routeBtn.disabled = true;  // 현위치가 먼저 필요하다
+                locate().then(p => { showMe(p, false); refreshNear(true); }, m => { say(ui, m); lastRoute.on = false; press(routeBtn, false); }).then(() => { routeBtn.disabled = false; });
             }
             const layer = clustered ? L.markerClusterGroup({ maxClusterRadius: 46, showCoverageOnHover: false, disableClusteringAtZoom: 15,
                 iconCreateFunction: c => {
@@ -1357,7 +1448,7 @@ const DataIntelMapLib = (function () {
                         return m;
                     });
                     if (clustered) layer.addLayers(handles); else handles.forEach(m => m.addTo(layer));
-                    if (here) nearPanel(ui, items, here, api.focus);
+                    refreshNear(false);
                 },
                 fit(maxZoom) {
                     lastZoom = maxZoom;
@@ -1381,6 +1472,8 @@ const DataIntelMapLib = (function () {
                 b.disabled = true;
                 locate().then(p => showMe(p, true), m => say(ui, m)).then(() => { b.disabled = false; });
             });
+            const routeBtn = tool(ui, '🚩 방문 루트', '현위치에서 가까운 순으로 방문 순서를 정해 점선과 거리로 보여줍니다', () => setRoute(!lastRoute.on));
+            press(routeBtn, lastRoute.on);
             tool(ui, '🧭 전체', '표시된 곳이 모두 보이게 맞춥니다', () => api.fit(lastZoom));
             const big = bigTool(ui, on => { if (on) map.scrollWheelZoom.enable(); else map.scrollWheelZoom.disable(); setTimeout(() => map.invalidateSize(), 60); });
             L.DomEvent.disableClickPropagation(ui.bar);
@@ -1410,7 +1503,39 @@ const DataIntelMapLib = (function () {
                   new K.CustomOverlay({ position: pos, content: mk('div', 'dim-me'), xAnchor: 0.5, yAnchor: 0.5, zIndex: 45 })];
             me.forEach(x => x.setMap(map));
             if (move) { if (map.getLevel() > 8) map.setLevel(8); map.setCenter(pos); }
-            nearPanel(ui, items, here, api.focus);
+            refreshNear(false);
+        }
+        // 현위치 기준 목록: 방문 루트가 켜져 있으면 루트(점선 + 순번 + 구간 거리), 아니면 가까운 5곳
+        let routeObjs = [];
+        function clearRoute() { routeObjs.forEach(o => o.setMap(null)); routeObjs = []; }
+        function refreshNear(fit) {
+            clearRoute();
+            if (!here) return;
+            if (!lastRoute.on) { nearPanel(ui, items, here, api.focus); return; }
+            const stops = routeStops(items, here, lastRoute.n);
+            const path = [new K.LatLng(here.lat, here.lng)].concat(stops.map(s => new K.LatLng(s.it.lat, s.it.lng)));
+            routeObjs.push(new K.Polyline({ path, strokeWeight: 5, strokeColor: '#1d4ed8', strokeOpacity: 0.95, strokeStyle: 'shortdash' }));
+            stops.forEach((s, k) => {
+                routeObjs.push(new K.CustomOverlay({ position: new K.LatLng((s.from.lat + s.it.lat) / 2, (s.from.lng + s.it.lng) / 2), content: routeLegEl(s.leg), xAnchor: 0, yAnchor: 0, zIndex: 20 }));
+                routeObjs.push(new K.CustomOverlay({ position: new K.LatLng(s.it.lat, s.it.lng), content: routeNoEl(k + 1), xAnchor: 0, yAnchor: 0, zIndex: 30 }));
+            });
+            routeObjs.forEach(o => o.setMap(map));
+            routePanel(ui, stops, items.length, api.focus, n => { lastRoute.n = n; refreshNear(true); }, () => setRoute(false));
+            if (fit && stops.length && holder.offsetWidth) {
+                const b = new K.LatLngBounds();
+                path.forEach(pt => b.extend(pt));
+                map.setBounds(b, 60, 48, 48, 48);
+                if (map.getLevel() < 3) map.setLevel(3);
+            }
+        }
+        function setRoute(on) {
+            lastRoute.on = on;
+            press(routeBtn, on);
+            closePopup();
+            if (!on) { clearRoute(); if (ui.near) { ui.near.remove(); ui.near = null; } if (here) nearPanel(ui, items, here, api.focus); return; }
+            if (here) { refreshNear(true); return; }
+            routeBtn.disabled = true;  // 현위치가 먼저 필요하다
+            locate().then(p => { showMe(p, false); refreshNear(true); }, m => { say(ui, m); lastRoute.on = false; press(routeBtn, false); }).then(() => { routeBtn.disabled = false; });
         }
         let clusterer = null;
         if (opts.cluster && K.MarkerClusterer) {
@@ -1502,7 +1627,7 @@ const DataIntelMapLib = (function () {
                     d.addEventListener('click', () => { if (it.onClick) it.onClick(); openPopup(h); });
                     return h;
                 });
-                if (here) nearPanel(ui, items, here, api.focus);
+                refreshNear(false);
                 if (clusterer) {
                     try { clusterer.addMarkers(handles); return; } catch (e) { clusterer = null; }  // 묶음이 안 되면 그냥 다 찍는다
                 }
@@ -1529,13 +1654,15 @@ const DataIntelMapLib = (function () {
                 openPopup(h);
             },
             resize() { map.relayout(); if (rv && rvPanel && !rvPanel.hidden) rv.relayout(); },
-            destroy() { big.close(); closePopup(); if (clusterer) { try { clusterer.clear(); } catch (e) { /* ignore */ } } handles.forEach(h => h.setMap(null)); holder.textContent = ''; holder.classList.remove('dim-rv-open'); },
+            destroy() { big.close(); closePopup(); clearRoute(); if (clusterer) { try { clusterer.clear(); } catch (e) { /* ignore */ } } handles.forEach(h => h.setMap(null)); holder.textContent = ''; holder.classList.remove('dim-rv-open'); },
         };
 
         tool(ui, '📍 현위치', '내 위치로 이동하고 가까운 곳을 보여줍니다', b => {
             b.disabled = true;
             locate().then(p => showMe(p, true), m => say(ui, m)).then(() => { b.disabled = false; });
         });
+        const routeBtn = tool(ui, '🚩 방문 루트', '현위치에서 가까운 순으로 방문 순서를 정해 점선과 거리로 보여줍니다', () => setRoute(!lastRoute.on));
+        press(routeBtn, lastRoute.on);
         tool(ui, '🧭 전체', '표시된 곳이 모두 보이게 맞춥니다', () => { closePopup(); api.fit(lastZoom); });
         tool(ui, '🛰 스카이뷰', '항공사진으로 보기', b => {
             const on = !b.classList.contains('on');
