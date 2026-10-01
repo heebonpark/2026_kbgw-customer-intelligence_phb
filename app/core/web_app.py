@@ -153,6 +153,10 @@ def generate_web_app_html():
         "unlockTemplate": UNLOCK_PAGE_TEMPLATE,
         "lockScreenHtml": LOCK_SCREEN_HTML,
         "iterations": PBKDF2_ITERATIONS,
+        # 배포 저장소 첫 화면에 두는 빈 페이지 (deploy_report.py PLACEHOLDER_PAGE와 같은 내용)
+        "placeholderPage": ('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
+                            '<meta name="robots" content="noindex, nofollow"><title>Not Found</title></head>'
+                            '<body></body></html>'),
     }
     # The report script's lock screen is never shown here (no data is embedded),
     # so its password constants are just unguessable filler.
@@ -1193,13 +1197,28 @@ __DASH_SECTIONS__
             const made = await gh(token, 'POST', '/user/repos', { name: repo, private: false, auto_init: true, description: 'Data Intel PRO 암호화 리포트 배포용' });
             if (!made.ok) throw ghFail('저장소 생성', made);
         } else if (!info.ok) throw ghFail('저장소 확인', info);
+        // 링크를 추측할 수 없게 무작위 폴더 아래에 올린다 (deploy_report.py와 같은 규칙). 이미 있는 폴더는 그대로 써서
+        // 다시 배포해도 링크가 유지된다. 저장소 첫 화면에는 빈 페이지를 둔다.
+        let slug = null;
+        const listing = await gh(token, 'GET', '/repos/' + full + '/contents/');
+        if (listing.ok && Array.isArray(listing.json)) {
+            const dir = listing.json.find(f => f.type === 'dir' && /^[a-z0-9]{10}$/.test(f.name));
+            if (dir) slug = dir.name;
+        }
+        if (!slug) {
+            const alphabet = 'abcdefghjkmnpqrstuvwxyz23456789';
+            slug = Array.from(crypto.getRandomValues(new Uint8Array(10)), v => alphabet[v % alphabet.length]).join('');
+        }
         say('리포트 올리는 중...');
         const blob = await gh(token, 'POST', '/repos/' + full + '/git/blobs', { content: b64(new TextEncoder().encode(html)), encoding: 'base64' });
         if (!blob.ok) throw ghFail('업로드', blob);
+        const front = await gh(token, 'POST', '/repos/' + full + '/git/blobs', { content: CFG.placeholderPage, encoding: 'utf-8' });
+        if (!front.ok) throw ghFail('업로드', front);
         const nojekyll = await gh(token, 'POST', '/repos/' + full + '/git/blobs', { content: '', encoding: 'utf-8' });
         if (!nojekyll.ok) throw ghFail('업로드', nojekyll);
         const tree = await gh(token, 'POST', '/repos/' + full + '/git/trees', { tree: [
-            { path: 'index.html', mode: '100644', type: 'blob', sha: blob.json.sha },
+            { path: slug + '/index.html', mode: '100644', type: 'blob', sha: blob.json.sha },
+            { path: 'index.html', mode: '100644', type: 'blob', sha: front.json.sha },
             { path: '.nojekyll', mode: '100644', type: 'blob', sha: nojekyll.json.sha }] });
         if (!tree.ok) throw ghFail('업로드', tree);
         // parents: [] -- 이전 리포트를 기록에 남기지 않는 단일 커밋 (deploy_report.py의 force push와 같음)
@@ -1214,7 +1233,8 @@ __DASH_SECTIONS__
             pages = await gh(token, 'POST', '/repos/' + full + '/pages', { source: { branch: 'main', path: '/' } });
             if (!pages.ok) throw ghFail('GitHub Pages 설정', pages);
         }
-        return (pages.json && pages.json.html_url) || ('https://' + me.json.login.toLowerCase() + '.github.io/' + repo + '/');
+        const base = (pages.json && pages.json.html_url) || ('https://' + me.json.login.toLowerCase() + '.github.io/' + repo + '/');
+        return base.replace(/\/+$/, '') + '/' + slug + '/';
     }
     $('shareDeployBtn').addEventListener('click', async () => {
         const btn = $('shareDeployBtn'); btn.disabled = true; $('shareDownloadBtn').disabled = true;

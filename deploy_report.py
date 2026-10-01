@@ -16,6 +16,13 @@ first one, e.g. on a second PC.
 - The report goes to its own repository, never this (public) source repo.
 - Each deploy force-pushes a single commit, so earlier reports don't pile up
   in the repository's history.
+- The report goes under a random folder (https://<you>.github.io/<repo>/<10 random
+  characters>/) so the link can't be guessed; the short address shows an empty
+  page. The same folder is reused on later deploys (looked up in the deploy
+  repository itself, so every PC keeps the same link) unless a new link is
+  asked for. The repository is public, so this hides the link from guessing,
+  not from someone who browses the repository -- the encryption is what
+  protects the data.
 - GitHub Pages on a private repository needs a paid plan; on a free account
   pass --public (the page is still unreadable without the password).
 """
@@ -24,6 +31,7 @@ import argparse
 import json
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
@@ -87,11 +95,55 @@ def _owner_from_source_repo():
     return match.group(1) if match else None
 
 
-def _push_single_commit(html_path, full, log):
-    """리포트 한 파일을 index.html 단일 커밋으로 강제 푸시 (이전 리포트를 기록에 남기지 않는다)."""
+SLUG_RE = re.compile(r'^[a-z0-9]{10}$')
+SLUG_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789'  # 헷갈리는 글자(0/o, 1/l/i) 제외
+# 짧은 주소(저장소 첫 화면)에 두는 빈 페이지 -- 리포트가 여기 있다는 것도 알리지 않는다
+PLACEHOLDER_PAGE = ('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">'
+                    '<meta name="robots" content="noindex, nofollow"><title>Not Found</title></head>'
+                    '<body></body></html>')
+
+
+def new_slug():
+    return ''.join(secrets.choice(SLUG_ALPHABET) for _ in range(10))
+
+
+def _remote_slug(full):
+    """배포 저장소에 이미 있는 무작위 폴더 이름 (없으면 None) -- 어느 PC에서 배포해도 같은 링크를 유지한다."""
+    tmp = tempfile.mkdtemp(prefix='report_slug_')
+    try:
+        if _run(['git', 'clone', '--depth', '1', '-q', f"https://github.com/{full}.git", tmp], check=False).returncode != 0:
+            return None
+        for name in sorted(os.listdir(tmp)):
+            if SLUG_RE.match(name) and os.path.isfile(os.path.join(tmp, name, 'index.html')):
+                return name
+        return None
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def _pick_slug(full, hidden_link, new_link, log):
+    if not hidden_link:
+        return None
+    slug = None if new_link else _remote_slug(full)
+    if slug:
+        log("기존 링크를 그대로 씁니다 (내용만 새 리포트로 바뀝니다)")
+        return slug
+    log("새 링크를 만듭니다 -- 이전 링크는 더 이상 열리지 않습니다")
+    return new_slug()
+
+
+def _push_single_commit(html_path, full, log, slug=None):
+    """리포트 한 파일을 단일 커밋으로 강제 푸시 (이전 리포트를 기록에 남기지 않는다).
+    slug가 있으면 <slug>/index.html 에 두고 첫 화면은 빈 페이지, 없으면 첫 화면이 리포트."""
     workdir = tempfile.mkdtemp(prefix='report_deploy_')
     try:
-        shutil.copyfile(html_path, os.path.join(workdir, 'index.html'))
+        if slug:
+            os.makedirs(os.path.join(workdir, slug))
+            shutil.copyfile(html_path, os.path.join(workdir, slug, 'index.html'))
+            with open(os.path.join(workdir, 'index.html'), 'w', encoding='utf-8') as f:
+                f.write(PLACEHOLDER_PAGE)
+        else:
+            shutil.copyfile(html_path, os.path.join(workdir, 'index.html'))
         open(os.path.join(workdir, '.nojekyll'), 'w').close()
         _run(['git', 'init', '-q', '-b', 'main'], cwd=workdir)
         _run(['git', 'add', '-A'], cwd=workdir)
@@ -103,7 +155,7 @@ def _push_single_commit(html_path, full, log):
         shutil.rmtree(workdir, ignore_errors=True)
 
 
-def _deploy_without_gh(html_path, repo_name, log):
+def _deploy_without_gh(html_path, repo_name, log, hidden_link=True, new_link=False):
     # 계정: 이 PC에 저장해 둔 이름 -> 이 폴더를 받은 저장소(origin)
     owner = load_github_owner() or _owner_from_source_repo()
     if not owner:
@@ -112,19 +164,25 @@ def _deploy_without_gh(html_path, repo_name, log):
         raise OwnerNeeded(f"GitHub 계정 이름이 올바르지 않습니다: {owner}")
     full = f"{owner}/{repo_name}"
     log(f"gh 없이 배포합니다: {full} (처음이면 GitHub 로그인 창이 뜹니다)")
-    pushed = _push_single_commit(html_path, full, log)
+    slug = _pick_slug(full, hidden_link, new_link, log)
+    pushed = _push_single_commit(html_path, full, log, slug)
     if pushed.returncode != 0:
         msg = (pushed.stderr or pushed.stdout).strip()
         if 'not found' in msg.lower():
             raise DeployError(f"배포 저장소 {full} 를 찾을 수 없습니다 (계정 이름이 맞는지, 로그인한 계정에 권한이 있는지 확인). "
                               "저장소를 처음 만들 때는 gh가 필요합니다. " + GH_INSTALL_HINT)
         raise DeployError(f"업로드 실패 (GitHub 로그인·권한 확인): {msg[:300]}  " + GH_INSTALL_HINT)
-    return f"https://{owner.lower()}.github.io/{repo_name}/"
+    return f"https://{owner.lower()}.github.io/{repo_name}/" + (f"{slug}/" if slug else "")
 
 
-def deploy(html_path, repo_name=DEFAULT_REPO, public=False, log=print, description='Data Intel PRO 암호화 리포트 배포용'):
+def deploy(html_path, repo_name=DEFAULT_REPO, public=False, log=print, description='Data Intel PRO 암호화 리포트 배포용',
+           hidden_link=True, new_link=False):
     """Returns the published https URL. Raises DeployError with a readable
-    reason on any failure."""
+    reason on any failure.
+
+    hidden_link: publish under a random folder so the link can't be guessed
+        (the same folder is kept across deploys). new_link: replace that
+        folder with a fresh one -- the previous link stops working."""
     if not os.path.exists(html_path):
         raise DeployError(f"리포트 파일이 없습니다: {html_path}")
     with open(html_path, encoding='utf-8') as f:
@@ -133,7 +191,7 @@ def deploy(html_path, repo_name=DEFAULT_REPO, public=False, log=print, descripti
     if shutil.which('git') is None:
         raise DeployError("'git' 명령을 찾을 수 없습니다. Git을 설치한 뒤 다시 시도하세요 (https://git-scm.com/download/win).")
     if shutil.which('gh') is None:
-        return _deploy_without_gh(html_path, repo_name, log)
+        return _deploy_without_gh(html_path, repo_name, log, hidden_link, new_link)
 
     owner = _run(['gh', 'api', 'user', '--jq', '.login']).stdout.strip()
     if not owner:
@@ -145,7 +203,8 @@ def deploy(html_path, repo_name=DEFAULT_REPO, public=False, log=print, descripti
         _run(['gh', 'repo', 'create', full, '--public' if public else '--private',
               '--description', description])
 
-    pushed = _push_single_commit(html_path, full, log)
+    slug = _pick_slug(full, hidden_link, new_link, log)
+    pushed = _push_single_commit(html_path, full, log, slug)
     if pushed.returncode != 0:
         raise DeployError(f"git push 실패: {(pushed.stderr or pushed.stdout).strip()[:400]}")
 
@@ -167,7 +226,8 @@ def deploy(html_path, repo_name=DEFAULT_REPO, public=False, log=print, descripti
         url = json.loads(pages.stdout).get('html_url')
     except (ValueError, AttributeError):
         url = None
-    return url or f"https://{owner}.github.io/{repo_name}/"
+    base = url or f"https://{owner}.github.io/{repo_name}/"
+    return base.rstrip('/') + '/' + (f"{slug}/" if slug else "")
 
 
 def main():
@@ -176,9 +236,11 @@ def main():
     parser.add_argument('html', nargs='?', default=os.path.join(base_dir, 'Data_Intel_PRO_Report.html'))
     parser.add_argument('--repo', default=DEFAULT_REPO, help=f"배포 저장소 이름 (기본 {DEFAULT_REPO})")
     parser.add_argument('--public', action='store_true', help="공개 저장소로 배포 (무료 계정의 GitHub Pages)")
+    parser.add_argument('--plain-link', action='store_true', help="무작위 폴더 없이 저장소 첫 화면에 배포 (예전 방식)")
+    parser.add_argument('--new-link', action='store_true', help="링크를 새로 만든다 (이전 링크는 닫힘)")
     args = parser.parse_args()
     try:
-        url = deploy(args.html, args.repo, public=args.public)
+        url = deploy(args.html, args.repo, public=args.public, hidden_link=not args.plain_link, new_link=args.new_link)
     except DeployError as e:
         print(f"배포 실패: {e}")
         sys.exit(1)

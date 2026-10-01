@@ -190,6 +190,7 @@ class DataIntelGUI:
         self.kakao_key = tk.StringVar(value=load_kakao_key() or '')
         self.kakao_js_key = tk.StringVar(value=load_kakao_js_key() or '')
         self.visit_code = tk.StringVar(value=load_visit_code() or '')
+        self.new_link = tk.BooleanVar(value=False)
         self.report_expiry = tk.StringVar()
 
         self.create_widgets()
@@ -217,7 +218,7 @@ class DataIntelGUI:
         list_container = tk.Frame(body, bg=BG)
         list_container.pack(fill=tk.BOTH, expand=True)
 
-        canvas = tk.Canvas(list_container, bg=BG, highlightthickness=0, height=170)
+        canvas = tk.Canvas(list_container, bg=BG, highlightthickness=0, height=150)
         scrollbar = ttk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
         self.scroll_frame = tk.Frame(canvas, bg=BG)
         self.scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
@@ -299,12 +300,16 @@ class DataIntelGUI:
         self._bind_autocorrect(adm_ent, self.admin_password)
 
         exp_row = tk.Frame(opts_card, bg=CARD_BG)
-        exp_row.pack(fill=tk.X, padx=14, pady=(4, 12))
+        exp_row.pack(fill=tk.X, padx=14, pady=(4, 4))
         tk.Label(exp_row, text="★ 리포트 만료일 (YYYY-MM-DD)", bg=CARD_BG, width=26, anchor="w",
                  font=("Helvetica", 10)).pack(side=tk.LEFT)
         exp_ent = tk.Entry(exp_row, textvariable=self.report_expiry, font=("Helvetica", 10))
         exp_ent.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self._bind_autocorrect(exp_ent, self.report_expiry)
+
+        tk.Checkbutton(opts_card, text="배포할 때 링크 새로 만들기 (이전 링크는 닫힘 -- 평소에는 끄고, 링크가 퍼졌을 때만)",
+                       variable=self.new_link, bg=CARD_BG, activebackground=CARD_BG, font=("Helvetica", 10),
+                       anchor="w").pack(fill=tk.X, padx=12, pady=(0, 8))
 
         # ---- actions ----
         action_row = tk.Frame(body, bg=BG)
@@ -593,7 +598,7 @@ class DataIntelGUI:
             self.log("GitHub Pages 배포를 시작합니다...")
             try:
                 try:
-                    url = deploy(path, repo_name=repo, log=self.log, description=f"{title} (암호화)")
+                    url = deploy(path, repo_name=repo, log=self.log, description=f"{title} (암호화)", new_link=self.new_link.get())
                 except OwnerNeeded as e:
                     # zip으로 받은 폴더 + gh 없음: 계정 이름을 한 번 물어 이 PC에 저장하고 다시 시도
                     owner = simpledialog.askstring(
@@ -603,7 +608,7 @@ class DataIntelGUI:
                         self.log("배포 취소됨 (GitHub 계정 이름 없음)")
                         return
                     save_github_owner(owner.strip())
-                    url = deploy(path, repo_name=repo, log=self.log, description=f"{title} (암호화)")
+                    url = deploy(path, repo_name=repo, log=self.log, description=f"{title} (암호화)", new_link=self.new_link.get())
             except DeployError as e:
                 if '비공개 저장소' not in str(e):
                     raise
@@ -613,7 +618,8 @@ class DataIntelGUI:
                         "리포트는 암호화되어 있어 비밀번호 없이는 내용을 볼 수 없습니다.\n\n공개 저장소로 배포할까요?"):
                     self.log("배포 취소됨")
                     return
-                url = deploy(path, repo_name=repo, public=True, log=self.log, description=f"{title} (암호화)")
+                url = deploy(path, repo_name=repo, public=True, log=self.log, description=f"{title} (암호화)", new_link=self.new_link.get())
+            self.new_link.set(False)  # 한 번 쓰면 끈다 -- 다음 배포부터는 방금 만든 링크를 유지
             share = f"[{title}]\n링크: {url}\n비밀번호: {pwd}\n만료일: {expiry}"
             self.root.clipboard_clear()
             self.root.clipboard_append(share)
