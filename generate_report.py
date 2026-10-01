@@ -110,9 +110,11 @@ def main():
     parser.add_argument("--expiry", type=str, help="리포트 만료일 (YYYY-MM-DD, 지정하지 않으면 월말)", default=None)
     parser.add_argument("--core-only", action="store_true",
                         help="9. 코어고객(+9-1) 파일만으로 코어고객 활동현황 리포트 생성 (총괄DB 불필요)")
+    parser.add_argument("--dir", type=str, default=os.path.dirname(os.path.abspath(__file__)),
+                        help="원본 파일이 있고 리포트를 저장할 폴더 (기본: 이 스크립트가 있는 폴더)")
     args = parser.parse_args()
 
-    base_dir = "/Users/heebonpark/Downloads/관리고객통합솔루션"
+    base_dir = os.path.abspath(args.dir)
 
     if args.core_only:
         html_content, pwd, expiry, admin_pwd, msg = build_core_report(
