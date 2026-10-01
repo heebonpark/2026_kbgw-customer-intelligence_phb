@@ -5,7 +5,11 @@ Publishes the generated (encrypted) HTML report to GitHub Pages.
     python deploy_report.py report.html --repo my-report --public
     python deploy_report.py Core_Customer_Report.html --repo kbgw-core-report --public   # 코어고객 리포트
 
-Needs git and the GitHub CLI (`gh`, logged in with `gh auth login`).
+Needs git. With the GitHub CLI (`gh`, logged in with `gh auth login`) it can
+also create the deploy repository and switch GitHub Pages on. Without `gh` it
+still updates a repository that already exists (plain `git push`, signing in
+through Git's own credential window) -- enough for every deploy after the
+first one, e.g. on a second PC.
 
 - Refuses to publish a report that isn't encrypted (see core/secure_report.py)
   -- an unencrypted report carries every customer row in plain text.
@@ -19,6 +23,7 @@ Needs git and the GitHub CLI (`gh`, logged in with `gh auth login`).
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -34,10 +39,55 @@ class DeployError(Exception):
 
 
 def _run(cmd, cwd=None, check=True):
-    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding='utf-8', errors='replace')
+    # GIT_TERMINAL_PROMPT=0: 로그인 정보가 없을 때 보이지 않는 콘솔에서 입력을 기다리며 멈추지 않게 (로그인 창은 그대로 뜬다)
+    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, encoding='utf-8', errors='replace',
+                            env=dict(os.environ, GIT_TERMINAL_PROMPT='0'))
     if check and result.returncode != 0:
         raise DeployError(f"{' '.join(cmd[:3])} 실패: {(result.stderr or result.stdout).strip()[:400]}")
     return result
+
+
+GH_INSTALL_HINT = ("GitHub CLI(gh)를 설치하면 저장소 생성까지 자동으로 됩니다: 명령 프롬프트에서 "
+                   "'winget install --id GitHub.cli' 실행 후 'gh auth login' (맥은 'brew install gh').")
+
+
+def _owner_from_source_repo():
+    """gh 없이 배포할 때 GitHub 계정 이름: 이 프로그램을 내려받은 저장소(origin) 주소에서 읽는다."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    result = _run(['git', '-C', here, 'remote', 'get-url', 'origin'], check=False)
+    match = re.search(r'github\.com[:/]([^/\s]+)/', result.stdout or '')
+    return match.group(1) if match else None
+
+
+def _push_single_commit(html_path, full, log):
+    """리포트 한 파일을 index.html 단일 커밋으로 강제 푸시 (이전 리포트를 기록에 남기지 않는다)."""
+    workdir = tempfile.mkdtemp(prefix='report_deploy_')
+    try:
+        shutil.copyfile(html_path, os.path.join(workdir, 'index.html'))
+        open(os.path.join(workdir, '.nojekyll'), 'w').close()
+        _run(['git', 'init', '-q', '-b', 'main'], cwd=workdir)
+        _run(['git', 'add', '-A'], cwd=workdir)
+        _run(['git', '-c', 'user.name=report-deploy', '-c', 'user.email=report-deploy@users.noreply.github.com',
+              'commit', '-q', '-m', 'Deploy encrypted report'], cwd=workdir)
+        log("리포트 업로드 중...")
+        return _run(['git', 'push', '-q', '--force', f"https://github.com/{full}.git", 'main'], cwd=workdir, check=False)
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
+def _deploy_without_gh(html_path, repo_name, log):
+    owner = _owner_from_source_repo()
+    if not owner:
+        raise DeployError("'gh' 명령이 없고 GitHub 계정도 알 수 없습니다 (이 폴더가 git으로 받은 저장소가 아님). " + GH_INSTALL_HINT)
+    full = f"{owner}/{repo_name}"
+    log(f"gh 없이 배포합니다: {full} (처음이면 GitHub 로그인 창이 뜹니다)")
+    pushed = _push_single_commit(html_path, full, log)
+    if pushed.returncode != 0:
+        msg = (pushed.stderr or pushed.stdout).strip()
+        if 'not found' in msg.lower():
+            raise DeployError(f"배포 저장소 {full} 가 아직 없습니다. 저장소를 처음 만들 때는 gh가 필요합니다. " + GH_INSTALL_HINT)
+        raise DeployError(f"업로드 실패 (GitHub 로그인·권한 확인): {msg[:300]}  " + GH_INSTALL_HINT)
+    return f"https://{owner.lower()}.github.io/{repo_name}/"
 
 
 def deploy(html_path, repo_name=DEFAULT_REPO, public=False, log=print, description='Data Intel PRO 암호화 리포트 배포용'):
@@ -48,9 +98,10 @@ def deploy(html_path, repo_name=DEFAULT_REPO, public=False, log=print, descripti
     with open(html_path, encoding='utf-8') as f:
         if ENCRYPTED_MARKER not in f.read():
             raise DeployError("암호화되지 않은 리포트는 배포하지 않습니다 (고객 데이터가 그대로 노출됩니다).")
-    for tool in ('git', 'gh'):
-        if shutil.which(tool) is None:
-            raise DeployError(f"'{tool}' 명령을 찾을 수 없습니다. 설치 후 다시 시도하세요.")
+    if shutil.which('git') is None:
+        raise DeployError("'git' 명령을 찾을 수 없습니다. Git을 설치한 뒤 다시 시도하세요 (https://git-scm.com/download/win).")
+    if shutil.which('gh') is None:
+        return _deploy_without_gh(html_path, repo_name, log)
 
     owner = _run(['gh', 'api', 'user', '--jq', '.login']).stdout.strip()
     if not owner:
@@ -62,18 +113,9 @@ def deploy(html_path, repo_name=DEFAULT_REPO, public=False, log=print, descripti
         _run(['gh', 'repo', 'create', full, '--public' if public else '--private',
               '--description', description])
 
-    workdir = tempfile.mkdtemp(prefix='report_deploy_')
-    try:
-        shutil.copyfile(html_path, os.path.join(workdir, 'index.html'))
-        open(os.path.join(workdir, '.nojekyll'), 'w').close()
-        _run(['git', 'init', '-q', '-b', 'main'], cwd=workdir)
-        _run(['git', 'add', '-A'], cwd=workdir)
-        _run(['git', '-c', 'user.name=report-deploy', '-c', 'user.email=report-deploy@users.noreply.github.com',
-              'commit', '-q', '-m', 'Deploy encrypted report'], cwd=workdir)
-        log("리포트 업로드 중...")
-        _run(['git', 'push', '-q', '--force', f"https://github.com/{full}.git", 'main'], cwd=workdir)
-    finally:
-        shutil.rmtree(workdir, ignore_errors=True)
+    pushed = _push_single_commit(html_path, full, log)
+    if pushed.returncode != 0:
+        raise DeployError(f"git push 실패: {(pushed.stderr or pushed.stdout).strip()[:400]}")
 
     pages = _run(['gh', 'api', f"repos/{full}/pages"], check=False)
     if pages.returncode != 0:

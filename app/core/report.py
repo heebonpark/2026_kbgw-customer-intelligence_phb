@@ -2065,8 +2065,12 @@ const DataIntelMapLib = (function () {
     }));
     // 카카오맵 SDK: 등록 안 된 도메인·파일(file://)에서는 스크립트가 거절된다 -> 실패로 처리해 Leaflet으로 넘어간다
     const kakao = () => once('kakao', () => new Promise((resolve, reject) => {
-        const ready = () => { try { window.kakao.maps.load(() => resolve()); } catch (e) { reject(e); } };
-        setTimeout(() => reject(new Error('kakao timeout')), 8000);  // 이미 끝났으면 아무 일도 없다
+        // 시간 제한은 SDK 스크립트를 받은 뒤부터 잰다 -- 큰 리포트를 계산하느라 화면이 잠시 멈춘 사이(느린 PC)
+        // 제한이 먼저 끝나 기본 지도로 넘어가 버리지 않게. 스크립트 자체가 거절되면(도메인 미등록) 바로 실패한다.
+        const ready = () => {
+            setTimeout(() => reject(new Error('kakao timeout')), 20000);  // 이미 끝났으면 아무 일도 없다
+            try { window.kakao.maps.load(() => resolve()); } catch (e) { reject(e); }
+        };
         if (window.kakao && window.kakao.maps) { ready(); return; }
         script('https://dapi.kakao.com/v2/maps/sdk.js?appkey=' + encodeURIComponent(config.kakaoJsKey) + '&autoload=false&libraries=clusterer')
             .then(ready, () => reject(new Error('kakao sdk')));
