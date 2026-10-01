@@ -39,6 +39,9 @@ _make_streams_safe()
 warnings.filterwarnings("ignore")
 
 import re
+import threading
+import http.server
+from urllib.parse import quote, unquote
 from datetime import datetime
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -76,6 +79,61 @@ _COLOR_EMOJI = re.compile('[\U0001F300-\U0001FAFF\u2699\uFE0F]')
 
 def ui(text):
     return _COLOR_EMOJI.sub('', text).strip() if _STRIP_EMOJI else text
+
+
+class PreviewServer:
+    """만든 리포트를 파일(file://)이 아니라 http://localhost 주소로 열어 준다.
+
+    카카오맵은 카카오 콘솔에 등록한 주소에서만 뜬다 -- 파일을 더블클릭해 열면 항상 기본 지도가 된다.
+    그래서 이 PC 안에서만 보이는 작은 서버(127.0.0.1)로 방금 만든 리포트만 내보낸다. 80번 포트를
+    먼저 쓰고(콘솔에 http://localhost 등록됨), 못 쓰면 8765번(http://localhost:8765 등록 필요)으로 연다.
+    프로그램을 닫으면 같이 꺼진다."""
+    PORTS = (80, 8765)
+
+    def __init__(self):
+        self.httpd = None
+        self.port = None
+        self.files = {}  # URL에 쓰는 파일 이름 -> 실제 경로 (등록한 리포트만 내보낸다)
+
+    def _start(self):
+        files = self.files
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                path = files.get(unquote(self.path.split('?', 1)[0].lstrip('/')))
+                if not path or not os.path.exists(path):
+                    self.send_error(404)
+                    return
+                with open(path, 'rb') as f:
+                    body = f.read()
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Content-Length', str(len(body)))
+                self.send_header('Cache-Control', 'no-store')
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, *args):  # 콘솔 없는 exe에서 stderr 출력으로 죽지 않게
+                pass
+
+        for port in self.PORTS:
+            try:
+                self.httpd = http.server.ThreadingHTTPServer(('127.0.0.1', port), Handler)
+            except OSError:
+                continue
+            self.port = port
+            threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
+            return True
+        return False
+
+    def url_for(self, path):
+        """-> (브라우저로 열 주소, 카카오맵이 뜨는 주소인지). 서버를 못 띄우면 file:// 로."""
+        if self.httpd is None and not self._start():
+            return f"file://{path}", False
+        name = os.path.basename(path)
+        self.files[name] = path
+        host = 'localhost' if self.port == 80 else f'localhost:{self.port}'
+        return f"http://{host}/{quote(name)}", True
 
 
 def load_file_notes():
@@ -125,6 +183,7 @@ class DataIntelGUI:
         self.file_notes = {key: tk.StringVar(value=saved_notes.get(key, '')) for key in self.file_paths}
 
         self.last_report = None  # (path, user password, expiry, deploy repo, title) of the latest generated report
+        self.preview = PreviewServer()
         self.report_password = tk.StringVar()
         self.admin_password = tk.StringVar(value=load_admin_password() or '')
         self.kakao_key = tk.StringVar(value=load_kakao_key() or '')
@@ -398,7 +457,7 @@ class DataIntelGUI:
             messagebox.showinfo("성공", f"리포트 생성 완료!\n만료일: {expiry}\n사용자용 암호: {pwd}\n관리자용 암호: {admin_pwd}")
             self.last_report = (output_path, pwd, expiry, DEFAULT_REPO, "Data Intel PRO 리포트")
             self.deploy_btn.config(state=tk.NORMAL)
-            webbrowser.open(f"file://{output_path}")
+            self._open_report(output_path)
 
         except Exception as e:
             tb = traceback.format_exc()
@@ -406,6 +465,17 @@ class DataIntelGUI:
             messagebox.showerror("오류", f"실행 중 오류가 발생했습니다: {str(e)}")
         finally:
             self.run_btn.config(state=tk.NORMAL)
+
+    def _open_report(self, path):
+        """방금 만든 리포트를 브라우저로 연다 -- 카카오맵이 뜨도록 가능하면 http://localhost 주소로."""
+        url, served = self.preview.url_for(path)
+        if not served:
+            self.log("미리보기를 파일로 엽니다 (지도는 기본 지도로 표시 -- 카카오맵은 배포한 링크에서 보입니다)")
+        elif self.kakao_js_key.get().strip():
+            self.log(f"미리보기: {url}")
+            if self.preview.port != 80:
+                self.log(f"  (카카오맵이 안 보이면 카카오 콘솔 사이트 도메인에 http://localhost:{self.preview.port} 를 추가하세요)")
+        webbrowser.open(url)
 
     def _read_options(self):
         """리포트 옵션 칸을 읽는다 -> (사용자 비밀번호, 관리자 비밀번호, 카카오 키, 만료일); 빈칸은 None.
@@ -472,7 +542,7 @@ class DataIntelGUI:
                                         "'GitHub Pages 배포'를 누르면 공유 링크가 만들어집니다.")
             self.last_report = (output_path, pwd, expiry, CORE_REPO, f"{CORE_REPORT_TITLE} 리포트")
             self.deploy_btn.config(state=tk.NORMAL)
-            webbrowser.open(f"file://{output_path}")
+            self._open_report(output_path)
         except ValueError as e:
             self.log(f"생성 실패: {e}")
             messagebox.showerror("오류", str(e))
