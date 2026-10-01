@@ -55,8 +55,9 @@ from core.handlers import process_and_merge, load_data
 from core.report import generate_html_report, generate_core_report, CORE_REPORT_TITLE
 from core.matching_config import load_matching_config
 from deploy_report import deploy, DeployError, OwnerNeeded, save_github_owner, DEFAULT_REPO, CORE_REPO
-from core.secure_report import load_admin_password, save_admin_password
-from core.core_customers import load_kakao_key, save_kakao_key, load_kakao_js_key, save_kakao_js_key
+from core.secure_report import (load_admin_password, save_admin_password, load_scope_passwords,
+                                save_scope_passwords, ensure_scope_passwords)
+from core.core_customers import load_kakao_key, save_kakao_key, load_kakao_js_key, save_kakao_js_key, core_scope_names
 from core.visit_sync import load_visit_code, save_visit_code
 
 APP_DIR = os.path.expanduser("~/.dataintelligence_pro")
@@ -157,7 +158,7 @@ class DataIntelGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Data Intel PRO - Admin Uploader")
-        self.root.geometry("820x820")
+        self.root.geometry("820x840")
         self.root.configure(bg=BG)
 
         style = ttk.Style()
@@ -191,6 +192,7 @@ class DataIntelGUI:
         self.kakao_js_key = tk.StringVar(value=load_kakao_js_key() or '')
         self.visit_code = tk.StringVar(value=load_visit_code() or '')
         self.new_link = tk.BooleanVar(value=False)
+        self.scoped = tk.BooleanVar(value=True)  # 코어고객 리포트를 지사별 비밀번호로 나눠 보기
         self.report_expiry = tk.StringVar()
 
         self.create_widgets()
@@ -218,7 +220,7 @@ class DataIntelGUI:
         list_container = tk.Frame(body, bg=BG)
         list_container.pack(fill=tk.BOTH, expand=True)
 
-        canvas = tk.Canvas(list_container, bg=BG, highlightthickness=0, height=150)
+        canvas = tk.Canvas(list_container, bg=BG, highlightthickness=0, height=130)
         scrollbar = ttk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
         self.scroll_frame = tk.Frame(canvas, bg=BG)
         self.scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
@@ -307,6 +309,12 @@ class DataIntelGUI:
         exp_ent.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self._bind_autocorrect(exp_ent, self.report_expiry)
 
+        sc_row = tk.Frame(opts_card, bg=CARD_BG)
+        sc_row.pack(fill=tk.X, padx=12, pady=(0, 2))
+        tk.Checkbutton(sc_row, text="코어고객 리포트: 지사별 비밀번호로 나눠 보기 (지사 · 본부장 · 관리자)",
+                       variable=self.scoped, bg=CARD_BG, activebackground=CARD_BG, font=("Helvetica", 10),
+                       anchor="w").pack(side=tk.LEFT)
+        ttk.Button(sc_row, text="지사별 비밀번호", style="Ghost.TButton", command=self.edit_scope_passwords).pack(side=tk.RIGHT)
         tk.Checkbutton(opts_card, text="배포할 때 링크 새로 만들기 (이전 링크는 닫힘 -- 평소에는 끄고, 링크가 퍼졌을 때만)",
                        variable=self.new_link, bg=CARD_BG, activebackground=CARD_BG, font=("Helvetica", 10),
                        anchor="w").pack(fill=tk.X, padx=12, pady=(0, 8))
@@ -493,6 +501,43 @@ class DataIntelGUI:
                 self.log(f"  (카카오맵이 안 보이면 카카오 콘솔 사이트 도메인에 http://localhost:{self.preview.port} 를 추가하세요)")
         webbrowser.open(url)
 
+    def edit_scope_passwords(self):
+        """지사별 비밀번호 보기·수정 -- '이름=비밀번호' 한 줄씩. 다른 PC와 맞추려면 이 내용을 그대로 옮긴다."""
+        win = tk.Toplevel(self.root)
+        win.title("지사별 비밀번호 (코어고객 리포트)")
+        win.configure(bg=CARD_BG)
+        win.transient(self.root)
+        tk.Label(win, text="한 줄에 하나씩 '이름=비밀번호' (이름: 지사 이름 또는 본부장).\n"
+                           "비어 있는 지사는 리포트를 만들 때 자동으로 비밀번호가 만들어집니다.\n"
+                           "전체를 보는 관리자 비밀번호는 '관리자 비밀번호' 칸의 값입니다.",
+                 bg=CARD_BG, fg=TEXT_MUTED, justify=tk.LEFT, font=("Helvetica", 10)).pack(anchor="w", padx=14, pady=(12, 6))
+        box = tk.Text(win, width=44, height=12, font=("Consolas", 11))
+        box.pack(padx=14, pady=4)
+        box.insert("1.0", "\n".join(f"{k}={v}" for k, v in load_scope_passwords().items()))
+
+        def parse():
+            out = {}
+            for line in box.get("1.0", tk.END).splitlines():
+                if '=' in line:
+                    name, value = line.split('=', 1)
+                    if name.strip() and value.strip():
+                        out[name.strip()] = value.strip()
+            return out
+
+        def save():
+            save_scope_passwords(parse())
+            win.destroy()
+
+        def copy():
+            self.root.clipboard_clear()
+            self.root.clipboard_append(box.get("1.0", tk.END).strip())
+
+        row = tk.Frame(win, bg=CARD_BG)
+        row.pack(fill=tk.X, padx=14, pady=(6, 12))
+        ttk.Button(row, text="저장", style="Action.TButton", command=save).pack(side=tk.RIGHT)
+        ttk.Button(row, text="취소", style="Ghost.TButton", command=win.destroy).pack(side=tk.RIGHT, padx=(0, 8))
+        ttk.Button(row, text="전체 복사", style="Ghost.TButton", command=copy).pack(side=tk.LEFT)
+
     def copy_visit_code(self):
         """다른 PC(예: 윈도우)의 같은 칸에 붙여 넣을 수 있게 연결 코드를 클립보드로."""
         code = self.visit_code.get().strip()
@@ -557,9 +602,11 @@ class DataIntelGUI:
                     self.log(f"로드 중: {os.path.basename(path)}")
                     frames[key] = load_data(path, is_csv=path.lower().endswith('.csv'))
             self.log("코어고객 리포트를 생성합니다...")
+            # 지사별 비밀번호: 이 PC에 저장된 것을 쓰고, 없는 지사만 새로 만든다 (다시 만들어도 비밀번호 유지)
+            scope_pw = ensure_scope_passwords(core_scope_names(frames['core'])) if self.scoped.get() else None
             html_content, pwd, expiry, admin_pwd, count = generate_core_report(
                 frames['core'], frames.get('core_voc'), password=pwd_val, admin_password=admin_val,
-                expiry_date=exp_val, kakao_key=kakao_val, log=self.log)
+                expiry_date=exp_val, kakao_key=kakao_val, scope_passwords=scope_pw, log=self.log)
 
             output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Core_Customer_Report.html")
             with open(output_path, "w", encoding="utf-8") as f:
@@ -569,9 +616,17 @@ class DataIntelGUI:
             self.log(f"{CORE_REPORT_TITLE} 리포트가 생성되었습니다! (코어고객 {count:,}곳)")
             self.log(f"저장 위치: {output_path}")
             self.log(f"만료일: {expiry}")
-            self.log(f"비밀번호: {pwd}")
+            if isinstance(pwd, dict):
+                self.log("로그인 화면에서 관리주체·지사를 고르고 아래 비밀번호를 넣습니다:")
+                for name, value in pwd.items():
+                    self.log(f"  {'본부장' if name == '본부장' else '지사장 · ' + name}: {value}")
+                self.log(f"  관리자(전체): {admin_pwd}")
+                summary = f"지사별 비밀번호 {len(pwd)}개 + 관리자 (실행 로그와 '지사별 비밀번호' 버튼에서 확인)"
+            else:
+                self.log(f"비밀번호: {pwd}")
+                summary = f"비밀번호: {pwd}"
             self.log("=========================================")
-            messagebox.showinfo("성공", f"코어고객 리포트 생성 완료!\n코어고객 {count:,}곳\n만료일: {expiry}\n비밀번호: {pwd}\n\n"
+            messagebox.showinfo("성공", f"코어고객 리포트 생성 완료!\n코어고객 {count:,}곳\n만료일: {expiry}\n{summary}\n\n"
                                         "'GitHub Pages 배포'를 누르면 공유 링크가 만들어집니다.")
             self.last_report = (output_path, pwd, expiry, CORE_REPO, f"{CORE_REPORT_TITLE} 리포트")
             self.deploy_btn.config(state=tk.NORMAL)
@@ -620,7 +675,12 @@ class DataIntelGUI:
                     return
                 url = deploy(path, repo_name=repo, public=True, log=self.log, description=f"{title} (암호화)", new_link=self.new_link.get())
             self.new_link.set(False)  # 한 번 쓰면 끈다 -- 다음 배포부터는 방금 만든 링크를 유지
-            share = f"[{title}]\n링크: {url}\n비밀번호: {pwd}\n만료일: {expiry}"
+            if isinstance(pwd, dict):  # 지사별 비밀번호: 지사마다 보낼 문구 (관리자 비밀번호는 넣지 않는다)
+                lines = "\n".join(f"- {'본부장' if n == '본부장' else '지사장 · ' + n}: {v}" for n, v in pwd.items())
+                share = (f"[{title}]\n링크: {url}\n만료일: {expiry}\n"
+                         f"로그인 화면에서 관리주체·지사를 고르고 해당 비밀번호를 입력하세요.\n{lines}")
+            else:
+                share = f"[{title}]\n링크: {url}\n비밀번호: {pwd}\n만료일: {expiry}"
             self.root.clipboard_clear()
             self.root.clipboard_append(share)
             self.log("=========================================")
@@ -657,5 +717,6 @@ def _show_on_screen(root, width, height):
 if __name__ == "__main__":
     root = tk.Tk()
     app = DataIntelGUI(root)
-    _show_on_screen(root, 820, 820)
+    # 화면이 낮은 노트북(예: 768px)에서는 창을 화면 높이에 맞춘다 -- 아래쪽 버튼이 화면 밖으로 나가지 않게
+    _show_on_screen(root, 820, min(840, max(600, root.winfo_screenheight() - 90)))
     root.mainloop()

@@ -339,6 +339,18 @@ def geocode_addresses(addresses, kakao_key=None, log=print):
     return geo, note
 
 
+def core_scope_names(core_df):
+    """지사별 비밀번호를 줄 범위 이름: 지사(중앙, 강북, ... 순) + 본부장 관리 고객이 있으면 '본부장'."""
+    if core_df is None or core_df.empty:
+        return []
+    branch_col, owner_col = _find_col(core_df, CORE_FIELDS['지사']), _find_col(core_df, CORE_FIELDS['관리주체'])
+    branches = {str(_clean(v)) for v in core_df[branch_col]} - {'None'} if branch_col else set()
+    names = [b for b in BRANCH_ORDER if b in branches] + sorted(branches - set(BRANCH_ORDER))
+    if owner_col is not None and any(_clean(v) == '본부장' for v in core_df[owner_col]):
+        names.append('본부장')
+    return names
+
+
 # ---------------------------------------------------------------- payload
 
 def build_core_payload(core_df, voc_df=None, kakao_key=None, log=print):

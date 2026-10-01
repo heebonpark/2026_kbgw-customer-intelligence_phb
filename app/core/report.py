@@ -1933,7 +1933,8 @@ function checkPassword() {
     const pwd = document.getElementById('pwd').value;
     // window.__dimOuterOk: 암호화를 푼 바깥 화면(secure_report.py)이 넘겨주는, 이미 맞다고 확인된 비밀번호
     if (pwd === CORRECT_PWD || pwd === ADMIN_PWD || (window.__dimOuterOk && window.__dimOuterOk === pwd)) {
-        isAdminUnlocked = (pwd !== CORRECT_PWD);
+        // 범위별 잠금(secure_report.py encrypt_scoped_report)은 권한도 넘겨준다: window.__dimRole
+        isAdminUnlocked = (window.__dimOuterOk === pwd && window.__dimRole) ? window.__dimRole === 'admin' : (pwd !== CORRECT_PWD);
         document.getElementById('lockScreen').style.display = 'none';
         document.getElementById('content').style.display = 'block';
         const adminWrap = document.getElementById('adminOnlyWrap');
@@ -3538,7 +3539,15 @@ const DataIntelMapLib = (function () {
     };
     document.addEventListener('DOMContentLoaded', () => {
         const d = document.getElementById('coreData');
-        if (d) { try { window.DataIntelCore(JSON.parse(d.textContent)); } catch (e) { console.error(e); } }
+        if (d) {
+            try {
+                const p = JSON.parse(d.textContent);
+                // 지사별 비밀번호로 연 리포트: 어느 범위를 보고 있는지 제목 아래에 적는다
+                const meta = document.getElementById('reportMeta');
+                if (p.scope_meta && meta) meta.textContent = p.scope_meta;
+                window.DataIntelCore(p);
+            } catch (e) { console.error(e); }
+        }
     });
 })();
 
@@ -7061,7 +7070,7 @@ CORE_SCRIPT_TEMPLATE = APP_SCRIPT_TEMPLATE.split('// ===== Client-side matching 
 
 
 def generate_core_report(core_df, core_voc_df=None, password=None, admin_password=None, expiry_date=None,
-                         encrypt=True, kakao_key=None, kakao_js_key=None, visit_sync=None, log=print):
+                         encrypt=True, kakao_key=None, kakao_js_key=None, visit_sync=None, scope_passwords=None, log=print):
     """9. 코어고객 활동관리(+ 9-1 VOC매칭)만으로 만드는 독립 리포트 -- 총괄DB 없이.
 
     Same lock/encryption as generate_html_report: a blank password becomes a
@@ -7069,6 +7078,12 @@ def generate_core_report(core_df, core_voc_df=None, password=None, admin_passwor
     admin panel here; admin_password (this PC's saved one by default) is just
     a second password that also opens the report, so the owner can always
     open what they shared.
+
+    scope_passwords: {"본부장": pw, "<지사 이름>": pw, ...} -> one link, but each
+        password opens only its own slice (a 지사 its customers, 본부장 the
+        본부장-managed ones, the admin password everything); `password` is then
+        unused and the returned password is this dict. See
+        secure_report.encrypt_scoped_report. Needs encrypt=True.
 
     Returns (html, password, expiry_date, admin_password, customer_count).
     Raises ValueError when the sheet has no 관리고객 명 / 계약번호 column.
@@ -7092,8 +7107,42 @@ def generate_core_report(core_df, core_voc_df=None, password=None, admin_passwor
     if expiry_date is None:
         expiry_date = get_end_of_month_iso()
 
-    core_json = ('<script type="application/json" id="coreData">'
-                 + json.dumps(payload, ensure_ascii=False).replace('<', '\\u003c') + '</script>')
+    # 범위(지사)별 비밀번호: 데이터 자리를 비워 둔 틀 하나 + 범위마다 그 범위의 고객만 담은 데이터
+    scoped = bool(encrypt and scope_passwords)
+    scopes = []
+    if scoped:
+        from .secure_report import SCOPE_PLACEHOLDER, generate_strong_password
+        import secrets as _secrets
+        if admin_password == password or not admin_password:
+            admin_password = generate_strong_password()  # 전체를 여는 비밀번호는 지사 비밀번호와 달라야 한다
+        password = _secrets.token_urlsafe(24)            # 안쪽 잠금용 값 -- 사람이 쓰는 비밀번호가 아니다
+        generated = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+        def scope_data(label, rows):
+            part = dict(payload, rows=rows, voc_matched=sum(1 for x in rows if x['VOC']),
+                        coord_stats={'파일': sum(1 for x in rows if x['좌표출처'] == '파일'),
+                                     '카카오': sum(1 for x in rows if x['좌표출처'] == '카카오'),
+                                     '동단위': sum(1 for x in rows if x['좌표출처'] == '카카오(동 단위)'),
+                                     '없음': sum(1 for x in rows if x['lat'] is None)},
+                        scope_meta=f"{label} · 생성일시 {generated} · 코어고객 {len(rows):,}곳 · 만료일 {expiry_date}")
+            return json.dumps(part, ensure_ascii=False).replace('<', '\\u003c')
+
+        all_rows = payload['rows']
+        for i, branch in enumerate(dict.fromkeys(x['지사'] for x in all_rows)):  # payload는 이미 지사 순(중앙, 강북, ...)
+            if scope_passwords.get(branch):
+                rows = [x for x in all_rows if x['지사'] == branch]
+                scopes.append({"id": f"b{i}", "group": "지사장", "label": branch, "role": "user",
+                               "passwords": [scope_passwords[branch]], "data": scope_data(f"{branch}지사", rows)})
+        hq_rows = [x for x in all_rows if x['관리주체'] == '본부장']
+        if hq_rows and scope_passwords.get('본부장'):
+            scopes.append({"id": "hq", "group": "본부장", "label": "본부장", "role": "user",
+                           "passwords": [scope_passwords['본부장']], "data": scope_data("본부장 관리 고객", hq_rows)})
+        scopes.append({"id": "admin", "group": "관리자", "label": "관리자", "role": "admin",
+                       "passwords": [admin_password], "data": scope_data("전체 (관리자)", all_rows)})
+        core_json = f'<script type="application/json" id="coreData">{SCOPE_PLACEHOLDER}</script>'
+    else:
+        core_json = ('<script type="application/json" id="coreData">'
+                     + json.dumps(payload, ensure_ascii=False).replace('<', '\\u003c') + '</script>')
     # 방문 조치결과 등록 / 관리자 실시간 현황 (visit_sync.py): 이 PC에 연결 코드가 저장돼 있을 때만 켠다.
     # 관리자용 토큰은 관리자 비밀번호로 암호화해 싣는다 -- 일반 비밀번호로 연 사람은 풀 수 없다.
     if visit_sync is None:
@@ -7155,6 +7204,10 @@ def generate_core_report(core_df, core_voc_df=None, password=None, admin_passwor
 </body>
 </html>"""
 
+    if encrypt and scoped:
+        from .secure_report import encrypt_scoped_report
+        html_out = encrypt_scoped_report(html_out, scopes, expiry_date=expiry_date, title=f"{CORE_REPORT_TITLE} 보안 리포트")
+        return html_out, dict(scope_passwords), expiry_date, admin_password, count
     if encrypt:
         from .secure_report import encrypt_report
         html_out = encrypt_report(html_out, [password, admin_password], expiry_date=expiry_date,
