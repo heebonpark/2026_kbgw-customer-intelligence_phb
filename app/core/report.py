@@ -1508,6 +1508,47 @@ body {
 .core-state.s-접수::before { background: var(--warning); }
 .core-state.s-미접수::before { background: var(--critical); }
 .core-state.s-미처리::before { background: var(--text-muted); }
+/* 방문 조치결과 등록 / 관리자 실시간 현황 */
+#visitPanel:empty { display: none; }
+#visitPanel { margin-bottom: 16px; }
+#visitPanel > .chart-card { margin-top: 12px; }
+.visit-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 18px 0 10px; }
+.visit-head .core-block-title { margin: 0; }
+.visit-status { font-size: 12px; color: var(--text-muted); margin-right: auto; font-variant-numeric: tabular-nums; }
+.visit-queued { margin-right: 0; color: var(--text-primary); font-weight: 600; }
+.visit-guide { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; }
+.visit-guide .visit-name { flex: none; width: 150px; min-width: 0; }
+.visit-cols { margin-top: 12px; }
+.visit-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; white-space: nowrap; color: inherit; }
+.visit-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: none; }
+.visit-feed { display: flex; flex-direction: column; max-height: 330px; overflow-y: auto; }
+.visit-feed-row { display: grid; grid-template-columns: 78px minmax(110px, 1.1fr) 96px minmax(0, 2fr) 64px 22px; gap: 8px; align-items: center; padding: 6px 4px;
+                  border-bottom: 1px solid var(--grid-line); font-size: 12px; }
+.visit-feed-row.is-new { background: color-mix(in srgb, var(--brand) 12%, transparent); }
+.visit-feed-time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.visit-feed-name { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--text-primary); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+button.visit-feed-name { cursor: pointer; text-decoration: underline; text-decoration-color: var(--baseline); }
+.visit-feed-note { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visit-feed-who { color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.visit-feed-del { border: 0; background: none; color: var(--text-muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 2px; }
+.visit-feed-del:hover { color: var(--critical); }
+.visit-list { margin-bottom: 8px; }
+.visit-add { background: var(--surface-1); font-family: inherit; cursor: pointer; }
+.visit-pop { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0; font-size: 12px; color: #222; }
+.visit-pop .visit-add { background: #fff; }
+.visit-modal { position: fixed; inset: 0; z-index: 10050; background: rgba(15,23,42,0.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.visit-form { width: 100%; max-width: 440px; max-height: 100%; overflow-y: auto; background: var(--surface-1); color: var(--text-primary); border-radius: 16px; padding: 20px 22px;
+              box-shadow: 0 16px 48px rgba(0,0,0,0.35); display: flex; flex-direction: column; gap: 12px; }
+.visit-form-title { margin: 0; font-size: 16px; }
+.visit-form-who { font-size: 13px; color: var(--text-secondary); }
+.visit-field { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 700; color: var(--text-secondary); }
+.visit-field .filter-input { flex: none; min-width: 0; width: 100%; font-size: 14px; }
+.visit-picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.visit-note { min-height: 96px; resize: vertical; font-family: inherit; }
+.visit-form-msg { min-height: 16px; font-size: 12.5px; color: var(--critical); }
+.visit-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.visit-form-actions .filter-pill { padding: 9px 20px; font-size: 13px; }
+@media (max-width: 640px) { .visit-feed-row { grid-template-columns: 70px minmax(0, 1fr) 90px 22px; } .visit-feed-note, .visit-feed-who { display: none; } }
 /* 코어고객만 보는 화면 (총괄DB 없이 9번만 올린 웹 / 코어고객만 공유) */
 body.core-only .dash-sec:not(#secCore), body.core-only #dashNav, body.core-only .dash-admin, body.core-only .dash-anchor,
 body.core-only .global-filter-bar:not(.core-filter-bar) { display: none !important; }
@@ -1890,8 +1931,9 @@ function checkPassword() {
         return;
     }
     const pwd = document.getElementById('pwd').value;
-    if (pwd === CORRECT_PWD || pwd === ADMIN_PWD) {
-        isAdminUnlocked = (pwd === ADMIN_PWD);
+    // window.__dimOuterOk: 암호화를 푼 바깥 화면(secure_report.py)이 넘겨주는, 이미 맞다고 확인된 비밀번호
+    if (pwd === CORRECT_PWD || pwd === ADMIN_PWD || (window.__dimOuterOk && window.__dimOuterOk === pwd)) {
+        isAdminUnlocked = (pwd !== CORRECT_PWD);
         document.getElementById('lockScreen').style.display = 'none';
         document.getElementById('content').style.display = 'block';
         const adminWrap = document.getElementById('adminOnlyWrap');
@@ -2572,6 +2614,21 @@ const DataIntelMapLib = (function () {
     let view = '현황';  // '현황'(요약·조치·차트·지도·표) / '지도'(지도 크게 + 표) -- 필터를 바꿔도 유지
     let payload = null, map = null, mapToken = null, markerIndex = new Map(), period = '';
 
+    // 방문 조치결과 등록에 쓰는 값들 (아래 '방문 조치결과 등록' 부분) -- 표의 열 정의가 먼저 참조하므로 위에 둔다
+    const VISIT_RESULTS = ['방문완료', '부재', '재방문필요', '해지징후', '기타'];
+    const VISIT_LABEL = { 방문완료: '방문완료', 부재: '부재·미접촉', 재방문필요: '재방문 필요', 해지징후: '해지징후', 기타: '기타' };
+    const VISIT_ROLE = { 방문완료: 'role-good', 부재: 'role-none', 재방문필요: 'role-warning', 해지징후: 'role-critical', 기타: 'role-s1' };
+    const visitCfg = (function () { const e = document.getElementById('visitConfig'); if (!e) return null; try { return JSON.parse(e.textContent); } catch (err) { return null; } })();
+    const visit = { token: visitCfg ? visitCfg.userToken : null, admin: false, started: false, rows: [], by: new Map(), error: '', at: null, seen: null, fresh: new Set(), busy: false };
+    const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* 저장 불가(사생활 보호 모드) */ } } };
+    const visitAuthor = () => (store.get('dim-visit-author') || '').trim();
+    const visitKey = r => String(r.계약번호 || r.관리고객명 || '');
+    const visitQueue = () => { try { return JSON.parse(store.get('dim-visit-queue') || '[]'); } catch (e) { return []; } };
+    const todayIso = () => { const d = new Date(), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); };
+    const visitWhen = iso => { const d = new Date(iso); if (isNaN(d)) return ''; const p = n => String(n).padStart(2, '0'); return p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); };
+    const visitChip = result => { const c = el('span', 'visit-chip'); c.appendChild(el('span', 'visit-dot ' + (VISIT_ROLE[result] || 'role-none'))); c.appendChild(document.createTextNode(VISIT_LABEL[result] || result)); return c; };
+
+
     // ---- 날짜 ----
     const today0 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
     const daysTo = d => { if (!d) return null; const t = new Date(d + 'T00:00:00'); return isNaN(t) ? null : Math.round((t - today0()) / 86400000); };
@@ -2882,6 +2939,13 @@ const DataIntelMapLib = (function () {
         if (r.VOC && r.VOC.length) lines.push('VOC ' + r.VOC.length + '건: ' + r.VOC.map(v => (v.상태 || '-') + ' ' + (v.유형 || '')).join(', '));
         lines.forEach(t => box.appendChild(el('div', 'core-pop-line', t)));
         if (r.불만요구) box.appendChild(el('div', 'core-pop-note', r.불만요구));
+        if (visitCfg) {
+            const vs = visit.by.get(visitKey(r)) || [];
+            const line = el('div', 'visit-pop');
+            if (vs.length) { line.appendChild(visitChip(vs[0].result)); line.appendChild(document.createTextNode(' ' + vs[0].visited_on + ' · ' + vs[0].author + (vs.length > 1 ? ' 외 ' + (vs.length - 1) + '건' : ''))); }
+            line.appendChild(visitAddButton(r, '📝 결과 등록'));
+            box.appendChild(line);
+        }
         // 전체 컬럼 -- 값이 있는 항목만
         const det = document.createElement('details');
         det.className = 'cust-pop-all';
@@ -2954,9 +3018,10 @@ const DataIntelMapLib = (function () {
     // ---- 활동내역 표 ----
     const COLS = [
         ['지사', r => BRANCHES.indexOf(r.지사) < 0 ? 99 : BRANCHES.indexOf(r.지사)], ['관리주체', r => r.관리주체], ['관리고객 명', r => r.관리고객명 || ''],
-        ['담당', r => owner(r)], ['상태', r => STATES.indexOf(r.활동상태)], ['최근 방문', r => lastVisit(r) || ''],
+        ['담당', r => owner(r)], ['상태', r => STATES.indexOf(r.활동상태)]].concat(visitCfg ? [['등록 결과', r => { const v = (visit.by.get(visitKey(r)) || [])[0]; return v ? v.created_at : ''; }]] : []).concat([
+        ['최근 방문', r => lastVisit(r) || ''],
         ['계약종료', r => r.계약종료일 || '9999'], ['월정료', r => r.월정료 || 0], ['VOC', r => (r.VOC || []).length], ['최근 메모 (불만·요구·영업기회)', null],
-    ];
+    ]);
     function tableRows() {
         const q = state.q.trim().toLowerCase();
         let rows = visible();
@@ -3010,6 +3075,13 @@ const DataIntelMapLib = (function () {
         const link = kakaoLink(r.설치주소);
         if (link) { const m = el('a', 'pending-map-link', '🗺 카카오맵에서 보기'); m.href = link; m.target = '_blank'; m.rel = 'noopener'; c.appendChild(m); }
         grid.appendChild(c);
+        if (visitCfg) {
+            const d = el('div');
+            d.appendChild(el('div', 'core-detail-title', visit.admin ? '등록된 조치결과' : '내가 등록한 조치결과'));
+            d.appendChild(visitListEl(r));
+            d.appendChild(visitAddButton(r));
+            grid.insertBefore(d, grid.firstChild);
+        }
         return grid;
     }
     function fillTable() {
@@ -3031,6 +3103,12 @@ const DataIntelMapLib = (function () {
             if (state.open === r._i) tr.classList.add('core-active');
             [r.지사, r.관리주체, r.관리고객명 || '-', owner(r)].forEach(c => tr.appendChild(el('td', null, c)));
             const st = el('td'); st.appendChild(el('span', 'core-state s-' + r.활동상태, r.활동상태)); tr.appendChild(st);
+            if (visitCfg) {
+                const vs = visit.by.get(visitKey(r)) || [], vt = el('td', vs.length ? null : 'core-novisit');
+                if (vs.length) { vt.appendChild(visitChip(vs[0].result)); vt.appendChild(el('span', 'core-dday', vs[0].visited_on.slice(5) + (vs.length > 1 ? ' 외 ' + (vs.length - 1) : ''))); }
+                else vt.textContent = '-';
+                tr.appendChild(vt);
+            }
             tr.appendChild(el('td', lastVisit(r) ? null : 'core-novisit', lastVisit(r) || '기록 없음'));
             const end = el('td', null, r.계약종료일 || '-');
             const dd = daysTo(r.계약종료일);
@@ -3075,6 +3153,245 @@ const DataIntelMapLib = (function () {
         setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     }
 
+    // ---- 방문 조치결과 등록 + (관리자) 실시간 현황 ----
+    // 저장소: Supabase 함수 kbgw_visit_submit / _list / _delete (visit_sync.py 참고). #visitConfig가 없으면 기능 전체가 꺼진다.
+    // 일반 비밀번호로 연 사람: 등록 + 자기 이름으로 등록한 내역만. 관리자 비밀번호로 연 사람: 전체 현황(자동 갱신).
+    async function visitRpc(fn, body) {
+        const res = await fetch(visitCfg.url + '/rest/v1/rpc/' + fn, {
+            method: 'POST', headers: { apikey: visitCfg.key, Authorization: 'Bearer ' + visitCfg.key, 'Content-Type': 'application/json' },
+            body: JSON.stringify(Object.assign({ p_workspace: visitCfg.ws, p_token: visit.token }, body)) });
+        if (!res.ok) {
+            let msg = 'HTTP ' + res.status;
+            try { msg = (await res.json()).message || msg; } catch (e) { /* 본문 없음 */ }
+            const err = new Error(msg); err.server = true;  // 서버가 거절 -- 다시 보내도 같다 (대기열에 넣지 않는다)
+            throw err;
+        }
+        return res.json();
+    }
+    async function visitDecryptAdmin(pwd) {
+        const a = visitCfg.adminEnc, b = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+        const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);
+        const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b(a.salt), iterations: a.iter, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+        return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b(a.iv) }, key, b(a.data)));
+    }
+    function visitIndex() {
+        visit.by = new Map();
+        visit.rows.forEach(v => { if (!visit.by.has(v.contract_no)) visit.by.set(v.contract_no, []); visit.by.get(v.contract_no).push(v); });
+    }
+    // 연결이 끊겨 못 보낸 등록은 이 기기에 두었다가 다시 보낸다
+    async function visitFlush() {
+        const q = visitQueue();
+        if (!q.length) return;
+        const left = [];
+        for (const body of q) {
+            try { await visitRpc('kbgw_visit_submit', body); } catch (e) { if (!e.server) left.push(body); }
+        }
+        store.set('dim-visit-queue', JSON.stringify(left));
+    }
+    async function visitLoad() {
+        if (!visitCfg || !visit.started || visit.busy) return;
+        visit.busy = true;
+        try {
+            await visitFlush();
+            if (visit.admin || visitAuthor()) {
+                const rows = await visitRpc('kbgw_visit_list', { p_author: visit.admin ? null : visitAuthor() });
+                if (visit.seen) rows.forEach(v => { if (!visit.seen.has(v.id)) visit.fresh.add(v.id); });  // 지난번 이후 새로 들어온 것 강조
+                visit.seen = new Set(rows.map(v => v.id));
+                visit.rows = rows;
+            } else visit.rows = [];
+            visit.error = '';
+            visit.at = new Date();
+        } catch (e) {
+            visit.error = e.server ? e.message : '저장소에 연결하지 못했습니다 (인터넷 확인)';
+        }
+        visit.busy = false;
+        visitIndex();
+        visitPanel();
+        if (!document.querySelector('.visit-modal')) fillTable();
+    }
+    async function visitStart(pwd) {
+        if (!visitCfg || visit.started) return;
+        visit.started = true;
+        if (visitCfg.adminEnc && typeof isAdminUnlocked !== 'undefined' && isAdminUnlocked) {
+            try { visit.token = await visitDecryptAdmin(pwd); visit.admin = true; } catch (e) { /* 관리자 토큰을 못 풀면 일반 등록자로 */ }
+        }
+        visitPanel();
+        visitLoad();
+        setInterval(() => { if (document.visibilityState === 'visible') visitLoad(); }, visit.admin ? 20000 : 60000);
+        window.addEventListener('online', visitLoad);
+    }
+    if (visitCfg) {
+        // 잠금이 풀리는 순간(비밀번호가 맞았을 때) 시작한다 -- 관리자 토큰을 푸는 데 그 비밀번호가 필요하다
+        const original = window.checkPassword;
+        window.checkPassword = function () {
+            const pwd = (document.getElementById('pwd') || {}).value || '';
+            original();
+            const content = document.getElementById('content');
+            if (content && content.style.display === 'block') visitStart(pwd);
+        };
+    }
+
+    // 등록 창
+    function visitForm(r) {
+        const old = document.querySelector('.visit-modal');
+        if (old) old.remove();
+        const back = el('div', 'visit-modal');
+        const box = el('form', 'visit-form');
+        box.appendChild(el('h3', 'visit-form-title', '방문 조치결과 등록'));
+        box.appendChild(el('div', 'visit-form-who', (r.관리고객명 || '-') + ' · ' + r.지사 + (r.계약번호 ? ' · 계약 ' + r.계약번호 : '')));
+        const field = (label, node) => { const l = el('label', 'visit-field'); l.appendChild(el('span', null, label)); l.appendChild(node); box.appendChild(l); return node; };
+        const picks = el('div', 'visit-picks');
+        let chosen = '방문완료';
+        VISIT_RESULTS.forEach(v => {
+            const b = el('button', 'filter-pill' + (v === chosen ? ' active' : ''), VISIT_LABEL[v]); b.type = 'button';
+            b.addEventListener('click', () => { chosen = v; picks.querySelectorAll('.filter-pill').forEach(x => x.classList.toggle('active', x === b)); });
+            picks.appendChild(b);
+        });
+        field('결과', picks);
+        const date = el('input', 'filter-input'); date.type = 'date'; date.value = todayIso(); date.max = todayIso(); field('방문일', date);
+        const note = el('textarea', 'filter-input visit-note'); note.maxLength = 2000; note.placeholder = '조치 내용 · 고객 요청 · 다음 할 일'; field('내용', note);
+        const who = el('input', 'filter-input'); who.type = 'text'; who.maxLength = 40; who.value = visitAuthor(); who.placeholder = '예: 홍길동'; who.required = true; field('등록자 이름', who);
+        const msg = el('div', 'visit-form-msg'); msg.setAttribute('role', 'status'); box.appendChild(msg);
+        const actions = el('div', 'visit-form-actions');
+        const cancel = el('button', 'filter-pill', '취소'); cancel.type = 'button'; cancel.addEventListener('click', () => back.remove());
+        const save = el('button', 'filter-pill active', '등록'); save.type = 'submit';
+        actions.appendChild(cancel); actions.appendChild(save); box.appendChild(actions);
+        box.addEventListener('submit', async e => {
+            e.preventDefault();
+            const author = who.value.trim();
+            if (!author) { msg.textContent = '등록자 이름을 입력하세요.'; who.focus(); return; }
+            store.set('dim-visit-author', author);
+            const body = { p_contract_no: visitKey(r), p_customer_name: r.관리고객명 || null, p_branch: r.지사 || null, p_result: chosen,
+                p_note: note.value.trim() || null, p_visited_on: date.value || todayIso(), p_author: author };
+            save.disabled = true; msg.textContent = '등록 중...';
+            try {
+                await visitRpc('kbgw_visit_submit', body);
+                back.remove();
+            } catch (err) {
+                if (err.server) { msg.textContent = '등록하지 못했습니다: ' + err.message; save.disabled = false; return; }
+                store.set('dim-visit-queue', JSON.stringify(visitQueue().concat([body])));  // 연결이 없으면 이 기기에 두었다가 자동 전송
+                back.remove();
+            }
+            visitLoad();
+        });
+        back.addEventListener('click', e => { if (e.target === back) back.remove(); });
+        back.appendChild(box);
+        document.body.appendChild(back);
+        (visitAuthor() ? note : who).focus();
+    }
+    // 한 고객에 등록된 결과 (표의 펼친 칸·지도 풍선에서)
+    function visitListEl(r, limit) {
+        const wrap = el('div', 'visit-list');
+        const rows = (visit.by.get(visitKey(r)) || []).slice(0, limit || 20);
+        rows.forEach(v => {
+            const item = el('div', 'core-hist');
+            const head = el('div', 'core-hist-head');
+            head.appendChild(visitChip(v.result));
+            head.appendChild(document.createTextNode(' ' + v.visited_on + ' · ' + v.author));
+            item.appendChild(head);
+            if (v.note) item.appendChild(el('div', 'core-hist-body', v.note));
+            wrap.appendChild(item);
+        });
+        if (!rows.length) wrap.appendChild(el('div', 'core-action-empty', visit.admin ? '등록된 결과가 없습니다.' : '내가 등록한 결과가 없습니다.'));
+        return wrap;
+    }
+    function visitAddButton(r, label) {
+        const b = el('button', 'pending-map-link visit-add', label || '📝 조치결과 등록'); b.type = 'button';
+        b.addEventListener('click', e => { e.stopPropagation(); visitForm(r); });
+        return b;
+    }
+    function visitCsv() {
+        const head = ['등록일시', '방문일', '지사', '관리고객명', '계약번호', '결과', '내용', '등록자'];
+        const q = v => '"' + String(v === null || v === undefined ? '' : v).split('"').join('""') + '"';
+        const lines = [head.map(q).join(',')].concat(visit.rows.map(v => [visitWhen(v.created_at), v.visited_on, v.branch, v.customer_name, v.contract_no, VISIT_LABEL[v.result] || v.result, v.note, v.author].map(q).join(',')));
+        const blob = new Blob([String.fromCharCode(0xFEFF) + lines.join(String.fromCharCode(13, 10))], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '방문조치결과_' + todayIso() + '.csv'; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    }
+    // 요약 아래 칸: 관리자 = 실시간 현황, 일반 = 등록 안내 + 내 등록 내역
+    function visitPanel() {
+        const box = document.getElementById('visitPanel');
+        if (!box || !visitCfg || !payload) return;
+        box.textContent = '';
+        if (!visit.started) return;
+        const rows = visit.rows, queued = visitQueue().length;
+        const head = el('div', 'visit-head');
+        head.appendChild(el('h3', 'core-block-title', visit.admin ? '방문 조치결과 실시간 현황' : '방문 조치결과 등록'));
+        if (visit.admin) head.appendChild(el('span', 'badge', '관리자'));
+        const status = el('span', 'visit-status', visit.error ? '⚠ ' + visit.error
+            : visit.at ? '갱신 ' + visit.at.toLocaleTimeString('en-GB') + (visit.admin ? ' · 20초마다 자동' : '') : '불러오는 중...');
+        head.appendChild(status);
+        if (queued) head.appendChild(el('span', 'visit-status visit-queued', '전송 대기 ' + queued + '건 (연결되면 자동 전송)'));
+        const refresh = el('button', 'filter-pill', '🔄 새로고침'); refresh.type = 'button'; refresh.addEventListener('click', visitLoad); head.appendChild(refresh);
+        if (visit.admin && rows.length) { const c = el('button', 'filter-pill', '📥 CSV 저장'); c.type = 'button'; c.addEventListener('click', visitCsv); head.appendChild(c); }
+        box.appendChild(head);
+
+        if (!visit.admin) {
+            const guide = el('div', 'visit-guide');
+            guide.appendChild(el('span', null, '지도의 마커나 아래 표의 고객을 열고 "조치결과 등록"을 누르세요. 등록한 내용은 관리자가 바로 봅니다.'));
+            const name = el('input', 'filter-input visit-name'); name.type = 'text'; name.maxLength = 40; name.placeholder = '등록자 이름'; name.value = visitAuthor();
+            name.setAttribute('aria-label', '등록자 이름');
+            name.addEventListener('change', () => { store.set('dim-visit-author', name.value.trim()); visitLoad(); });
+            guide.appendChild(name);
+            box.appendChild(guide);
+            if (!rows.length) return;
+        }
+        const today = todayIso();
+        const isToday = v => { const d = new Date(v.created_at); const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) === today; };
+        const customers = new Set(rows.map(v => v.contract_no));
+        const grid = el('div', 'stat-grid');
+        grid.appendChild(tile(visit.admin ? '오늘 등록' : '오늘 내가 등록', rows.filter(isToday).length + '건', '전체 ' + rows.length + '건'));
+        grid.appendChild(tile('등록된 고객', customers.size + '곳', visit.admin ? '코어고객 ' + payload.rows.length + '곳 중 ' + pct(payload.rows.filter(r => customers.has(visitKey(r))).length, payload.rows.length) + '%' : '내가 등록한 고객',
+            visit.admin ? pct(payload.rows.filter(r => customers.has(visitKey(r))).length, payload.rows.length) : null));
+        grid.appendChild(tile('해지징후 · 재방문 필요', rows.filter(v => v.result === '해지징후').length + ' · ' + rows.filter(v => v.result === '재방문필요').length + '건', '부재 ' + rows.filter(v => v.result === '부재').length + '건'));
+        if (visit.admin) grid.appendChild(tile('등록자', new Set(rows.map(v => v.author)).size + '명', '최근: ' + (rows[0] ? rows[0].author + ' ' + visitWhen(rows[0].created_at) : '-')));
+        box.appendChild(grid);
+
+        const cols = el('div', 'chart-grid core-charts visit-cols');
+        if (visit.admin && rows.length) {
+            const parts = list => VISIT_RESULTS.map(s => ({ name: VISIT_LABEL[s], n: list.filter(v => v.result === s).length, role: VISIT_ROLE[s] }));
+            const groupCard = (title, note, keyOf, order) => {
+                const c = card(title, note);
+                c.appendChild(legend(VISIT_RESULTS.map(s => [VISIT_LABEL[s], VISIT_ROLE[s]])));
+                let keys = Array.from(new Set(rows.map(keyOf)));
+                keys = order ? order(keys) : keys.sort((a, b) => rows.filter(v => keyOf(v) === b).length - rows.filter(v => keyOf(v) === a).length).slice(0, 10);
+                const max = Math.max(1, ...keys.map(k => rows.filter(v => keyOf(v) === k).length));
+                const list = el('div', 'zone-list');
+                keys.forEach(k => { const sub = rows.filter(v => keyOf(v) === k), p = parts(sub); list.appendChild(stackRow(k, p, max, sub.length + '건', p.filter(x => x.n).map(x => x.name + ' ' + x.n + '건'))); });
+                c.appendChild(list);
+                return c;
+            };
+            cols.appendChild(groupCard('지사별 등록', '결과별 건수', v => v.branch || '미지정', keys => keys.sort((a, b) => branchRank(a) - branchRank(b))));
+            cols.appendChild(groupCard('등록자별', '등록이 많은 순 10명', v => v.author, null));
+        }
+        const feed = card(visit.admin ? '최근 등록' : '내 등록 내역', '고객명을 누르면 아래 표에서 그 고객을 엽니다' + (visit.admin ? ' · 새로 들어온 등록은 파랗게 표시' : ''));
+        const list = el('div', 'visit-feed');
+        rows.slice(0, 40).forEach(v => {
+            const row = el('div', 'visit-feed-row' + (visit.fresh.has(v.id) ? ' is-new' : ''));
+            row.appendChild(el('span', 'visit-feed-time', visitWhen(v.created_at)));
+            const target = payload.rows.find(r => visitKey(r) === v.contract_no);
+            const name = el(target ? 'button' : 'span', 'visit-feed-name', (v.branch ? v.branch + ' · ' : '') + (v.customer_name || v.contract_no));
+            if (target) { name.type = 'button'; name.dataset.coreFocus = target._i; }
+            row.appendChild(name);
+            row.appendChild(visitChip(v.result));
+            row.appendChild(el('span', 'visit-feed-note', v.note || ''));
+            row.appendChild(el('span', 'visit-feed-who', v.author));
+            const del = el('button', 'visit-feed-del', '×'); del.type = 'button'; del.title = '이 등록 삭제'; del.setAttribute('aria-label', '이 등록 삭제');
+            del.addEventListener('click', async () => {
+                if (!window.confirm((v.customer_name || v.contract_no) + ' · ' + (VISIT_LABEL[v.result] || v.result) + ' 등록을 삭제할까요?')) return;
+                try { await visitRpc('kbgw_visit_delete', { p_id: v.id, p_author: visit.admin ? '관리자' : visitAuthor() }); } catch (e) { visit.error = e.message; }
+                visitLoad();
+            });
+            row.appendChild(del);
+            list.appendChild(row);
+        });
+        if (!rows.length) list.appendChild(el('div', 'core-action-empty', '아직 등록된 결과가 없습니다.'));
+        feed.appendChild(list);
+        if (cols.firstChild) box.appendChild(cols);
+        box.appendChild(feed);  // 최근 등록은 내용이 길어 한 줄 전체를 쓴다
+        visit.fresh = new Set();
+    }
+
     function render() {
         const wrap = document.getElementById('coreSectionWrap');
         if (!wrap || !payload) return;
@@ -3096,6 +3413,7 @@ const DataIntelMapLib = (function () {
         bar.appendChild(el('span', 'filter-summary', rows.length.toLocaleString('ko-KR') + ' / ' + all.length.toLocaleString('ko-KR') + '곳'));
         wrap.appendChild(bar);
         wrap.appendChild(headline(rows));
+        if (visitCfg) { const vp = el('div'); vp.id = 'visitPanel'; wrap.appendChild(vp); visitPanel(); }
 
         const sum = k => rows.reduce((n, r) => n + (r[k] || 0), 0);
         const vocs = rows.flatMap(r => r.VOC || []);
@@ -6743,7 +7061,7 @@ CORE_SCRIPT_TEMPLATE = APP_SCRIPT_TEMPLATE.split('// ===== Client-side matching 
 
 
 def generate_core_report(core_df, core_voc_df=None, password=None, admin_password=None, expiry_date=None,
-                         encrypt=True, kakao_key=None, kakao_js_key=None, log=print):
+                         encrypt=True, kakao_key=None, kakao_js_key=None, visit_sync=None, log=print):
     """9. 코어고객 활동관리(+ 9-1 VOC매칭)만으로 만드는 독립 리포트 -- 총괄DB 없이.
 
     Same lock/encryption as generate_html_report: a blank password becomes a
@@ -6776,8 +7094,24 @@ def generate_core_report(core_df, core_voc_df=None, password=None, admin_passwor
 
     core_json = ('<script type="application/json" id="coreData">'
                  + json.dumps(payload, ensure_ascii=False).replace('<', '\\u003c') + '</script>')
+    # 방문 조치결과 등록 / 관리자 실시간 현황 (visit_sync.py): 이 PC에 연결 코드가 저장돼 있을 때만 켠다.
+    # 관리자용 토큰은 관리자 비밀번호로 암호화해 싣는다 -- 일반 비밀번호로 연 사람은 풀 수 없다.
+    if visit_sync is None:
+        from .visit_sync import load_visit_sync
+        visit_sync = load_visit_sync()
+    visit_json = ""
+    if visit_sync:
+        from .visit_sync import report_config
+        visit_json = ('<script type="application/json" id="visitConfig">'
+                      + json.dumps(report_config(visit_sync, admin_password if admin_password != password else None))
+                      .replace('<', '\\u003c') + '</script>')
+    # 암호화된 리포트는 바깥 화면이 비밀번호를 확인하므로(window.__dimOuterOk) 관리자 비밀번호를 페이지에 싣지 않는다
+    inner_admin = admin_password
+    if encrypt and admin_password != password:
+        import secrets
+        inner_admin = secrets.token_urlsafe(24)
     script = (CORE_SCRIPT_TEMPLATE.replace('__PASSWORD__', password)
-              .replace('__ADMIN_PASSWORD__', admin_password).replace('__EXPIRY__', expiry_date))
+              .replace('__ADMIN_PASSWORD__', inner_admin).replace('__EXPIRY__', expiry_date))
     generated_at = datetime.now().strftime('%Y-%m-%d %H:%M')
     count = len(payload['rows'])
 
@@ -6816,6 +7150,7 @@ def generate_core_report(core_df, core_voc_df=None, password=None, admin_passwor
 </div>
 
 {render_map_config(kakao_js_key)}
+{visit_json}
 <script>{script}</script>
 </body>
 </html>"""

@@ -182,6 +182,9 @@ button:disabled { opacity: .6; cursor: progress; }
             // enforces the expiry date and decides user vs admin view.
             const unlock = () => {
                 const input = document.getElementById('pwd');
+                // __dimOuterOk: this password just decrypted the report, so the inner lock can trust it without
+                // carrying the admin password in the page itself (report.py checkPassword).
+                window.__dimOuterOk = pwd;
                 if (input && typeof window.checkPassword === 'function') { input.value = pwd; window.checkPassword(); }
             };
             if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', unlock); else unlock();

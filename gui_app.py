@@ -57,6 +57,7 @@ from core.matching_config import load_matching_config
 from deploy_report import deploy, DeployError, OwnerNeeded, save_github_owner, DEFAULT_REPO, CORE_REPO
 from core.secure_report import load_admin_password, save_admin_password
 from core.core_customers import load_kakao_key, save_kakao_key, load_kakao_js_key, save_kakao_js_key
+from core.visit_sync import load_visit_code, save_visit_code
 
 APP_DIR = os.path.expanduser("~/.dataintelligence_pro")
 NOTES_FILE = os.path.join(APP_DIR, "file_notes.json")
@@ -156,7 +157,7 @@ class DataIntelGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Data Intel PRO - Admin Uploader")
-        self.root.geometry("820x800")
+        self.root.geometry("820x820")
         self.root.configure(bg=BG)
 
         style = ttk.Style()
@@ -188,6 +189,7 @@ class DataIntelGUI:
         self.admin_password = tk.StringVar(value=load_admin_password() or '')
         self.kakao_key = tk.StringVar(value=load_kakao_key() or '')
         self.kakao_js_key = tk.StringVar(value=load_kakao_js_key() or '')
+        self.visit_code = tk.StringVar(value=load_visit_code() or '')
         self.report_expiry = tk.StringVar()
 
         self.create_widgets()
@@ -215,7 +217,7 @@ class DataIntelGUI:
         list_container = tk.Frame(body, bg=BG)
         list_container.pack(fill=tk.BOTH, expand=True)
 
-        canvas = tk.Canvas(list_container, bg=BG, highlightthickness=0, height=190)
+        canvas = tk.Canvas(list_container, bg=BG, highlightthickness=0, height=170)
         scrollbar = ttk.Scrollbar(list_container, orient="vertical", command=canvas.yview)
         self.scroll_frame = tk.Frame(canvas, bg=BG)
         self.scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
@@ -278,6 +280,15 @@ class DataIntelGUI:
         kj_ent = tk.Entry(kj_row, textvariable=self.kakao_js_key, font=("Helvetica", 10), show="•")
         kj_ent.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self._bind_autocorrect(kj_ent, self.kakao_js_key)
+
+        vc_row = tk.Frame(opts_card, bg=CARD_BG)
+        vc_row.pack(fill=tk.X, padx=14, pady=4)
+        tk.Label(vc_row, text="★ 방문등록 연결 코드 (코어고객, 선택)", bg=CARD_BG, width=26, anchor="w",
+                 font=("Helvetica", 10)).pack(side=tk.LEFT)
+        vc_ent = tk.Entry(vc_row, textvariable=self.visit_code, font=("Helvetica", 10), show="•")
+        vc_ent.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self._bind_autocorrect(vc_ent, self.visit_code)
+        ttk.Button(vc_row, text="복사", style="Ghost.TButton", command=self.copy_visit_code).pack(side=tk.LEFT, padx=(6, 0))
 
         adm_row = tk.Frame(opts_card, bg=CARD_BG)
         adm_row.pack(fill=tk.X, padx=14, pady=4)
@@ -477,6 +488,16 @@ class DataIntelGUI:
                 self.log(f"  (카카오맵이 안 보이면 카카오 콘솔 사이트 도메인에 http://localhost:{self.preview.port} 를 추가하세요)")
         webbrowser.open(url)
 
+    def copy_visit_code(self):
+        """다른 PC(예: 윈도우)의 같은 칸에 붙여 넣을 수 있게 연결 코드를 클립보드로."""
+        code = self.visit_code.get().strip()
+        if not code:
+            messagebox.showinfo("방문등록 연결 코드", "이 PC에는 연결 코드가 없습니다.\n코드가 있는 PC에서 복사해 이 칸에 붙여 넣으세요.")
+            return
+        self.root.clipboard_clear()
+        self.root.clipboard_append(code)
+        messagebox.showinfo("방문등록 연결 코드", "연결 코드를 복사했습니다.\n다른 PC의 같은 칸에 붙여 넣으면 같은 등록 데이터를 씁니다.\n(이 코드는 외부에 공유하지 마세요)")
+
     def _read_options(self):
         """리포트 옵션 칸을 읽는다 -> (사용자 비밀번호, 관리자 비밀번호, 카카오 키, 만료일); 빈칸은 None.
         만료일 형식이 틀리면 알리고 None을 돌려준다. 카카오 키·관리자 비밀번호는 이 PC에 저장."""
@@ -492,6 +513,13 @@ class DataIntelGUI:
         kakao_val = self.kakao_key.get().strip() or None
         if kakao_val != load_kakao_key():
             save_kakao_key(kakao_val)  # 지도 좌표용 -- 이 PC에만 저장
+        visit_val = self.visit_code.get().strip() or None
+        if visit_val != load_visit_code():
+            try:
+                save_visit_code(visit_val)  # 코어고객 리포트의 방문 조치결과 등록·관리자 현황 연결 (빈칸=기능 끔)
+            except ValueError as e:
+                messagebox.showerror("오류", str(e))
+                return None
         js_val = self.kakao_js_key.get().strip() or None
         if js_val != load_kakao_js_key():
             save_kakao_js_key(js_val)  # 지도 배경을 카카오맵으로 (리포트 생성 때 저장된 값을 읽는다)
@@ -623,5 +651,5 @@ def _show_on_screen(root, width, height):
 if __name__ == "__main__":
     root = tk.Tk()
     app = DataIntelGUI(root)
-    _show_on_screen(root, 820, 800)
+    _show_on_screen(root, 820, 820)
     root.mainloop()
