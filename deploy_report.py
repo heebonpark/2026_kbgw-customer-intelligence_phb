@@ -193,15 +193,22 @@ def deploy(html_path, repo_name=DEFAULT_REPO, public=False, log=print, descripti
     if shutil.which('gh') is None:
         return _deploy_without_gh(html_path, repo_name, log, hidden_link, new_link)
 
-    owner = _run(['gh', 'api', 'user', '--jq', '.login']).stdout.strip()
-    if not owner:
+    login = _run(['gh', 'api', 'user', '--jq', '.login']).stdout.strip()
+    if not login:
         raise DeployError("GitHub 로그인이 필요합니다 (gh auth login).")
+    # 이 PC에 저장된 배포 계정·조직이 있으면 그쪽으로 올린다 (링크에 개인 계정 이름이 보이지 않게 조직을 쓸 때)
+    owner = load_github_owner() or login
+    if not re.fullmatch(r'[A-Za-z0-9-]{1,39}', owner):
+        raise DeployError(f"배포 계정·조직 이름이 올바르지 않습니다: {owner}")
     full = f"{owner}/{repo_name}"
 
     if _run(['gh', 'repo', 'view', full], check=False).returncode != 0:
         log(f"배포 저장소 생성: {full} ({'public' if public else 'private'})")
-        _run(['gh', 'repo', 'create', full, '--public' if public else '--private',
-              '--description', description])
+        created = _run(['gh', 'repo', 'create', full, '--public' if public else '--private',
+                        '--description', description], check=False)
+        if created.returncode != 0:
+            raise DeployError(f"배포 저장소 {full} 를 만들지 못했습니다 (조직 이름이 맞는지, 그 조직에 저장소를 만들 권한이 있는지 확인): "
+                              f"{(created.stderr or created.stdout).strip()[:250]}")
 
     slug = _pick_slug(full, hidden_link, new_link, log)
     pushed = _push_single_commit(html_path, full, log, slug)
@@ -226,7 +233,7 @@ def deploy(html_path, repo_name=DEFAULT_REPO, public=False, log=print, descripti
         url = json.loads(pages.stdout).get('html_url')
     except (ValueError, AttributeError):
         url = None
-    base = url or f"https://{owner}.github.io/{repo_name}/"
+    base = url or f"https://{owner.lower()}.github.io/{repo_name}/"
     return base.rstrip('/') + '/' + (f"{slug}/" if slug else "")
 
 

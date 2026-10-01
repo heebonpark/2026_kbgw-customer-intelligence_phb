@@ -54,7 +54,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
 from core.handlers import process_and_merge, load_data
 from core.report import generate_html_report, generate_core_report, CORE_REPORT_TITLE
 from core.matching_config import load_matching_config
-from deploy_report import deploy, DeployError, OwnerNeeded, save_github_owner, DEFAULT_REPO, CORE_REPO
+from deploy_report import deploy, DeployError, OwnerNeeded, save_github_owner, load_github_owner, DEFAULT_REPO, CORE_REPO
 from core.secure_report import (load_admin_password, save_admin_password, load_scope_passwords,
                                 save_scope_passwords, ensure_scope_passwords)
 from core.core_customers import load_kakao_key, save_kakao_key, load_kakao_js_key, save_kakao_js_key, core_scope_names
@@ -193,6 +193,7 @@ class DataIntelGUI:
         self.visit_code = tk.StringVar(value=load_visit_code() or '')
         self.new_link = tk.BooleanVar(value=False)
         self.scoped = tk.BooleanVar(value=True)  # 코어고객 리포트를 지사별 비밀번호로 나눠 보기
+        self.deploy_owner = tk.StringVar(value=load_github_owner() or '')
         self.report_expiry = tk.StringVar()
 
         self.create_widgets()
@@ -315,9 +316,17 @@ class DataIntelGUI:
                        variable=self.scoped, bg=CARD_BG, activebackground=CARD_BG, font=("Helvetica", 10),
                        anchor="w").pack(side=tk.LEFT)
         ttk.Button(sc_row, text="지사별 비밀번호", style="Ghost.TButton", command=self.edit_scope_passwords).pack(side=tk.RIGHT)
-        tk.Checkbutton(opts_card, text="배포할 때 링크 새로 만들기 (이전 링크는 닫힘 -- 평소에는 끄고, 링크가 퍼졌을 때만)",
+        dp_row = tk.Frame(opts_card, bg=CARD_BG)
+        dp_row.pack(fill=tk.X, padx=12, pady=(0, 8))
+        tk.Checkbutton(dp_row, text="배포할 때 링크 새로 만들기 (이전 링크는 닫힘)",
                        variable=self.new_link, bg=CARD_BG, activebackground=CARD_BG, font=("Helvetica", 10),
-                       anchor="w").pack(fill=tk.X, padx=12, pady=(0, 8))
+                       anchor="w").pack(side=tk.LEFT)
+        # 링크의 맨 앞(…github.io 앞)에 보이는 이름: 비우면 로그인한 내 계정, 조직 이름을 넣으면 그 조직
+        own_ent = tk.Entry(dp_row, textvariable=self.deploy_owner, font=("Helvetica", 10), width=18)
+        own_ent.pack(side=tk.RIGHT)
+        self._bind_autocorrect(own_ent, self.deploy_owner)
+        tk.Label(dp_row, text="배포 계정·조직 (빈칸=내 계정)", bg=CARD_BG, fg=TEXT_MUTED,
+                 font=("Helvetica", 10)).pack(side=tk.RIGHT, padx=(0, 6))
 
         # ---- actions ----
         action_row = tk.Frame(body, bg=BG)
@@ -648,6 +657,9 @@ class DataIntelGUI:
         if not self.last_report:
             return
         path, pwd, expiry, repo, title = self.last_report
+        owner_val = self.deploy_owner.get().strip() or None
+        if owner_val != load_github_owner():
+            save_github_owner(owner_val)  # 링크에 보이는 계정·조직 이름 -- 이 PC에 저장
         self.deploy_btn.config(state=tk.DISABLED)
         try:
             self.log("GitHub Pages 배포를 시작합니다...")
@@ -663,6 +675,7 @@ class DataIntelGUI:
                         self.log("배포 취소됨 (GitHub 계정 이름 없음)")
                         return
                     save_github_owner(owner.strip())
+                    self.deploy_owner.set(owner.strip())
                     url = deploy(path, repo_name=repo, log=self.log, description=f"{title} (암호화)", new_link=self.new_link.get())
             except DeployError as e:
                 if '비공개 저장소' not in str(e):
