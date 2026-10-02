@@ -33,6 +33,7 @@ Not covered here (desktop GUI only): 4. 해지 파이프라인 and 7. 해지시�
 내역 -- their sections are rendered server-side in Python only.
 """
 
+from datetime import datetime, timedelta, timezone
 import json
 import random
 import string
@@ -130,7 +131,10 @@ def _upload_slots_html():
     return "".join(cards)
 
 
-def generate_web_app_html():
+def generate_web_app_html(built_at=None):
+    """built_at: 이 페이지를 만든 시각(기본: 지금). 화면에 '버전'으로 보이고, 열려 있는 화면이 최신
+    배포본인지 비교하는 값(data-build)이 된다."""
+    built_at = built_at or datetime.now(timezone(timedelta(hours=9)))  # 한국 시간으로 표시
     embedded = {
         "db": {"columns": [], "rows": []},
         "files": {k: {"columns": [], "rows": []} for k in MATCHABLE_FILES},
@@ -180,6 +184,9 @@ def generate_web_app_html():
             .replace('__EMBEDDED__', embedded_json)
             .replace('__UPLOAD_CONFIG__', upload_json)
             .replace('__SHEETJS__', SHEETJS_URL)
+            .replace('__BUILD_ID__', built_at.strftime('%Y%m%d%H%M%S'))
+            .replace('__BUILD_LABEL__', built_at.strftime('%Y-%m-%d %H:%M'))
+            .replace('__BUILT_AT__', built_at.isoformat(timespec='seconds'))
             .replace('__APP_SCRIPT__', app_script))
 
 
@@ -242,6 +249,10 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
 .web-run:disabled { opacity: .5; cursor: not-allowed; }
 .web-progress { font-size: 13px; color: var(--text-secondary); }
 .web-footnote { font-size: 11.5px; color: var(--text-muted); margin: 12px 0 0; }
+.web-version { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; font-size: 11.5px; color: var(--text-muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.web-version-status.ok { color: var(--text-secondary); font-weight: 600; }
+.web-version-status.old { color: var(--text-primary); font-weight: 700; background: color-mix(in srgb, var(--warning) 30%, transparent); padding: 2px 10px; border-radius: 999px; }
+.web-version button { font: inherit; font-weight: 700; border: 1px solid var(--brand); background: var(--brand); color: #fff; border-radius: 999px; padding: 2px 10px; cursor: pointer; }
 .web-share-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 10px 14px; }
 .web-field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
 .web-field input { font-size: 14px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--page-plane); color: var(--text-primary); }
@@ -268,6 +279,9 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
         <div>
             <h1>Data Intel PRO 관리고객 대시보드 <span style="font-weight:400;font-size:0.7em;color:var(--text-muted)">웹</span></h1>
             <div class="meta" id="reportMeta">파일을 선택하면 이 브라우저 안에서 바로 대시보드를 만듭니다.</div>
+            <div class="web-version" id="webVersion" data-build="__BUILD_ID__" data-built-at="__BUILT_AT__">
+                <span>버전 __BUILD_LABEL__</span><span id="webVersionCommit"></span><span id="webVersionStatus" class="web-version-status"></span>
+            </div>
         </div>
         <button class="theme-toggle" onclick="toggleTheme()">🌓 테마 전환</button>
     </div>
@@ -339,6 +353,56 @@ __DASH_SECTIONS__
 <script type="application/json" id="uploadConfig">__UPLOAD_CONFIG__</script>
 <script src="__SHEETJS__"></script>
 <script>__APP_SCRIPT__</script>
+<script>
+// ===== 버전 표시: 지금 열려 있는 화면이 최신 배포본인지 알려 준다 =====
+// 브라우저가 예전 화면을 저장해 두고 보여 주는 일이 잦다. (1) 같은 주소를 저장본 없이 다시 받아 빌드 값을 비교하고,
+// (2) GitHub에 올라간 최근 커밋 날짜를 보여 준다 (github.io 주소일 때만).
+(function () {
+    const box = document.getElementById('webVersion');
+    if (!box || getComputedStyle(box).display === 'none') return;  // 공유용으로 내보낸 리포트에서는 숨김
+    const status = document.getElementById('webVersionStatus'), commitEl = document.getElementById('webVersionCommit');
+    const say = (text, cls) => { status.textContent = text; status.className = 'web-version-status' + (cls ? ' ' + cls : ''); };
+    const reloadButton = () => {
+        if (box.querySelector('button')) return;
+        const b = document.createElement('button');
+        b.type = 'button'; b.textContent = '최신 버전으로 새로고침';
+        b.addEventListener('click', () => location.replace(location.href.split('#')[0].split('?')[0] + '?v=' + Date.now()));
+        box.appendChild(b);
+    };
+    const kst = d => d.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+    let lastCheck = 0;
+    async function check() {
+        lastCheck = Date.now();
+        if (location.protocol === 'file:') { say('파일로 열림 (최신 여부는 확인하지 않음)'); return; }
+        let current = null;
+        try {
+            const r = await fetch(location.href.split('#')[0].split('?')[0] + '?v=' + Date.now(), { cache: 'no-store' });
+            const m = r.ok ? /id="webVersion" data-build="(\d+)"/.exec(await r.text()) : null;
+            current = m ? m[1] : null;
+        } catch (e) { /* 연결 없음 -- 아래에서 '확인 못 함' */ }
+        if (current && current !== box.dataset.build) {
+            say('새 버전이 올라와 있습니다', 'old');
+            reloadButton();
+            return;
+        }
+        say(current ? '✓ 최신 버전' : '최신 여부 확인 못 함 (연결 확인)', current ? 'ok' : '');
+        const host = /^([^.]+)\.github\.io$/.exec(location.hostname), repo = location.pathname.split('/').filter(Boolean)[0];
+        if (!host || !repo) return;
+        try {
+            const r = await fetch('https://api.github.com/repos/' + host[1] + '/' + repo + '/commits?path=docs/index.html&per_page=1');
+            if (!r.ok) return;
+            const latest = new Date((await r.json())[0].commit.committer.date);
+            commitEl.textContent = '· 최근 커밋 ' + kst(latest);
+            // 커밋은 올라갔는데 이 화면보다 한참 뒤의 것: GitHub가 아직 새 화면을 내보내는 중
+            if (current && latest - new Date(box.dataset.builtAt) > 30 * 60 * 1000) say('새 버전을 배포하는 중입니다 -- 1~2분 뒤 새로고침', 'old');
+        } catch (e) { /* 커밋 날짜는 참고용 -- 못 가져와도 된다 */ }
+    }
+    window.DataIntelVersionCheck = check;
+    check();
+    // 화면을 켜 둔 채 며칠 지나도 돌아왔을 때 다시 확인한다 (5분에 한 번까지)
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastCheck > 5 * 60 * 1000) check(); });
+})();
+</script>
 <script>
 // ===== 웹 업로드: 브라우저 안에서 파일을 읽어 리포트 엔진(window.DataIntelLoad)에 넘긴다 =====
 (function () {
@@ -1081,7 +1145,7 @@ __DASH_SECTIONS__
         must('const CORRECT_PWD = "' + CFG.filler + '";', 'const CORRECT_PWD = ' + JSON.stringify(userPwd) + ';');
         must('const ADMIN_PWD = "' + CFG.filler + '";', 'const ADMIN_PWD = ' + JSON.stringify(adminPwd) + ';');
         must('new Date("9999-12-31T23:59:59")', 'new Date("' + expiry + 'T23:59:59")');
-        must('<style id="webVisibleStyle">#content { display: block; }</style>', '<style>#webUpload, #webShare { display: none !important; }</style>');
+        must('<style id="webVisibleStyle">#content { display: block; }</style>', '<style>#webUpload, #webShare, #webVersion { display: none !important; }</style>');
         const bodyAt = src.indexOf('<body>');
         const lock = CFG.lockScreenHtml.replace('__EXPIRY_TEXT__', esc(expiry));
         src = src.slice(0, bodyAt + 6) + '\n' + (coreOnly ? lock.replace('Data Intel PRO 보안 리포트', CORE_TITLE + ' 보안 리포트') : lock) + src.slice(bodyAt + 6);
