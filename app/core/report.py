@@ -6973,7 +6973,7 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
                           cancelled_facility_df=None, raw_files=None, matching_config=None,
                           password=None, admin_password=None, expiry_date=None, encrypt=True,
                           eda_link=False, core_df=None, core_voc_df=None, kakao_key=None, kakao_js_key=None,
-                          visit_sync=None, log=print):
+                          visit_sync=None, page_passwords=None, scope_label=None, log=print):
     """Generates the password-protected HTML dashboard report.
 
     df: already-merged 총괄DB dataframe (server-rendered initial dashboard).
@@ -7004,6 +7004,11 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
     core_df / core_voc_df: 9. 코어고객 활동관리 (+ 9-1 VOC매칭) -- independent
         section with a 설치주소 map (see core_customers.py). kakao_key: Kakao
         REST key for geocoding; None -> this PC's saved key.
+    page_passwords: (user, admin) values for the page's own lock instead of
+        the real passwords -- generate_scoped_html_report() passes unusable
+        random ones because its login page already checked the password and
+        hands the result to the page (window.__dimOuterOk / __dimRole).
+    scope_label: shown before 생성일시 (e.g. '원주지사').
     visit_sync: 방문 조치결과 등록 연결 (visit_sync.py). None -> this PC's saved
         connection; with one, markers in 지도로 보기 and the core section get
         조치결과 등록 and the admin sees the live view.
@@ -7108,12 +7113,14 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
     })
     generated_at = datetime.now().strftime('%Y-%m-%d %H:%M')
 
+    page_user, page_admin = page_passwords or (password, admin_password)
     script = (
         APP_SCRIPT_TEMPLATE
-        .replace('__PASSWORD__', password)
-        .replace('__ADMIN_PASSWORD__', admin_password)
+        .replace('__PASSWORD__', page_user)
+        .replace('__ADMIN_PASSWORD__', page_admin)
         .replace('__EXPIRY__', expiry_date)
     )
+    scope_meta = f"{_e(scope_label)} · " if scope_label else ""
 
     html_out = f"""<!DOCTYPE html>
 <html lang="ko">
@@ -7142,7 +7149,7 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
     <div class="topbar">
         <div>
             <h1>Data Intel PRO 관리고객 대시보드</h1>
-            <div class="meta" id="reportMeta">생성일시 {_e(generated_at)} · 관리계약 {len(rows):,}건 · 만료일 {_e(expiry_date)}</div>
+            <div class="meta" id="reportMeta">{scope_meta}생성일시 {_e(generated_at)} · 관리계약 {len(rows):,}건 · 만료일 {_e(expiry_date)}</div>
         </div>
         <button class="theme-toggle" onclick="toggleTheme()">🌓 테마 전환</button>
     </div>
@@ -7155,7 +7162,7 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
 {embedded_script}
 {render_map_config(kakao_js_key) if (geo_json or core_json) else ""}
 {visit_json}
-<script>{script}</script>
+{APP_SCRIPT_MARK}<script>{script}</script>
 </body>
 </html>"""
 
@@ -7164,6 +7171,80 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
         html_out = encrypt_report(html_out, [password, admin_password], expiry_date=expiry_date)
 
     return html_out, password, expiry_date, admin_password
+
+
+APP_SCRIPT_MARK = "<!--app-script-->"
+
+
+def generate_scoped_html_report(files_dict, matching_config, scope_passwords, admin_password=None, expiry_date=None,
+                                core_df=None, core_voc_df=None, cancel_df=None, cancelled_facility_df=None,
+                                kakao_key=None, log=print):
+    """종합 리포트를 지사별 비밀번호로 나눈다: 한 파일·한 링크지만 지사 비밀번호로는 그 지사의 관리고객만 열린다.
+
+    지사마다 그 지사 자료만으로 리포트 화면을 따로 만들고(원본 자료도 그 지사 것만 싣는다), 화면들에 공통인
+    부분(스타일·스크립트)은 틀로 한 번만 넣는다. 각 지사 화면은 그 지사의 비밀번호로만 풀린다
+    (secure_report.encrypt_scoped_report). 관리자 비밀번호는 전체 화면을 연다.
+
+    지사 화면에는 해지파이프라인·해지시설 섹션을 넣지 않는다 (지사로 나눌 수 없는 본부 전체 자료).
+    files_dict: 병합 전 원본(총괄DB 'db' 포함). scope_passwords: {지사 이름: 비밀번호}.
+    Returns (html, scope_passwords, expiry_date, admin_password, merged_df, message)."""
+    import secrets
+    from .handlers import process_and_merge, normalize_branch, BRANCH_ORDER
+    from .secure_report import SCOPE_PLACEHOLDER, encrypt_scoped_report, generate_strong_password, load_admin_password
+    from .core_customers import CORE_FIELDS, _find_col, _clean
+
+    db = files_dict.get('db')
+    if db is None or '지사' not in db.columns:
+        raise ValueError("총괄DB에 '지사' 열이 없어 지사별로 나눌 수 없습니다.")
+    admin_password = admin_password or load_admin_password() or generate_strong_password()
+    if expiry_date is None:
+        expiry_date = get_end_of_month_iso()
+    page_passwords = (secrets.token_urlsafe(24), secrets.token_urlsafe(24))  # 화면 안쪽 잠금용 -- 사람이 쓰는 값이 아니다
+
+    merged_all, message, _ = process_and_merge(files_dict, matching_config)
+    if merged_all is None:
+        raise ValueError(message)
+    db_branch = db['지사'].map(normalize_branch)
+    present = set(db_branch)
+    branches = [b for b in BRANCH_ORDER if b in present and scope_passwords.get(b)]
+    branches += sorted(b for b in present if b not in BRANCH_ORDER and scope_passwords.get(b))
+    core_branch = None
+    if core_df is not None:
+        col = _find_col(core_df, CORE_FIELDS['지사'])
+        core_branch = core_df[col].map(lambda v: str(_clean(v))) if col else None
+
+    def page(label, files, merged, core, admin):
+        html_out, *_ = generate_html_report(
+            merged, voc_df=files.get('voc'), patrol_df=files.get('patrol'),
+            cancel_df=cancel_df if admin else None, cancelled_facility_df=cancelled_facility_df if admin else None,
+            raw_files=files, matching_config=matching_config, password=page_passwords[0], admin_password=admin_password,
+            expiry_date=expiry_date, encrypt=False, core_df=core, core_voc_df=core_voc_df if core is not None else None,
+            kakao_key=kakao_key, page_passwords=page_passwords, scope_label=label, log=log)
+        head, rest = html_out.split('<body>', 1)
+        body, tail = rest.split(APP_SCRIPT_MARK, 1)
+        return head + '<body>', body, tail
+
+    scopes, shell = [], None
+    for i, branch in enumerate(branches):
+        log(f"지사별 화면 만드는 중: {branch} ({i + 1}/{len(branches)})")
+        files = dict(files_dict, db=db[db_branch == branch])
+        merged, _, _ = process_and_merge(files, matching_config)
+        core = core_df[core_branch == branch] if core_branch is not None else None
+        head, body, tail = page(f"{branch}지사", files, merged, core if core is not None and len(core) else None, admin=False)
+        shell = shell or (head, tail)
+        if (head, tail) != shell:
+            raise ValueError("지사별 화면의 공통 부분이 서로 다릅니다 (리포트를 나눌 수 없음).")
+        scopes.append({"id": f"b{i}", "group": "지사장", "label": branch, "role": "user",
+                       "passwords": [scope_passwords[branch]], "data": body})
+    log("전체 화면 만드는 중: 관리자")
+    head, body, tail = page("전체 (관리자)", files_dict, merged_all, core_df, admin=True)
+    shell = shell or (head, tail)
+    if (head, tail) != shell:
+        raise ValueError("지사별 화면의 공통 부분이 서로 다릅니다 (리포트를 나눌 수 없음).")
+    scopes.append({"id": "admin", "group": "관리자", "label": "관리자", "role": "admin", "passwords": [admin_password], "data": body})
+
+    html_out = encrypt_scoped_report(shell[0] + SCOPE_PLACEHOLDER + shell[1], scopes, expiry_date=expiry_date)
+    return html_out, {b: scope_passwords[b] for b in branches}, expiry_date, admin_password, merged_all, message
 
 
 def render_map_config(kakao_js_key=None):

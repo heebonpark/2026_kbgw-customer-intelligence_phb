@@ -51,8 +51,8 @@ import traceback
 
 # Ensure we can import from app.core
 sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
-from core.handlers import process_and_merge, load_data
-from core.report import generate_html_report, generate_core_report, CORE_REPORT_TITLE
+from core.handlers import process_and_merge, load_data, normalize_branch, BRANCH_ORDER
+from core.report import generate_html_report, generate_scoped_html_report, generate_core_report, CORE_REPORT_TITLE
 from core.matching_config import load_matching_config
 from deploy_report import deploy, DeployError, OwnerNeeded, save_github_owner, load_github_owner, DEFAULT_REPO, CORE_REPO
 from core.secure_report import (load_admin_password, save_admin_password, load_scope_passwords,
@@ -312,7 +312,7 @@ class DataIntelGUI:
 
         sc_row = tk.Frame(opts_card, bg=CARD_BG)
         sc_row.pack(fill=tk.X, padx=12, pady=(0, 2))
-        tk.Checkbutton(sc_row, text="코어고객 리포트: 지사별 비밀번호로 나눠 보기 (지사 · 본부장 · 관리자)",
+        tk.Checkbutton(sc_row, text="지사별 비밀번호로 나눠 보기 (종합 · 코어고객 리포트, 지사 자료만 열림)",
                        variable=self.scoped, bg=CARD_BG, activebackground=CARD_BG, font=("Helvetica", 10),
                        anchor="w").pack(side=tk.LEFT)
         ttk.Button(sc_row, text="지사별 비밀번호", style="Ghost.TButton", command=self.edit_scope_passwords).pack(side=tk.RIGHT)
@@ -458,22 +458,33 @@ class DataIntelGUI:
 
             pwd_val, admin_val, kakao_val, exp_val = options
 
-            html_content, pwd, expiry, admin_pwd = generate_html_report(
-                merged_df,
-                voc_df=files_dict.get('voc'),
-                patrol_df=files_dict.get('patrol'),
-                cancel_df=files_dict.get('cancel'),
-                cancelled_facility_df=files_dict.get('cancelled_facility'),
-                raw_files=files_dict,
-                matching_config=matching_config,
-                password=pwd_val,
-                admin_password=admin_val,
-                expiry_date=exp_val,
-                core_df=files_dict.get('core'),
-                core_voc_df=files_dict.get('core_voc'),
-                kakao_key=kakao_val,
-                log=self.log,
-            )
+            db_df = files_dict.get('db')
+            if self.scoped.get() and db_df is not None and '지사' in db_df.columns:
+                # 지사별 비밀번호: 코어고객 리포트와 같은 비밀번호를 쓴다 (이 PC에 저장, 없는 지사만 새로 만든다)
+                present = set(db_df['지사'].map(normalize_branch))
+                names = [b for b in BRANCH_ORDER if b in present] + sorted(present - set(BRANCH_ORDER))
+                html_content, pwd, expiry, admin_pwd, _, _ = generate_scoped_html_report(
+                    files_dict, matching_config, ensure_scope_passwords(names), admin_password=admin_val, expiry_date=exp_val,
+                    core_df=files_dict.get('core'), core_voc_df=files_dict.get('core_voc'),
+                    cancel_df=files_dict.get('cancel'), cancelled_facility_df=files_dict.get('cancelled_facility'),
+                    kakao_key=kakao_val, log=self.log)
+            else:
+                html_content, pwd, expiry, admin_pwd = generate_html_report(
+                    merged_df,
+                    voc_df=files_dict.get('voc'),
+                    patrol_df=files_dict.get('patrol'),
+                    cancel_df=files_dict.get('cancel'),
+                    cancelled_facility_df=files_dict.get('cancelled_facility'),
+                    raw_files=files_dict,
+                    matching_config=matching_config,
+                    password=pwd_val,
+                    admin_password=admin_val,
+                    expiry_date=exp_val,
+                    core_df=files_dict.get('core'),
+                    core_voc_df=files_dict.get('core_voc'),
+                    kakao_key=kakao_val,
+                    log=self.log,
+                )
 
             output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Data_Intel_PRO_Report.html")
             with open(output_path, "w", encoding="utf-8") as f:
@@ -483,11 +494,19 @@ class DataIntelGUI:
             self.log("성공적으로 HTML 리포트가 생성되었습니다!")
             self.log(f"저장 위치: {output_path}")
             self.log(f"만료일: {expiry}")
-            self.log(f"사용자 비밀번호: {pwd}")
-            self.log(f"관리자 비밀번호: {admin_pwd}")
+            if isinstance(pwd, dict):
+                self.log("로그인 화면에서 관리주체·지사를 고르고 아래 비밀번호를 넣습니다:")
+                for name, value in pwd.items():
+                    self.log(f"  지사장 · {name}: {value}")
+                self.log(f"  관리자(전체): {admin_pwd}")
+                summary = f"지사별 비밀번호 {len(pwd)}개 + 관리자 (실행 로그와 '지사별 비밀번호' 버튼에서 확인)"
+            else:
+                self.log(f"사용자 비밀번호: {pwd}")
+                self.log(f"관리자 비밀번호: {admin_pwd}")
+                summary = f"사용자용 암호: {pwd}\n관리자용 암호: {admin_pwd}"
             self.log("=========================================")
 
-            messagebox.showinfo("성공", f"리포트 생성 완료!\n만료일: {expiry}\n사용자용 암호: {pwd}\n관리자용 암호: {admin_pwd}")
+            messagebox.showinfo("성공", f"리포트 생성 완료!\n만료일: {expiry}\n{summary}")
             self.last_report = (output_path, pwd, expiry, DEFAULT_REPO, "Data Intel PRO 리포트")
             self.deploy_btn.config(state=tk.NORMAL)
             self._open_report(output_path)
