@@ -245,6 +245,8 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
 .web-slot-status.ok { color: var(--good); font-weight: 600; }
 .web-slot-status.err { color: var(--critical); font-weight: 600; }
 .web-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.web-geo { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 14px; margin-top: 14px; }
+.web-geo .web-field { flex: 0 1 380px; }
 .web-run { font-size: 15px; font-weight: 700; padding: 11px 22px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; }
 .web-run:disabled { opacity: .5; cursor: not-allowed; }
 .web-progress { font-size: 13px; color: var(--text-secondary); }
@@ -298,8 +300,13 @@ WEB_PAGE_TEMPLATE = r"""<!DOCTYPE html>
                 <button type="button" class="web-btn2" id="webReloadAll" hidden title="엑셀에서 저장(Ctrl+S)한 최신 내용으로 모든 파일을 다시 읽고 대시보드를 새로 만듭니다">🔄 모두 다시 불러오고 대시보드 갱신</button>
                 <span class="web-progress" id="webProgress">1. 총괄관리DB(종합 대시보드) 또는 9. 코어고객(코어고객 현황만)을 선택하세요.</span>
             </div>
+            <div class="web-geo">
+                <label class="web-field">카카오 JavaScript 키 <small>지도용 (선택) · 이 브라우저에만 저장 · 넣으면 설치주소가 지도에 표시됩니다</small>
+                    <input type="password" id="webKakaoKey" autocomplete="off" placeholder="카카오 개발자 콘솔 → 앱 키 → JavaScript 키"></label>
+                <span class="web-progress" id="webGeoStatus"></span>
+            </div>
             <p class="web-footnote">엑셀에서 열어 둔 파일도 선택할 수 있습니다 -- 단, <b>마지막으로 저장된 내용</b>을 읽으므로 수정 중이면 먼저 저장하세요. 한 번 고른 파일은 <b>🔄 다시 불러오기</b>로 다시 고르지 않고 최신 저장본을 읽습니다 (Chrome·Edge). 저장 안 한 내용까지 쓰려면 <b>📋 엑셀에서 붙여넣기</b>를 쓰세요. 파일을 고르면 <b>시트 · 헤더 행 · 컬럼(열 위치)</b>을 자동으로 맞추고 미리보기를 보여줍니다 -- 다르면 드롭다운에서 바꾸세요. 설정은 이 브라우저에 기억되어 다음에 같은 양식이면 자동 적용됩니다.</p>
-            <p class="web-footnote"><b>9. 코어고객</b>(+9-1)만 올리면 총괄DB 없이 <b>코어고객 현황</b>만 만들고 공유할 수 있습니다 (설치주소 지도는 데스크톱 GUI 리포트에서). 4. 해지파이프라인 · 7. 해지시설내역 섹션도 데스크톱 GUI 리포트에서 제공합니다.</p>
+            <p class="web-footnote"><b>9. 코어고객</b>(+9-1)만 올리면 총괄DB 없이 <b>코어고객 현황</b>만 만들고 공유할 수 있습니다 . <b>지도</b>는 위 칸에 카카오 JavaScript 키를 넣으면 나옵니다 (주소만 카카오로 보내 좌표를 받고, 한 번 받은 좌표는 이 브라우저에 저장). 4. 해지파이프라인 · 7. 해지시설내역 섹션도 데스크톱 GUI 리포트에서 제공합니다.</p>
         </details>
         <div class="web-quickbar" id="webQuickbar" hidden>
             <button type="button" class="web-btn2" id="webQuickReload" hidden>🔄 모두 다시 불러오고 갱신</button>
@@ -921,7 +928,7 @@ __DASH_SECTIONS__
         rows.sort((a, b) => (rank(a.지사) - rank(b.지사)) || String(a.지사).localeCompare(String(b.지사)) || String(a.관리고객명 || '').localeCompare(String(b.관리고객명 || '')));
         const noCoord = rows.filter(r => r.lat === null).length;
         return { rows, coord_stats: { 파일: rows.length - noCoord, 카카오: 0, 없음: noCoord }, voc_matched: rows.filter(r => r.VOC.length).length, period,
-                 kakao_key_set: null, kakao_error: null, coord_note: noCoord ? '웹 업로드는 주소→좌표 변환을 하지 않음 -- 지도는 데스크톱 GUI 리포트에서' : null };
+                 kakao_key_set: null, kakao_error: null, coord_note: noCoord ? '카카오 JavaScript 키를 넣으면 지도에 표시됩니다' : null };
     }
 
     // ---- file -> {columns, rows} (mirrors handlers.py load_data) ----
@@ -1060,6 +1067,7 @@ __DASH_SECTIONS__
             const res = coreOnly ? { rows: 0 } : window.DataIntelLoad(payload);
             if (window.DataIntelCore) window.DataIntelCore(payload.core);
             lastPayload = payload;
+            locate(payload);  // 설치주소 -> 지도 좌표 (키가 있을 때, 화면을 먼저 보여 주고 뒤에서 채운다)
             document.getElementById('webShare').hidden = false;
             updateShareMode();
             // 대시보드가 바로 보이게 업로드 칸은 한 줄로 접고 섹션 메뉴를 켠다
@@ -1080,6 +1088,124 @@ __DASH_SECTIONS__
             refreshRun(true);
         }
     });
+
+    // ===== 지도 좌표: 카카오 JavaScript 키가 있으면 설치주소를 이 브라우저에서 좌표로 바꾼다 =====
+    // 데스크톱 GUI는 REST 키로 미리 변환해 리포트에 싣는다 (core_customers.py). 웹에서는 카카오 지도 SDK의 주소 검색을 쓴다.
+    // 카카오로 가는 것은 주소 문자열뿐이고, 받은 좌표는 이 브라우저에 저장해 다음에는 다시 묻지 않는다.
+    const GEO_CACHE = 'dim-geo-cache-v1', KAKAO_JS_KEY = 'dim-kakao-js-key';
+    const keyInput = document.getElementById('webKakaoKey'), geoStatus = document.getElementById('webGeoStatus');
+    const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+    const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* 저장 공간 없음 -- 이번 화면에서만 쓴다 */ } };
+    let geoCache = {};
+    try { geoCache = JSON.parse(lsGet(GEO_CACHE) || '{}') || {}; } catch (e) { geoCache = {}; }
+    let geoRun = 0;
+    keyInput.value = lsGet(KAKAO_JS_KEY) || '';
+    if (keyInput.value) DataIntelMapLib.setKey(keyInput.value);
+    keyInput.addEventListener('change', () => {
+        const key = keyInput.value.replace(/[^0-9A-Za-z]/g, '');
+        keyInput.value = key; lsSet(KAKAO_JS_KEY, key);
+        DataIntelMapLib.setKey(key);
+        if (lastPayload) locate(lastPayload);
+    });
+
+    // core_customers.py _clean_address / _address_candidates와 같은 정리: '280-9번지' -> '280-9', 괄호 메모 제거,
+    // 주소가 두 번 들어간 경우 뒤쪽만, 번지에서 끊기, 동·리가 둘이면 하나씩.
+    const REGION_STARTS = ['서울', '경기', '강원', '인천', '충북', '충남', '충청', '전북', '전남', '전라', '경북', '경남', '경상', '부산', '대구', '광주', '대전', '울산', '세종', '제주'];
+    const LOT_RE = /^(산)?\d+(-\d+)?$/, AREA_RE = /(동|리|가|읍|면)$/;
+    function addressTokens(address) {
+        let tokens = address.split(/\s+/).map(t => t.replace('번지', '')).filter(t => t && !t.includes('(') && !t.includes(')'));
+        const starts = tokens.map((t, i) => i > 0 && REGION_STARTS.some(r => t.startsWith(r)) ? i : -1).filter(i => i > 0);
+        if (starts.length) tokens = tokens.slice(starts[starts.length - 1]);
+        return tokens;
+    }
+    function addressCandidates(address) {
+        const tokens = addressTokens(address), out = [];
+        const lot = tokens.findIndex(t => LOT_RE.test(t));
+        if (lot >= 0) {
+            const head = tokens.slice(0, lot + 1);
+            out.push(head.join(' '));
+            const areas = head.slice(0, -1).map((t, i) => AREA_RE.test(t) && i >= 2 ? i : -1).filter(i => i >= 0);
+            if (areas.length > 1) areas.forEach(keep => out.push(head.filter((t, i) => !areas.includes(i) || i === keep).join(' ')));
+        }
+        for (let n = tokens.length; n > Math.max(2, tokens.length - 3); n--) out.push(tokens.slice(0, n).join(' '));
+        return Array.from(new Set(out.filter(Boolean)));
+    }
+    function areaOnly(address) {  // 번지까지 못 찾으면 동·리 단위 위치
+        const tokens = addressTokens(address);
+        let last = -1;
+        tokens.forEach((t, i) => { if (i >= 1 && AREA_RE.test(t)) last = i; });
+        return last >= 0 ? tokens.slice(0, last + 1).join(' ') : null;
+    }
+    async function geocodeOne(geocoder, address) {
+        // -> [위도, 경도] | [위도, 경도, 1](동 단위) | 0(못 찾음) | undefined(카카오 오류 -- 저장하지 않고 다음에 다시)
+        const S = kakao.maps.services.Status;
+        const ask = q => new Promise(res => geocoder.addressSearch(q, (r, status) =>
+            res(status === S.OK && r[0] ? [Number(r[0].y), Number(r[0].x)] : (status === S.ZERO_RESULT ? null : undefined))));
+        for (const q of addressCandidates(address)) {
+            const hit = await ask(q);
+            if (hit === undefined) return undefined;
+            if (hit) return hit;
+        }
+        const area = areaOnly(address);
+        if (area) { const hit = await ask(area); if (hit === undefined) return undefined; if (hit) return hit.concat([1]); }
+        return 0;
+    }
+    function payloadAddresses(payload) {
+        const set = new Set();
+        if (payload.db) { const i = payload.db.columns.indexOf('설치주소'); if (i >= 0) payload.db.rows.forEach(r => { const a = norm(r[i]); if (a) set.add(a); }); }
+        if (payload.core) payload.core.rows.forEach(r => { const a = norm(r.설치주소); if (a) set.add(a); });
+        return Array.from(set);
+    }
+    function applyGeo(payload) {
+        const coords = {};
+        payloadAddresses(payload).forEach(a => { if (geoCache[a]) coords[a] = geoCache[a]; });
+        payload.geo = coords;
+        if (payload.db && window.DataIntelGeo) window.DataIntelGeo(coords);
+        if (payload.core) {
+            const rows = payload.core.rows;
+            rows.forEach(r => {
+                if (r.좌표출처 === '파일') return;
+                const hit = coords[norm(r.설치주소)];
+                r.lat = hit ? hit[0] : null; r.lng = hit ? hit[1] : null;
+                r.좌표출처 = hit ? (hit[2] === 1 ? '카카오(동 단위)' : '카카오') : null;
+            });
+            const count = src => rows.filter(r => r.좌표출처 === src).length;
+            payload.core.coord_stats = { 파일: count('파일'), 카카오: count('카카오'), 동단위: count('카카오(동 단위)'), 없음: rows.filter(r => r.lat === null).length };
+            payload.core.kakao_key_set = true;
+            payload.core.coord_note = null;
+            if (window.DataIntelCore) window.DataIntelCore(payload.core);
+        }
+        return Object.keys(coords).length;
+    }
+    async function locate(payload) {
+        const run = ++geoRun;
+        if (!DataIntelMapLib.hasKey()) { geoStatus.textContent = ''; return; }
+        const addresses = payloadAddresses(payload);
+        const todo = addresses.filter(a => geoCache[a] === undefined);
+        if (addresses.some(a => geoCache[a])) applyGeo(payload);  // 저장된 좌표는 바로 보여 준다
+        if (!todo.length) { geoStatus.textContent = addresses.length ? '✅ 지도 좌표 ' + addresses.filter(a => geoCache[a]).length + '/' + addresses.length + '개 주소 (저장된 좌표)' : ''; return; }
+        geoStatus.textContent = '지도 좌표 준비 중...';
+        try { await DataIntelMapLib.sdk(); }
+        catch (e) { geoStatus.textContent = '⚠️ 카카오맵을 불러오지 못했습니다 -- 키와, 카카오 콘솔의 사이트 도메인(' + location.origin + ') 등록을 확인하세요.'; return; }
+        const geocoder = new kakao.maps.services.Geocoder();
+        let done = 0, failed = 0, errors = 0, next = 0;
+        const worker = async () => {
+            while (next < todo.length && run === geoRun && errors < 20) {
+                const address = todo[next++];
+                const hit = await geocodeOne(geocoder, address);
+                if (hit === undefined) errors++; else { geoCache[address] = hit; if (!hit) failed++; }
+                done++;
+                if (done % 25 === 0 && run === geoRun) geoStatus.textContent = '지도 좌표 변환 중 ' + done.toLocaleString('ko-KR') + '/' + todo.length.toLocaleString('ko-KR');
+                if (done % 200 === 0) lsSet(GEO_CACHE, JSON.stringify(geoCache));
+            }
+        };
+        await Promise.all(Array.from({ length: 6 }, worker));
+        lsSet(GEO_CACHE, JSON.stringify(geoCache));
+        if (run !== geoRun) return;  // 그 사이 다시 실행됨
+        const shown = applyGeo(payload);
+        geoStatus.textContent = (errors >= 20 ? '⚠️ 카카오 응답 오류로 일부만 변환했습니다 -- ' : '✅ ')
+            + '지도 좌표 ' + shown.toLocaleString('ko-KR') + '/' + addresses.length.toLocaleString('ko-KR') + '개 주소' + (failed ? ' (못 찾음 ' + failed + ')' : '');
+    }
 
     // ===== 공유용 암호화 리포트 (report.py + secure_report.py와 같은 결과를 브라우저에서) =====
     const $ = id => document.getElementById(id);
@@ -1151,6 +1277,9 @@ __DASH_SECTIONS__
         src = src.slice(0, bodyAt + 6) + '\n' + (coreOnly ? lock.replace('Data Intel PRO 보안 리포트', CORE_TITLE + ' 보안 리포트') : lock) + src.slice(bodyAt + 6);
         // 코어고객만 공유할 때는 총괄DB·매칭 파일을 아예 싣지 않는다
         const data = coreOnly ? { db: null, files: {}, zoneOwnerMap: {}, core: lastPayload.core } : prefilterFiles(lastPayload);
+        // 지도: 구해 둔 좌표와 카카오 JavaScript 키를 같이 싣는다 (리포트 전체가 암호화된다)
+        if (!coreOnly && lastPayload.geo) data.geo = lastPayload.geo;
+        if (DataIntelMapLib.hasKey()) data.kakaoJsKey = keyInput.value;
         const generated = new Date();
         const meta = '생성일시 ' + generated.toLocaleString('ko-KR') + ' · '
             + (coreOnly ? '코어고객 ' + data.core.rows.length.toLocaleString('ko-KR') + '곳' : '관리계약 ' + data.db.rows.length.toLocaleString('ko-KR') + '건') + ' · 만료일 ' + expiry;
@@ -1158,10 +1287,11 @@ __DASH_SECTIONS__
             + '<script>document.addEventListener("DOMContentLoaded", function () {'
             + ' var p = JSON.parse(document.getElementById("webPreload").textContent);'
             + ' document.getElementById("webDashboard").hidden = false;'
+            + ' if (p.kakaoJsKey && typeof DataIntelMapLib !== "undefined") DataIntelMapLib.setKey(p.kakaoJsKey);'
             + (coreOnly
                 ? ' document.body.classList.add("core-only"); document.title = ' + JSON.stringify(CORE_TITLE) + ';'
                   + ' var h = document.querySelector(".topbar h1"); if (h) h.textContent = ' + JSON.stringify(CORE_TITLE) + ';'
-                : ' document.body.classList.remove("core-only"); var nav = document.getElementById("dashNav"); if (nav) nav.hidden = false; window.DataIntelLoad(p);')
+                : ' document.body.classList.remove("core-only"); var nav = document.getElementById("dashNav"); if (nav) nav.hidden = false; window.DataIntelLoad(p); if (p.geo && window.DataIntelGeo) window.DataIntelGeo(p.geo);')
             + ' if (window.DataIntelCore) window.DataIntelCore(p.core || null);'
             + ' document.getElementById("reportMeta").textContent = ' + JSON.stringify(meta) + ';'
             + '});<\/script>\n';

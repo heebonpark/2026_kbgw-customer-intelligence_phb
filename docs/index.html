@@ -770,6 +770,8 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
 .web-slot-status.ok { color: var(--good); font-weight: 600; }
 .web-slot-status.err { color: var(--critical); font-weight: 600; }
 .web-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.web-geo { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 14px; margin-top: 14px; }
+.web-geo .web-field { flex: 0 1 380px; }
 .web-run { font-size: 15px; font-weight: 700; padding: 11px 22px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; }
 .web-run:disabled { opacity: .5; cursor: not-allowed; }
 .web-progress { font-size: 13px; color: var(--text-secondary); }
@@ -804,8 +806,8 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
         <div>
             <h1>Data Intel PRO 관리고객 대시보드 <span style="font-weight:400;font-size:0.7em;color:var(--text-muted)">웹</span></h1>
             <div class="meta" id="reportMeta">파일을 선택하면 이 브라우저 안에서 바로 대시보드를 만듭니다.</div>
-            <div class="web-version" id="webVersion" data-build="20261002114719" data-built-at="2026-10-02T11:47:19+09:00">
-                <span>버전 2026-10-02 11:47</span><span id="webVersionCommit"></span><span id="webVersionStatus" class="web-version-status"></span>
+            <div class="web-version" id="webVersion" data-build="20261002124449" data-built-at="2026-10-02T12:44:49+09:00">
+                <span>버전 2026-10-02 12:44</span><span id="webVersionCommit"></span><span id="webVersionStatus" class="web-version-status"></span>
             </div>
         </div>
         <button class="theme-toggle" onclick="toggleTheme()">🌓 테마 전환</button>
@@ -927,8 +929,13 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
                 <button type="button" class="web-btn2" id="webReloadAll" hidden title="엑셀에서 저장(Ctrl+S)한 최신 내용으로 모든 파일을 다시 읽고 대시보드를 새로 만듭니다">🔄 모두 다시 불러오고 대시보드 갱신</button>
                 <span class="web-progress" id="webProgress">1. 총괄관리DB(종합 대시보드) 또는 9. 코어고객(코어고객 현황만)을 선택하세요.</span>
             </div>
+            <div class="web-geo">
+                <label class="web-field">카카오 JavaScript 키 <small>지도용 (선택) · 이 브라우저에만 저장 · 넣으면 설치주소가 지도에 표시됩니다</small>
+                    <input type="password" id="webKakaoKey" autocomplete="off" placeholder="카카오 개발자 콘솔 → 앱 키 → JavaScript 키"></label>
+                <span class="web-progress" id="webGeoStatus"></span>
+            </div>
             <p class="web-footnote">엑셀에서 열어 둔 파일도 선택할 수 있습니다 -- 단, <b>마지막으로 저장된 내용</b>을 읽으므로 수정 중이면 먼저 저장하세요. 한 번 고른 파일은 <b>🔄 다시 불러오기</b>로 다시 고르지 않고 최신 저장본을 읽습니다 (Chrome·Edge). 저장 안 한 내용까지 쓰려면 <b>📋 엑셀에서 붙여넣기</b>를 쓰세요. 파일을 고르면 <b>시트 · 헤더 행 · 컬럼(열 위치)</b>을 자동으로 맞추고 미리보기를 보여줍니다 -- 다르면 드롭다운에서 바꾸세요. 설정은 이 브라우저에 기억되어 다음에 같은 양식이면 자동 적용됩니다.</p>
-            <p class="web-footnote"><b>9. 코어고객</b>(+9-1)만 올리면 총괄DB 없이 <b>코어고객 현황</b>만 만들고 공유할 수 있습니다 (설치주소 지도는 데스크톱 GUI 리포트에서). 4. 해지파이프라인 · 7. 해지시설내역 섹션도 데스크톱 GUI 리포트에서 제공합니다.</p>
+            <p class="web-footnote"><b>9. 코어고객</b>(+9-1)만 올리면 총괄DB 없이 <b>코어고객 현황</b>만 만들고 공유할 수 있습니다 . <b>지도</b>는 위 칸에 카카오 JavaScript 키를 넣으면 나옵니다 (주소만 카카오로 보내 좌표를 받고, 한 번 받은 좌표는 이 브라우저에 저장). 4. 해지파이프라인 · 7. 해지시설내역 섹션도 데스크톱 GUI 리포트에서 제공합니다.</p>
         </details>
         <div class="web-quickbar" id="webQuickbar" hidden>
             <button type="button" class="web-btn2" id="webQuickReload" hidden>🔄 모두 다시 불러오고 갱신</button>
@@ -1081,12 +1088,12 @@ details[open] > summary.section-title::before, details[open] > summary.subsectio
 </div>
 
 <script type="application/json" id="embeddedData">{"db": {"columns": [], "rows": []}, "files": {"original": {"columns": [], "rows": []}, "facility": {"columns": [], "rows": []}, "patrol": {"columns": [], "rows": []}, "voc": {"columns": [], "rows": []}, "cancel": {"columns": [], "rows": []}, "cancelled_facility": {"columns": [], "rows": []}}, "matchingConfig": {"original": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "facility": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "patrol": [{"db_col": "서비스번호", "file_col": "고객번호", "enabled": true}], "voc": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "cancel": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}], "cancelled_facility": [{"db_col": "계약번호", "file_col": "계약번호", "enabled": true}]}, "fileLabels": {"original": "2026년 관리고객원본", "facility": "시설현황", "patrol": "순찰 정기점검 내역", "voc": "VOC정보조회", "cancel": "해지 파이프라인", "cancelled_facility": "해지시설 내역"}, "dbKeyCandidates": ["계약번호", "서비스번호"], "fileKeyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "hqOrder": ["강북/강원", "강남/서부", "대구/경북", "부산/경남", "충남/충북", "전남/전북"], "branchOrder": ["중앙", "강북", "서대문", "고양", "의정부", "남양주", "강릉", "원주"], "zoneOwnerMap": {}}</script>
-<script type="application/json" id="uploadConfig">{"matchable": ["original", "facility", "patrol", "voc", "cancel", "cancelled_facility"], "keyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "sheetHints": {"db": ["활동대상구분", "담당채널"], "voc": ["VOC유형대", "계약번호"], "patrol": ["고객번호"], "original": ["계약번호"], "facility": ["계약번호"], "zone_owner": ["구역번호"], "core": ["관리주체", "관리고객 명"], "core_voc": ["VOC유형", "VOC유형대"]}, "fieldSpecs": {"db": [{"name": "활동대상구분", "aliases": ["활동대상구분", "담당채널"], "required": true}, {"name": "지사", "aliases": ["지사", "관리지사명", "관리지사"], "required": true}, {"name": "계약번호", "aliases": ["계약번호"]}, {"name": "서비스번호", "aliases": ["서비스번호"]}, {"name": "상호", "aliases": ["상호", "상호명", "고객명"]}, {"name": "설치주소", "aliases": ["설치주소", "주소"]}, {"name": "영업구역정보", "aliases": ["영업구역정보", "영업구역번호", "영업구역"], "zone": true, "fuzzy": ["영업구역"]}, {"name": "기술구역정보", "aliases": ["기술구역정보", "기술구역번호", "기술구역"], "zone": true, "fuzzy": ["기술구역"]}, {"name": "구역정보", "aliases": ["구역정보", "구역"], "zone": true, "fuzzy": ["출동구역", "구역정보"], "fuzzyExclude": ["영업", "기술"]}, {"name": "활동유무", "aliases": ["활동유무", "활동유무(o,x)"], "prefix": "활동유무", "required": true}, {"name": "SP담당", "aliases": ["SP담당", "SP_담당", "SP 담당", "SP담당자", "SP_담당자", "SP 담당자"]}], "zone_owner": [{"name": "구역번호", "aliases": ["구역번호", "영업구역번호"], "required": true}, {"name": "담당자명", "aliases": ["담당자명", "담당자", "사원명", "(신규)사원명"], "required": true}]}, "dbKeyCandidates": ["계약번호", "서비스번호"], "unlockTemplate": "\u003c!DOCTYPE html>\n\u003chtml lang=\"ko\">\n\u003chead>\n\u003cmeta charset=\"UTF-8\">\n\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n\u003cmeta name=\"robots\" content=\"noindex, nofollow\">\n\u003ctitle>__TITLE__\u003c/title>\n\u003cstyle>\n:root { --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; --brand: #2563eb; --error: #d03b3b; }\n@media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --muted: #94a3b8; --border: #334155; } }\n* { box-sizing: border-box; }\nbody { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--text);\n       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; padding: 16px; }\n.card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; text-align: center; }\nh1 { font-size: 20px; margin: 0 0 6px; }\n.exp, .hint { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }\ninput { width: 100%; font-size: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }\nbutton { width: 100%; margin-top: 12px; font-size: 15px; font-weight: 700; padding: 12px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; }\nbutton:disabled { opacity: .6; cursor: progress; }\n.err { min-height: 18px; margin-top: 10px; font-size: 13px; color: var(--error); }\n\u003c/style>\n\u003c/head>\n\u003cbody>\n\u003cform class=\"card\" id=\"unlockForm\" autocomplete=\"off\">\n    \u003ch1>🔒 __TITLE__\u003c/h1>\n    __EXPIRY__\n    \u003cp class=\"hint\">공유받은 비밀번호를 입력하세요. 데이터는 암호화되어 있습니다.\u003c/p>\n    \u003cinput type=\"password\" id=\"unlockPwd\" placeholder=\"비밀번호\" autofocus>\n    \u003cbutton type=\"submit\" id=\"unlockBtn\">열기\u003c/button>\n    \u003cdiv class=\"err\" id=\"unlockErr\">\u003c/div>\n\u003c/form>\n\u003cscript type=\"application/json\" id=\"encPayload\">__PAYLOAD__\u003c/script>\n\u003cscript>\n(function () {\n    const payload = JSON.parse(document.getElementById('encPayload').textContent);\n    const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));\n    const form = document.getElementById('unlockForm');\n    const btn = document.getElementById('unlockBtn');\n    const err = document.getElementById('unlockErr');\n\n    async function unwrapContentKey(pwd) {\n        const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);\n        for (const slot of payload.slots) {\n            const kek = await crypto.subtle.deriveKey(\n                { name: 'PBKDF2', salt: b64(slot.salt), iterations: payload.iter, hash: 'SHA-256' },\n                base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);\n            try {\n                return await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(slot.iv) }, kek, b64(slot.key));\n            } catch (e) { /* not this slot -- try the next password slot */ }\n        }\n        return null;\n    }\n\n    form.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        const pwd = document.getElementById('unlockPwd').value;\n        if (!pwd) return;\n        if (!window.crypto || !crypto.subtle) {\n            err.textContent = '이 브라우저에서는 열 수 없습니다 (https 주소 또는 최신 브라우저가 필요합니다).';\n            return;\n        }\n        btn.disabled = true; btn.textContent = '여는 중...'; err.textContent = '';\n        try {\n            const rawKey = await unwrapContentKey(pwd);\n            if (!rawKey) throw new Error('bad password');\n            const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);\n            const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(payload.iv) }, key, b64(payload.data));\n            const reportHtml = new TextDecoder().decode(plain);\n            document.open();\n            document.write(reportHtml);\n            document.close();\n            // Hand the same password to the report's own lock screen: it still\n            // enforces the expiry date and decides user vs admin view.\n            const unlock = () => {\n                const input = document.getElementById('pwd');\n                // __dimOuterOk: this password just decrypted the report, so the inner lock can trust it without\n                // carrying the admin password in the page itself (report.py checkPassword).\n                window.__dimOuterOk = pwd;\n                if (input && typeof window.checkPassword === 'function') { input.value = pwd; window.checkPassword(); }\n            };\n            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', unlock); else unlock();\n        } catch (ex) {\n            btn.disabled = false; btn.textContent = '열기';\n            err.textContent = '비밀번호가 올바르지 않습니다.';\n        }\n    });\n})();\n\u003c/script>\n\u003c/body>\n\u003c/html>", "lockScreenHtml": "\u003cdiv id=\"lockScreen\" class=\"lock-screen\">\n    \u003ch2>Data Intel PRO 보안 리포트\u003c/h2>\n    \u003cp>만료일: __EXPIRY_TEXT__\u003c/p>\n    \u003cinput type=\"password\" id=\"pwd\" placeholder=\"비밀번호 입력\" autocomplete=\"off\">\n    \u003cbutton onclick=\"checkPassword()\">확인\u003c/button>\n    \u003cdiv id=\"errorMsg\" class=\"error\">\u003c/div>\n\u003c/div>", "iterations": 310000, "placeholderPage": "\u003c!DOCTYPE html>\u003chtml lang=\"ko\">\u003chead>\u003cmeta charset=\"UTF-8\">\u003cmeta name=\"robots\" content=\"noindex, nofollow\">\u003ctitle>Not Found\u003c/title>\u003c/head>\u003cbody>\u003c/body>\u003c/html>", "filler": "LcbffswDVCtMUJJhxGkLbhyj"}</script>
+<script type="application/json" id="uploadConfig">{"matchable": ["original", "facility", "patrol", "voc", "cancel", "cancelled_facility"], "keyCandidates": {"original": ["계약번호", "고객번호", "서비스번호"], "facility": ["계약번호", "고객번호", "서비스번호"], "patrol": ["고객번호"], "voc": ["계약번호", "고객번호", "서비스번호"], "cancel": ["계약번호", "고객번호", "서비스번호"], "cancelled_facility": ["계약번호", "고객번호", "서비스번호"]}, "displayColumns": {"original": ["만기도래 월", "합산월정료(KTT+KT)", "계약상태", "재계약여부", "관리본부명", "관리지사명"], "facility": ["서비스재개시일", "KTT월정료", "계약상태(중)", "계약상태(대)", "쟤계약여부", "재계약여부", "관리본부명", "관리지사명"], "patrol": ["결과", "특이사항", "도착시간", "출발시간"], "voc": ["상태", "VOC유형대", "접수일시"], "cancel": ["계약상태"], "cancelled_facility": ["계약상태(중)", "계약상태(대)"]}, "sheetHints": {"db": ["활동대상구분", "담당채널"], "voc": ["VOC유형대", "계약번호"], "patrol": ["고객번호"], "original": ["계약번호"], "facility": ["계약번호"], "zone_owner": ["구역번호"], "core": ["관리주체", "관리고객 명"], "core_voc": ["VOC유형", "VOC유형대"]}, "fieldSpecs": {"db": [{"name": "활동대상구분", "aliases": ["활동대상구분", "담당채널"], "required": true}, {"name": "지사", "aliases": ["지사", "관리지사명", "관리지사"], "required": true}, {"name": "계약번호", "aliases": ["계약번호"]}, {"name": "서비스번호", "aliases": ["서비스번호"]}, {"name": "상호", "aliases": ["상호", "상호명", "고객명"]}, {"name": "설치주소", "aliases": ["설치주소", "주소"]}, {"name": "영업구역정보", "aliases": ["영업구역정보", "영업구역번호", "영업구역"], "zone": true, "fuzzy": ["영업구역"]}, {"name": "기술구역정보", "aliases": ["기술구역정보", "기술구역번호", "기술구역"], "zone": true, "fuzzy": ["기술구역"]}, {"name": "구역정보", "aliases": ["구역정보", "구역"], "zone": true, "fuzzy": ["출동구역", "구역정보"], "fuzzyExclude": ["영업", "기술"]}, {"name": "활동유무", "aliases": ["활동유무", "활동유무(o,x)"], "prefix": "활동유무", "required": true}, {"name": "SP담당", "aliases": ["SP담당", "SP_담당", "SP 담당", "SP담당자", "SP_담당자", "SP 담당자"]}], "zone_owner": [{"name": "구역번호", "aliases": ["구역번호", "영업구역번호"], "required": true}, {"name": "담당자명", "aliases": ["담당자명", "담당자", "사원명", "(신규)사원명"], "required": true}]}, "dbKeyCandidates": ["계약번호", "서비스번호"], "unlockTemplate": "\u003c!DOCTYPE html>\n\u003chtml lang=\"ko\">\n\u003chead>\n\u003cmeta charset=\"UTF-8\">\n\u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n\u003cmeta name=\"robots\" content=\"noindex, nofollow\">\n\u003ctitle>__TITLE__\u003c/title>\n\u003cstyle>\n:root { --bg: #f8fafc; --card: #ffffff; --text: #0f172a; --muted: #64748b; --border: #e2e8f0; --brand: #2563eb; --error: #d03b3b; }\n@media (prefers-color-scheme: dark) { :root { --bg: #0f172a; --card: #1e293b; --text: #f1f5f9; --muted: #94a3b8; --border: #334155; } }\n* { box-sizing: border-box; }\nbody { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); color: var(--text);\n       font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif; padding: 16px; }\n.card { width: 100%; max-width: 380px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; text-align: center; }\nh1 { font-size: 20px; margin: 0 0 6px; }\n.exp, .hint { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }\ninput { width: 100%; font-size: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); }\nbutton { width: 100%; margin-top: 12px; font-size: 15px; font-weight: 700; padding: 12px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; cursor: pointer; }\nbutton:disabled { opacity: .6; cursor: progress; }\n.err { min-height: 18px; margin-top: 10px; font-size: 13px; color: var(--error); }\n\u003c/style>\n\u003c/head>\n\u003cbody>\n\u003cform class=\"card\" id=\"unlockForm\" autocomplete=\"off\">\n    \u003ch1>🔒 __TITLE__\u003c/h1>\n    __EXPIRY__\n    \u003cp class=\"hint\">공유받은 비밀번호를 입력하세요. 데이터는 암호화되어 있습니다.\u003c/p>\n    \u003cinput type=\"password\" id=\"unlockPwd\" placeholder=\"비밀번호\" autofocus>\n    \u003cbutton type=\"submit\" id=\"unlockBtn\">열기\u003c/button>\n    \u003cdiv class=\"err\" id=\"unlockErr\">\u003c/div>\n\u003c/form>\n\u003cscript type=\"application/json\" id=\"encPayload\">__PAYLOAD__\u003c/script>\n\u003cscript>\n(function () {\n    const payload = JSON.parse(document.getElementById('encPayload').textContent);\n    const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));\n    const form = document.getElementById('unlockForm');\n    const btn = document.getElementById('unlockBtn');\n    const err = document.getElementById('unlockErr');\n\n    async function unwrapContentKey(pwd) {\n        const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pwd), 'PBKDF2', false, ['deriveKey']);\n        for (const slot of payload.slots) {\n            const kek = await crypto.subtle.deriveKey(\n                { name: 'PBKDF2', salt: b64(slot.salt), iterations: payload.iter, hash: 'SHA-256' },\n                base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);\n            try {\n                return await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(slot.iv) }, kek, b64(slot.key));\n            } catch (e) { /* not this slot -- try the next password slot */ }\n        }\n        return null;\n    }\n\n    form.addEventListener('submit', async (e) => {\n        e.preventDefault();\n        const pwd = document.getElementById('unlockPwd').value;\n        if (!pwd) return;\n        if (!window.crypto || !crypto.subtle) {\n            err.textContent = '이 브라우저에서는 열 수 없습니다 (https 주소 또는 최신 브라우저가 필요합니다).';\n            return;\n        }\n        btn.disabled = true; btn.textContent = '여는 중...'; err.textContent = '';\n        try {\n            const rawKey = await unwrapContentKey(pwd);\n            if (!rawKey) throw new Error('bad password');\n            const key = await crypto.subtle.importKey('raw', rawKey, 'AES-GCM', false, ['decrypt']);\n            const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(payload.iv) }, key, b64(payload.data));\n            const reportHtml = new TextDecoder().decode(plain);\n            document.open();\n            document.write(reportHtml);\n            document.close();\n            // Hand the same password to the report's own lock screen: it still\n            // enforces the expiry date and decides user vs admin view.\n            const unlock = () => {\n                const input = document.getElementById('pwd');\n                // __dimOuterOk: this password just decrypted the report, so the inner lock can trust it without\n                // carrying the admin password in the page itself (report.py checkPassword).\n                window.__dimOuterOk = pwd;\n                if (input && typeof window.checkPassword === 'function') { input.value = pwd; window.checkPassword(); }\n            };\n            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', unlock); else unlock();\n        } catch (ex) {\n            btn.disabled = false; btn.textContent = '열기';\n            err.textContent = '비밀번호가 올바르지 않습니다.';\n        }\n    });\n})();\n\u003c/script>\n\u003c/body>\n\u003c/html>", "lockScreenHtml": "\u003cdiv id=\"lockScreen\" class=\"lock-screen\">\n    \u003ch2>Data Intel PRO 보안 리포트\u003c/h2>\n    \u003cp>만료일: __EXPIRY_TEXT__\u003c/p>\n    \u003cinput type=\"password\" id=\"pwd\" placeholder=\"비밀번호 입력\" autocomplete=\"off\">\n    \u003cbutton onclick=\"checkPassword()\">확인\u003c/button>\n    \u003cdiv id=\"errorMsg\" class=\"error\">\u003c/div>\n\u003c/div>", "iterations": 310000, "placeholderPage": "\u003c!DOCTYPE html>\u003chtml lang=\"ko\">\u003chead>\u003cmeta charset=\"UTF-8\">\u003cmeta name=\"robots\" content=\"noindex, nofollow\">\u003ctitle>Not Found\u003c/title>\u003c/head>\u003cbody>\u003c/body>\u003c/html>", "filler": "mZawReeAcLtYflXbrZQJgJGY"}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 // ===== Lock screen =====
-const CORRECT_PWD = "LcbffswDVCtMUJJhxGkLbhyj";
-const ADMIN_PWD = "LcbffswDVCtMUJJhxGkLbhyj";
+const CORRECT_PWD = "mZawReeAcLtYflXbrZQJgJGY";
+const ADMIN_PWD = "mZawReeAcLtYflXbrZQJgJGY";
 const EXPIRY_DATE = new Date("9999-12-31T23:59:59");
 let isAdminUnlocked = false;
 
@@ -1326,7 +1333,7 @@ const DataIntelMapLib = (function () {
             try { window.kakao.maps.load(() => resolve()); } catch (e) { reject(e); }
         };
         if (window.kakao && window.kakao.maps) { ready(); return; }
-        script('https://dapi.kakao.com/v2/maps/sdk.js?appkey=' + encodeURIComponent(config.kakaoJsKey) + '&autoload=false&libraries=clusterer')
+        script('https://dapi.kakao.com/v2/maps/sdk.js?appkey=' + encodeURIComponent(config.kakaoJsKey) + '&autoload=false&libraries=clusterer,services')
             .then(ready, () => reject(new Error('kakao sdk')));
     }));
 
@@ -1802,7 +1809,8 @@ const DataIntelMapLib = (function () {
                 return leafletMap(holder, opts, '기본 지도 (' + reason + ')');
             });
     }
-    return { open };
+    // setKey: 웹 업로드 버전은 사용자가 화면에서 넣은 키를 쓴다. sdk: 카카오 SDK만 미리 받기 (주소 -> 좌표 변환용)
+    return { open, setKey: key => { config.kakaoJsKey = key || ''; pending.kakao = null; }, sdk: kakao, hasKey: () => !!config.kakaoJsKey };
 })();
 
 // ===== 9. 코어고객 활동관리 -- 독립 섹션 (총괄DB 필터와 무관). core_customers.py build_core_payload의 rows를 그린다 =====
@@ -5409,7 +5417,9 @@ const DataIntelMapLib = (function () {
     // 좌표는 리포트 생성 때 카카오로 변환해 실은 #geoData({주소: [위도, 경도(, 1=동 단위)]}) 또는 파일의 좌표 열.
     // 위 필터(본부/지사/대상구분/담당자)를 그대로 따르고, 여기서 지사·대상·상태·담당자·구역을 더 좁힌다.
     const geoEl = document.getElementById('geoData');
-    const GEO = (function () { if (!geoEl) return null; try { return JSON.parse(geoEl.textContent); } catch (e) { return null; } })();
+    let GEO = (function () { if (!geoEl) return null; try { return JSON.parse(geoEl.textContent); } catch (e) { return null; } })();
+    // 웹 업로드 버전은 좌표를 브라우저에서 구해 나중에 넣는다
+    window.DataIntelGeo = function (coords) { GEO = Object.assign(GEO || {}, coords || {}); renderCustomerMap(); };
     const MAP_STATUS = ['미접수', '접수', '미처리', '처리완료'];  // 급한 순 -- 한 주소에 계약이 여럿이면 가장 급한 상태의 색
     const MAP_STATUS_VAR = { 미접수: '--critical', 접수: '--warning', 미처리: '--text-muted', 처리완료: '--good' };
     const MAP_TYPE_VAR = { SP: '--s3', SE: '--s2', SG: '--s1' };
@@ -6590,7 +6600,7 @@ const DataIntelMapLib = (function () {
         rows.sort((a, b) => (rank(a.지사) - rank(b.지사)) || String(a.지사).localeCompare(String(b.지사)) || String(a.관리고객명 || '').localeCompare(String(b.관리고객명 || '')));
         const noCoord = rows.filter(r => r.lat === null).length;
         return { rows, coord_stats: { 파일: rows.length - noCoord, 카카오: 0, 없음: noCoord }, voc_matched: rows.filter(r => r.VOC.length).length, period,
-                 kakao_key_set: null, kakao_error: null, coord_note: noCoord ? '웹 업로드는 주소→좌표 변환을 하지 않음 -- 지도는 데스크톱 GUI 리포트에서' : null };
+                 kakao_key_set: null, kakao_error: null, coord_note: noCoord ? '카카오 JavaScript 키를 넣으면 지도에 표시됩니다' : null };
     }
 
     // ---- file -> {columns, rows} (mirrors handlers.py load_data) ----
@@ -6729,6 +6739,7 @@ const DataIntelMapLib = (function () {
             const res = coreOnly ? { rows: 0 } : window.DataIntelLoad(payload);
             if (window.DataIntelCore) window.DataIntelCore(payload.core);
             lastPayload = payload;
+            locate(payload);  // 설치주소 -> 지도 좌표 (키가 있을 때, 화면을 먼저 보여 주고 뒤에서 채운다)
             document.getElementById('webShare').hidden = false;
             updateShareMode();
             // 대시보드가 바로 보이게 업로드 칸은 한 줄로 접고 섹션 메뉴를 켠다
@@ -6749,6 +6760,124 @@ const DataIntelMapLib = (function () {
             refreshRun(true);
         }
     });
+
+    // ===== 지도 좌표: 카카오 JavaScript 키가 있으면 설치주소를 이 브라우저에서 좌표로 바꾼다 =====
+    // 데스크톱 GUI는 REST 키로 미리 변환해 리포트에 싣는다 (core_customers.py). 웹에서는 카카오 지도 SDK의 주소 검색을 쓴다.
+    // 카카오로 가는 것은 주소 문자열뿐이고, 받은 좌표는 이 브라우저에 저장해 다음에는 다시 묻지 않는다.
+    const GEO_CACHE = 'dim-geo-cache-v1', KAKAO_JS_KEY = 'dim-kakao-js-key';
+    const keyInput = document.getElementById('webKakaoKey'), geoStatus = document.getElementById('webGeoStatus');
+    const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+    const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* 저장 공간 없음 -- 이번 화면에서만 쓴다 */ } };
+    let geoCache = {};
+    try { geoCache = JSON.parse(lsGet(GEO_CACHE) || '{}') || {}; } catch (e) { geoCache = {}; }
+    let geoRun = 0;
+    keyInput.value = lsGet(KAKAO_JS_KEY) || '';
+    if (keyInput.value) DataIntelMapLib.setKey(keyInput.value);
+    keyInput.addEventListener('change', () => {
+        const key = keyInput.value.replace(/[^0-9A-Za-z]/g, '');
+        keyInput.value = key; lsSet(KAKAO_JS_KEY, key);
+        DataIntelMapLib.setKey(key);
+        if (lastPayload) locate(lastPayload);
+    });
+
+    // core_customers.py _clean_address / _address_candidates와 같은 정리: '280-9번지' -> '280-9', 괄호 메모 제거,
+    // 주소가 두 번 들어간 경우 뒤쪽만, 번지에서 끊기, 동·리가 둘이면 하나씩.
+    const REGION_STARTS = ['서울', '경기', '강원', '인천', '충북', '충남', '충청', '전북', '전남', '전라', '경북', '경남', '경상', '부산', '대구', '광주', '대전', '울산', '세종', '제주'];
+    const LOT_RE = /^(산)?\d+(-\d+)?$/, AREA_RE = /(동|리|가|읍|면)$/;
+    function addressTokens(address) {
+        let tokens = address.split(/\s+/).map(t => t.replace('번지', '')).filter(t => t && !t.includes('(') && !t.includes(')'));
+        const starts = tokens.map((t, i) => i > 0 && REGION_STARTS.some(r => t.startsWith(r)) ? i : -1).filter(i => i > 0);
+        if (starts.length) tokens = tokens.slice(starts[starts.length - 1]);
+        return tokens;
+    }
+    function addressCandidates(address) {
+        const tokens = addressTokens(address), out = [];
+        const lot = tokens.findIndex(t => LOT_RE.test(t));
+        if (lot >= 0) {
+            const head = tokens.slice(0, lot + 1);
+            out.push(head.join(' '));
+            const areas = head.slice(0, -1).map((t, i) => AREA_RE.test(t) && i >= 2 ? i : -1).filter(i => i >= 0);
+            if (areas.length > 1) areas.forEach(keep => out.push(head.filter((t, i) => !areas.includes(i) || i === keep).join(' ')));
+        }
+        for (let n = tokens.length; n > Math.max(2, tokens.length - 3); n--) out.push(tokens.slice(0, n).join(' '));
+        return Array.from(new Set(out.filter(Boolean)));
+    }
+    function areaOnly(address) {  // 번지까지 못 찾으면 동·리 단위 위치
+        const tokens = addressTokens(address);
+        let last = -1;
+        tokens.forEach((t, i) => { if (i >= 1 && AREA_RE.test(t)) last = i; });
+        return last >= 0 ? tokens.slice(0, last + 1).join(' ') : null;
+    }
+    async function geocodeOne(geocoder, address) {
+        // -> [위도, 경도] | [위도, 경도, 1](동 단위) | 0(못 찾음) | undefined(카카오 오류 -- 저장하지 않고 다음에 다시)
+        const S = kakao.maps.services.Status;
+        const ask = q => new Promise(res => geocoder.addressSearch(q, (r, status) =>
+            res(status === S.OK && r[0] ? [Number(r[0].y), Number(r[0].x)] : (status === S.ZERO_RESULT ? null : undefined))));
+        for (const q of addressCandidates(address)) {
+            const hit = await ask(q);
+            if (hit === undefined) return undefined;
+            if (hit) return hit;
+        }
+        const area = areaOnly(address);
+        if (area) { const hit = await ask(area); if (hit === undefined) return undefined; if (hit) return hit.concat([1]); }
+        return 0;
+    }
+    function payloadAddresses(payload) {
+        const set = new Set();
+        if (payload.db) { const i = payload.db.columns.indexOf('설치주소'); if (i >= 0) payload.db.rows.forEach(r => { const a = norm(r[i]); if (a) set.add(a); }); }
+        if (payload.core) payload.core.rows.forEach(r => { const a = norm(r.설치주소); if (a) set.add(a); });
+        return Array.from(set);
+    }
+    function applyGeo(payload) {
+        const coords = {};
+        payloadAddresses(payload).forEach(a => { if (geoCache[a]) coords[a] = geoCache[a]; });
+        payload.geo = coords;
+        if (payload.db && window.DataIntelGeo) window.DataIntelGeo(coords);
+        if (payload.core) {
+            const rows = payload.core.rows;
+            rows.forEach(r => {
+                if (r.좌표출처 === '파일') return;
+                const hit = coords[norm(r.설치주소)];
+                r.lat = hit ? hit[0] : null; r.lng = hit ? hit[1] : null;
+                r.좌표출처 = hit ? (hit[2] === 1 ? '카카오(동 단위)' : '카카오') : null;
+            });
+            const count = src => rows.filter(r => r.좌표출처 === src).length;
+            payload.core.coord_stats = { 파일: count('파일'), 카카오: count('카카오'), 동단위: count('카카오(동 단위)'), 없음: rows.filter(r => r.lat === null).length };
+            payload.core.kakao_key_set = true;
+            payload.core.coord_note = null;
+            if (window.DataIntelCore) window.DataIntelCore(payload.core);
+        }
+        return Object.keys(coords).length;
+    }
+    async function locate(payload) {
+        const run = ++geoRun;
+        if (!DataIntelMapLib.hasKey()) { geoStatus.textContent = ''; return; }
+        const addresses = payloadAddresses(payload);
+        const todo = addresses.filter(a => geoCache[a] === undefined);
+        if (addresses.some(a => geoCache[a])) applyGeo(payload);  // 저장된 좌표는 바로 보여 준다
+        if (!todo.length) { geoStatus.textContent = addresses.length ? '✅ 지도 좌표 ' + addresses.filter(a => geoCache[a]).length + '/' + addresses.length + '개 주소 (저장된 좌표)' : ''; return; }
+        geoStatus.textContent = '지도 좌표 준비 중...';
+        try { await DataIntelMapLib.sdk(); }
+        catch (e) { geoStatus.textContent = '⚠️ 카카오맵을 불러오지 못했습니다 -- 키와, 카카오 콘솔의 사이트 도메인(' + location.origin + ') 등록을 확인하세요.'; return; }
+        const geocoder = new kakao.maps.services.Geocoder();
+        let done = 0, failed = 0, errors = 0, next = 0;
+        const worker = async () => {
+            while (next < todo.length && run === geoRun && errors < 20) {
+                const address = todo[next++];
+                const hit = await geocodeOne(geocoder, address);
+                if (hit === undefined) errors++; else { geoCache[address] = hit; if (!hit) failed++; }
+                done++;
+                if (done % 25 === 0 && run === geoRun) geoStatus.textContent = '지도 좌표 변환 중 ' + done.toLocaleString('ko-KR') + '/' + todo.length.toLocaleString('ko-KR');
+                if (done % 200 === 0) lsSet(GEO_CACHE, JSON.stringify(geoCache));
+            }
+        };
+        await Promise.all(Array.from({ length: 6 }, worker));
+        lsSet(GEO_CACHE, JSON.stringify(geoCache));
+        if (run !== geoRun) return;  // 그 사이 다시 실행됨
+        const shown = applyGeo(payload);
+        geoStatus.textContent = (errors >= 20 ? '⚠️ 카카오 응답 오류로 일부만 변환했습니다 -- ' : '✅ ')
+            + '지도 좌표 ' + shown.toLocaleString('ko-KR') + '/' + addresses.length.toLocaleString('ko-KR') + '개 주소' + (failed ? ' (못 찾음 ' + failed + ')' : '');
+    }
 
     // ===== 공유용 암호화 리포트 (report.py + secure_report.py와 같은 결과를 브라우저에서) =====
     const $ = id => document.getElementById(id);
@@ -6820,6 +6949,9 @@ const DataIntelMapLib = (function () {
         src = src.slice(0, bodyAt + 6) + '\n' + (coreOnly ? lock.replace('Data Intel PRO 보안 리포트', CORE_TITLE + ' 보안 리포트') : lock) + src.slice(bodyAt + 6);
         // 코어고객만 공유할 때는 총괄DB·매칭 파일을 아예 싣지 않는다
         const data = coreOnly ? { db: null, files: {}, zoneOwnerMap: {}, core: lastPayload.core } : prefilterFiles(lastPayload);
+        // 지도: 구해 둔 좌표와 카카오 JavaScript 키를 같이 싣는다 (리포트 전체가 암호화된다)
+        if (!coreOnly && lastPayload.geo) data.geo = lastPayload.geo;
+        if (DataIntelMapLib.hasKey()) data.kakaoJsKey = keyInput.value;
         const generated = new Date();
         const meta = '생성일시 ' + generated.toLocaleString('ko-KR') + ' · '
             + (coreOnly ? '코어고객 ' + data.core.rows.length.toLocaleString('ko-KR') + '곳' : '관리계약 ' + data.db.rows.length.toLocaleString('ko-KR') + '건') + ' · 만료일 ' + expiry;
@@ -6827,10 +6959,11 @@ const DataIntelMapLib = (function () {
             + '<script>document.addEventListener("DOMContentLoaded", function () {'
             + ' var p = JSON.parse(document.getElementById("webPreload").textContent);'
             + ' document.getElementById("webDashboard").hidden = false;'
+            + ' if (p.kakaoJsKey && typeof DataIntelMapLib !== "undefined") DataIntelMapLib.setKey(p.kakaoJsKey);'
             + (coreOnly
                 ? ' document.body.classList.add("core-only"); document.title = ' + JSON.stringify(CORE_TITLE) + ';'
                   + ' var h = document.querySelector(".topbar h1"); if (h) h.textContent = ' + JSON.stringify(CORE_TITLE) + ';'
-                : ' document.body.classList.remove("core-only"); var nav = document.getElementById("dashNav"); if (nav) nav.hidden = false; window.DataIntelLoad(p);')
+                : ' document.body.classList.remove("core-only"); var nav = document.getElementById("dashNav"); if (nav) nav.hidden = false; window.DataIntelLoad(p); if (p.geo && window.DataIntelGeo) window.DataIntelGeo(p.geo);')
             + ' if (window.DataIntelCore) window.DataIntelCore(p.core || null);'
             + ' document.getElementById("reportMeta").textContent = ' + JSON.stringify(meta) + ';'
             + '});<\/script>\n';

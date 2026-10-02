@@ -2157,7 +2157,7 @@ const DataIntelMapLib = (function () {
             try { window.kakao.maps.load(() => resolve()); } catch (e) { reject(e); }
         };
         if (window.kakao && window.kakao.maps) { ready(); return; }
-        script('https://dapi.kakao.com/v2/maps/sdk.js?appkey=' + encodeURIComponent(config.kakaoJsKey) + '&autoload=false&libraries=clusterer')
+        script('https://dapi.kakao.com/v2/maps/sdk.js?appkey=' + encodeURIComponent(config.kakaoJsKey) + '&autoload=false&libraries=clusterer,services')
             .then(ready, () => reject(new Error('kakao sdk')));
     }));
 
@@ -2633,7 +2633,8 @@ const DataIntelMapLib = (function () {
                 return leafletMap(holder, opts, '기본 지도 (' + reason + ')');
             });
     }
-    return { open };
+    // setKey: 웹 업로드 버전은 사용자가 화면에서 넣은 키를 쓴다. sdk: 카카오 SDK만 미리 받기 (주소 -> 좌표 변환용)
+    return { open, setKey: key => { config.kakaoJsKey = key || ''; pending.kakao = null; }, sdk: kakao, hasKey: () => !!config.kakaoJsKey };
 })();
 
 // ===== 9. 코어고객 활동관리 -- 독립 섹션 (총괄DB 필터와 무관). core_customers.py build_core_payload의 rows를 그린다 =====
@@ -6240,7 +6241,9 @@ const DataIntelMapLib = (function () {
     // 좌표는 리포트 생성 때 카카오로 변환해 실은 #geoData({주소: [위도, 경도(, 1=동 단위)]}) 또는 파일의 좌표 열.
     // 위 필터(본부/지사/대상구분/담당자)를 그대로 따르고, 여기서 지사·대상·상태·담당자·구역을 더 좁힌다.
     const geoEl = document.getElementById('geoData');
-    const GEO = (function () { if (!geoEl) return null; try { return JSON.parse(geoEl.textContent); } catch (e) { return null; } })();
+    let GEO = (function () { if (!geoEl) return null; try { return JSON.parse(geoEl.textContent); } catch (e) { return null; } })();
+    // 웹 업로드 버전은 좌표를 브라우저에서 구해 나중에 넣는다
+    window.DataIntelGeo = function (coords) { GEO = Object.assign(GEO || {}, coords || {}); renderCustomerMap(); };
     const MAP_STATUS = ['미접수', '접수', '미처리', '처리완료'];  // 급한 순 -- 한 주소에 계약이 여럿이면 가장 급한 상태의 색
     const MAP_STATUS_VAR = { 미접수: '--critical', 접수: '--warning', 미처리: '--text-muted', 처리완료: '--good' };
     const MAP_TYPE_VAR = { SP: '--s3', SE: '--s2', SG: '--s1' };
@@ -6973,7 +6976,7 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
                           cancelled_facility_df=None, raw_files=None, matching_config=None,
                           password=None, admin_password=None, expiry_date=None, encrypt=True,
                           eda_link=False, core_df=None, core_voc_df=None, kakao_key=None, kakao_js_key=None,
-                          visit_sync=None, page_passwords=None, scope_label=None, log=print):
+                          visit_sync=None, page_passwords=None, scope_label=None, hide_cancel=False, log=print):
     """Generates the password-protected HTML dashboard report.
 
     df: already-merged 총괄DB dataframe (server-rendered initial dashboard).
@@ -7054,8 +7057,8 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
     eda_stats = build_eda_stats(df)
     eda_section_html = render_eda_section_body(eda_stats)
 
-    cancel_section_html = render_cancel_section(cancel_df)
-    nudge_section_html = render_nudge_section(cancelled_facility_df, cancel_df)
+    cancel_section_html = "" if hide_cancel else render_cancel_section(cancel_df)
+    nudge_section_html = "" if hide_cancel else render_nudge_section(cancelled_facility_df, cancel_df)
 
     admin_panel_html = ""
     filter_bar_html = ""
@@ -7219,7 +7222,7 @@ def generate_scoped_html_report(files_dict, matching_config, scope_passwords, ad
             cancel_df=cancel_df if admin else None, cancelled_facility_df=cancelled_facility_df if admin else None,
             raw_files=files, matching_config=matching_config, password=page_passwords[0], admin_password=admin_password,
             expiry_date=expiry_date, encrypt=False, core_df=core, core_voc_df=core_voc_df if core is not None else None,
-            kakao_key=kakao_key, page_passwords=page_passwords, scope_label=label, log=log)
+            kakao_key=kakao_key, page_passwords=page_passwords, scope_label=label, hide_cancel=not admin, log=log)
         head, rest = html_out.split('<body>', 1)
         body, tail = rest.split(APP_SCRIPT_MARK, 1)
         return head + '<body>', body, tail
