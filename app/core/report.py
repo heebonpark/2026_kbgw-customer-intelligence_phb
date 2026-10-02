@@ -311,11 +311,6 @@ PROGRESS_GROUP_COLS = {
 }
 
 
-def progress_bottom_count(n):
-    """순위 하위로 강조할 지사 수 -- 8개 지사면 4개, 적으면 절반 (1개뿐이면 없음)."""
-    return min(4, n // 2)
-
-
 def render_progress_matrix(matrix):
     if matrix is None:
         return ""
@@ -331,11 +326,11 @@ def render_progress_matrix(matrix):
         f'<th class="pg-sub {PROGRESS_GROUP_CLASS[g]}{" grp-start" if i == 0 else ""}">{_e(c)}</th>'
         for g in PROGRESS_GROUPS for i, c in enumerate(PROGRESS_GROUP_COLS[g])
     )
-    n = len(matrix['branch_rows'])
-    k = progress_bottom_count(n)
+    # 순위·하위 여부는 analytics.rank_progress_rows가 매긴다 (같은 진척율 = 같은 순위, 100%는 하위 아님)
+    any_bottom = any(r.get('하위') for r in matrix['branch_rows'])
 
     def render_row(row, is_total=False):
-        bottom = (not is_total) and k > 0 and row['순위'] > n - k
+        bottom = (not is_total) and bool(row.get('하위'))
         cells = [f'<td class="progress-branch{" progress-total-label" if is_total else ""}">'
                  f'{_e(row["지사"])}</td>']
         for g in PROGRESS_GROUPS:
@@ -350,9 +345,9 @@ def render_progress_matrix(matrix):
         if is_total:
             cells.append('<td class="cell-num">-</td>')
         elif bottom:
-            cells.append(f'<td class="cell-num progress-rank pg-rank-bottom" title="순위 하위 {k}개">▼ {row["순위"]}</td>')
+            cells.append(f'<td class="cell-num progress-rank pg-rank-bottom" title="순위 하위">▼ {row["순위"]}</td>')
         else:
-            cells.append(f'<td class="cell-num progress-rank">{row["순위"]}</td>')
+            cells.append(f'<td class="cell-num progress-rank">{row["순위"] if row["순위"] is not None else "-"}</td>')
         row_cls = 'progress-total-row' if is_total else ('pg-bottom' if bottom else '')
         row_attr = f' class="{row_cls}"' if row_cls else ''
         return f'<tr{row_attr}>{"".join(cells)}</tr>'
@@ -361,8 +356,9 @@ def render_progress_matrix(matrix):
     body_rows.append(render_row(matrix['total_row'], is_total=True))
 
     type_summary = " · ".join(f"{t} {matrix['type_totals'][t]:,}건" for t in PROGRESS_TYPES)
-    note = (f'<p class="pg-note"><span class="pg-note-swatch"></span>▼ 순위 하위 {k}개 지사 (연한 붉은 음영) · '
-            f'진척율 칸 색: 30% 미만 위험 · 55% 미만 주의 · 그 이상 양호</p>') if k else ""
+    note = ('<p class="pg-note">' + ('<span class="pg-note-swatch"></span>▼ 순위 하위 지사 (연한 붉은 음영) · ' if any_bottom else '')
+            + '순위: 진척율이 같으면 같은 순위, 100% 달성 지사는 하위에서 제외 · '
+            '진척율 칸 색: 30% 미만 위험 · 55% 미만 주의 · 그 이상 양호</p>')
 
     return f"""
     <p class="section-desc">활동대상구분 기준 이번 달 대상 건수 -- {type_summary}</p>
@@ -604,10 +600,9 @@ def render_branch_insights(insights, section_id="progressInsight"):
             <span class="insight-value"><strong>{_e(d['지사'])}</strong> -- {d['진척율']:.1f}% ({d['처리완료']:,}/{d['계']:,}건)</span>
         </div>"""
 
-    cards = [
-        card("전체 진척율 최고 지사", insights['best'], 'callout-good'),
-        card("전체 진척율 최저 지사 (집중관리 필요)", insights['worst'], 'callout-warning'),
-    ]
+    cards = [card("전체 진척율 최고 지사", insights['best'], 'callout-good')]
+    if insights['worst']:
+        cards.append(card("전체 진척율 최저 지사 (집중관리 필요)", insights['worst'], 'callout-warning'))
     type_labels = {'SP': 'SP 진척율 최저 지사', 'SE': 'SE 진척율 최저 지사', 'SG': 'SG 진척율 최저 지사'}
     for t in PROGRESS_TYPES:
         if t in insights['type_worst']:
@@ -2043,6 +2038,51 @@ function wireNudgeFilter() {
     applyNudgeFilter('');
 }
 document.addEventListener('DOMContentLoaded', wireNudgeFilter);
+
+// ===== 핵심 요약 표 엑셀 다운로드 -- 지금 화면의 표(필터 적용 상태)를 그대로. 머리글 병합(SP/SE/SG/전체)도 유지 =====
+function downloadProgressXlsx() {
+    const src = document.querySelector('#progressSection table.progress-table');
+    if (!src) { alert('핵심 요약 표가 없습니다.'); return; }
+    const table = src.cloneNode(true);
+    // 엑셀에서 숫자로 계산할 수 있게: 순위의 ▼ 표시는 떼고, 진척율은 % 서식, 건수는 천 단위 구분 서식
+    table.querySelectorAll('tbody td').forEach(td => {
+        if (td.classList.contains('progress-rank')) td.textContent = td.textContent.replace('▼', '').trim();
+        if (td.classList.contains('progress-cell')) td.setAttribute('data-z', '0.0%');
+        else if (td.classList.contains('cell-num')) td.setAttribute('data-z', '#,##0');
+    });
+    const d = new Date(), two = n => String(n).padStart(2, '0');
+    const name = '핵심요약_진척율_' + d.getFullYear() + two(d.getMonth() + 1) + two(d.getDate());
+    const filter = ((document.getElementById('navFilterSummary') || {}).textContent || '').trim();
+    const stamp = '기준: ' + d.toLocaleString('ko-KR') + (filter ? ' · 조건: ' + filter : '');
+    const asXlsx = () => {
+        const wb = XLSX.utils.table_to_book(table, { sheet: '핵심요약', raw: false });
+        const ws = wb.Sheets['핵심요약'];
+        XLSX.utils.sheet_add_aoa(ws, [[], [stamp]], { origin: -1 });
+        ws['!cols'] = [{ wch: 10 }].concat(Array.from({ length: 18 }, () => ({ wch: 9 })));
+        XLSX.writeFile(wb, name + '.xlsx');
+    };
+    // 엑셀 모듈을 못 불러오면(인터넷 없음) CSV로 -- 병합된 머리글은 칸 수만큼 빈칸으로 편다
+    const asCsv = () => {
+        const q = v => '"' + String(v).split('"').join('""') + '"';
+        const lines = Array.from(table.querySelectorAll('tr')).map(tr => Array.from(tr.children).map(c =>
+            [q(c.textContent.trim())].concat(Array.from({ length: (c.colSpan || 1) - 1 }, () => '""')).join(',')).join(','));
+        lines.push('', q(stamp));
+        const blob = new Blob([String.fromCharCode(0xFEFF) + lines.join(String.fromCharCode(13, 10))], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name + '.csv'; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    };
+    if (window.XLSX) { asXlsx(); return; }
+    const btn = document.getElementById('btnProgressXlsx');
+    if (btn) btn.disabled = true;
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    script.onload = () => { if (btn) btn.disabled = false; asXlsx(); };
+    script.onerror = () => { if (btn) btn.disabled = false; asCsv(); };
+    document.head.appendChild(script);
+}
+document.addEventListener('click', (e) => {
+    if (e.target.closest && e.target.closest('#btnProgressXlsx')) downloadProgressXlsx();
+});
 
 // ===== 섹션 메뉴: 상단 고정 높이 맞춤 / 클릭 이동(접힌 섹션은 펼침) / 현재 섹션 강조 =====
 function initDashNav() {
@@ -4541,9 +4581,7 @@ const DataIntelMapLib = (function () {
             row['전체'] = progressCellGeneric(sub.filter(r => PROGRESS_TYPES.includes(r['활동대상구분'])));
             return row;
         });
-        branchRows.map((r, i) => i)
-            .sort((a, b) => branchRows[b]['전체'].진척율 - branchRows[a]['전체'].진척율)
-            .forEach((idx, rank) => { branchRows[idx]['순위'] = rank + 1; });
+        rankProgressRows(branchRows);
 
         const totalRow = { 지사: '본부계' };
         totalRow.SP = progressCellSP(rows.filter(r => r['활동대상구분'] === 'SP'));
@@ -4572,18 +4610,36 @@ const DataIntelMapLib = (function () {
         });
         return charts;
     }
+    // analytics.py rank_progress_rows와 같은 규칙: 같은 진척율(표에 보이는 소수 첫째 자리) = 같은 순위,
+    // 대상 없는 지사는 순위 없음, 100% 달성·공동 1위는 '하위'(붉은 음영)가 아니다.
+    function rankProgressRows(branchRows) {
+        const shown = r => Number(r['전체'].진척율.toFixed(1));
+        const ranked = branchRows.filter(r => r['전체'].계 > 0);
+        branchRows.forEach(r => { r['순위'] = null; r['하위'] = false; });
+        ranked.forEach(r => { r['순위'] = 1 + ranked.filter(o => shown(o) > shown(r)).length; });
+        const k = Math.min(4, Math.floor(ranked.length / 2));
+        if (k) {
+            const threshold = ranked.map(shown).sort((a, b) => a - b)[k - 1];
+            ranked.forEach(r => { r['하위'] = shown(r) <= threshold && shown(r) < 100 && r['순위'] !== 1; });
+        }
+    }
     function buildBranchInsightsJS(matrix) {
         if (!matrix || !matrix.branch_rows.length) return null;
         const rows = matrix.branch_rows;
         const summarize = (r, t) => ({ 지사: r['지사'], 진척율: r[t].진척율, 처리완료: r[t].처리완료, 계: r[t].계 });
         const best = rows.reduce((a, b) => b['전체'].진척율 > a['전체'].진척율 ? b : a);
         const worst = rows.reduce((a, b) => b['전체'].진척율 < a['전체'].진척율 ? b : a);
+        // '최저 지사(집중관리 필요)'는 실제로 뒤처진 지사가 있을 때만: 100% 달성했거나 전 지사가 같은 값이면 없다
+        const lagging = (low, high) => low < 100 && low.toFixed(1) !== high.toFixed(1);
         const typeWorst = {};
         PROGRESS_TYPES.forEach(t => {
             const eligible = rows.filter(r => r[t].계 > 0);
-            if (eligible.length) typeWorst[t] = summarize(eligible.reduce((a, b) => b[t].진척율 < a[t].진척율 ? b : a), t);
+            if (!eligible.length) return;
+            const low = eligible.reduce((a, b) => b[t].진척율 < a[t].진척율 ? b : a);
+            if (lagging(low[t].진척율, Math.max(...eligible.map(r => r[t].진척율)))) typeWorst[t] = summarize(low, t);
         });
-        return { avg_pct: matrix.total_row['전체'].진척율, best: summarize(best, '전체'), worst: summarize(worst, '전체'), type_worst: typeWorst };
+        return { avg_pct: matrix.total_row['전체'].진척율, best: summarize(best, '전체'),
+                 worst: lagging(worst['전체'].진척율, best['전체'].진척율) ? summarize(worst, '전체') : null, type_worst: typeWorst };
     }
     function barRowEl(it, role) {
         const pct = Math.max(0, Math.min(100, it.value));
@@ -4662,7 +4718,7 @@ const DataIntelMapLib = (function () {
             return box;
         }
         grid.appendChild(card('전체 진척율 최고 지사', insights.best, 'callout-good'));
-        grid.appendChild(card('전체 진척율 최저 지사 (집중관리 필요)', insights.worst, 'callout-warning'));
+        if (insights.worst) grid.appendChild(card('전체 진척율 최저 지사 (집중관리 필요)', insights.worst, 'callout-warning'));
         const typeLabels = { SP: 'SP 진척율 최저 지사', SE: 'SE 진척율 최저 지사', SG: 'SG 진척율 최저 지사' };
         PROGRESS_TYPES.forEach(t => {
             if (insights.type_worst[t]) grid.appendChild(card(typeLabels[t], insights.type_worst[t], 'callout-warning'));
@@ -5948,9 +6004,8 @@ const DataIntelMapLib = (function () {
         SG: ['처리완료', '미처리', '계', '진척율'],
         '전체': ['처리완료', '미처리', '계', '진척율', '순위'],
     };
-    const pgBottomCount = n => Math.min(4, Math.floor(n / 2));
-    function progressRowEl(row, isTotal, n, k) {
-        const bottom = !isTotal && k > 0 && row['순위'] > n - k;
+    function progressRowEl(row, isTotal) {
+        const bottom = !isTotal && !!row['하위'];
         const tr = document.createElement('tr');
         if (isTotal) tr.className = 'progress-total-row'; else if (bottom) tr.className = 'pg-bottom';
         tr.appendChild(mkEl('td', 'progress-branch' + (isTotal ? ' progress-total-label' : ''), row['지사']));
@@ -5965,9 +6020,9 @@ const DataIntelMapLib = (function () {
         if (isTotal) tr.appendChild(mkEl('td', 'cell-num', '-'));
         else if (bottom) {
             const td = mkEl('td', 'cell-num progress-rank pg-rank-bottom', '▼ ' + row['순위']);
-            td.title = '순위 하위 ' + k + '개';
+            td.title = '순위 하위';
             tr.appendChild(td);
-        } else tr.appendChild(mkEl('td', 'cell-num progress-rank', String(row['순위'])));
+        } else tr.appendChild(mkEl('td', 'cell-num progress-rank', row['순위'] === null || row['순위'] === undefined ? '-' : String(row['순위'])));
         return tr;
     }
     function renderProgressSectionEl(containerEl, matrix) {
@@ -5993,19 +6048,18 @@ const DataIntelMapLib = (function () {
         thead.appendChild(groupTr); thead.appendChild(subTr);
         table.appendChild(thead);
 
-        const n = matrix.branch_rows.length, k = pgBottomCount(n);
         const tbody = document.createElement('tbody');
-        matrix.branch_rows.forEach(r => tbody.appendChild(progressRowEl(r, false, n, k)));
-        tbody.appendChild(progressRowEl(matrix.total_row, true, n, k));
+        matrix.branch_rows.forEach(r => tbody.appendChild(progressRowEl(r, false)));
+        tbody.appendChild(progressRowEl(matrix.total_row, true));
         table.appendChild(tbody);
         scrollDiv.appendChild(table);
         containerEl.appendChild(scrollDiv);
-        if (k) {
-            const note = mkEl('p', 'pg-note');
-            note.appendChild(mkEl('span', 'pg-note-swatch'));
-            note.appendChild(document.createTextNode('▼ 순위 하위 ' + k + '개 지사 (연한 붉은 음영) · 진척율 칸 색: 30% 미만 위험 · 55% 미만 주의 · 그 이상 양호'));
-            containerEl.appendChild(note);
-        }
+        const note = mkEl('p', 'pg-note');
+        const anyBottom = matrix.branch_rows.some(r => r['하위']);
+        if (anyBottom) note.appendChild(mkEl('span', 'pg-note-swatch'));
+        note.appendChild(document.createTextNode((anyBottom ? '▼ 순위 하위 지사 (연한 붉은 음영) · ' : '')
+            + '순위: 진척율이 같으면 같은 순위, 100% 달성 지사는 하위에서 제외 · 진척율 칸 색: 30% 미만 위험 · 55% 미만 주의 · 그 이상 양호'));
+        containerEl.appendChild(note);
 
         const legend = mkEl('div', 'legend-grid progress-chart-legend');
         PROGRESS_TYPES.forEach(t => {
@@ -6801,6 +6855,7 @@ def render_dashboard_sections(p):
         <summary class="section-title">📊 핵심 요약 <span class="sec-hint">활동 처리율 · 지사별 진척율 (보고서 상단 표)</span></summary>
         <div id="overviewTiles"></div>
         <div id="progressInsightWrap">{g("branch_insights")}</div>
+        <button type="button" id="btnProgressXlsx" class="export-btn" title="지금 보이는 핵심 요약 표(필터 적용 상태)를 엑셀 파일로 저장합니다">📥 핵심 요약 엑셀 다운로드</button>
         <div class="table-section" id="progressSection">{g("progress_table")}{g("progress_chart")}</div>
         <details class="subsection-collapse">
         <summary class="subsection-title">유형별 지사 순위 (SP / SE / SG)</summary>

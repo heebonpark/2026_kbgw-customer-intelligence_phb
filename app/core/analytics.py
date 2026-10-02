@@ -260,9 +260,7 @@ def build_progress_matrix(df):
         row['전체'] = overall
         branch_rows.append(row)
 
-    ranked_idx = sorted(range(len(branch_rows)), key=lambda i: -branch_rows[i]['전체']['진척율'])
-    for rank, idx in enumerate(ranked_idx, start=1):
-        branch_rows[idx]['순위'] = rank
+    rank_progress_rows(branch_rows)
 
     total_row = {"지사": "본부계"}
     total_row['SP'] = _cell_sp(work[work['활동대상구분'] == 'SP'])
@@ -274,6 +272,30 @@ def build_progress_matrix(df):
     type_totals = {t: total_row[t]['계'] for t in PROGRESS_TYPES}
 
     return {"branch_rows": branch_rows, "total_row": total_row, "type_totals": type_totals}
+
+
+PROGRESS_BOTTOM_MAX = 4  # 하위로 강조할 지사 수: 8개 지사면 4개, 적으면 절반
+
+
+def rank_progress_rows(branch_rows):
+    """전체 진척율로 '순위'와 '하위'(붉은 음영 여부)를 매긴다. report.py JS의 rankProgressRows와 같은 규칙.
+
+    - 진척율이 같으면 같은 순위 (1, 1, 3 ...). 표에 보이는 소수 첫째 자리로 비교한다 -- 화면에 같은
+      숫자로 보이는 두 지사의 순위가 갈리지 않게.
+    - 대상이 없는 지사(계 0)는 순위 없음.
+    - 하위: 낮은 쪽에서 세어 k번째 지사의 진척율 이하 (같은 값은 함께). 100% 달성 지사와 공동 1위는
+      하위가 아니다 -- 전 지사가 100%인데 아래쪽 절반을 '하위'로 칠하지 않는다."""
+    shown = lambda r: float(f"{r['전체']['진척율']:.1f}")
+    ranked = [r for r in branch_rows if r['전체']['계'] > 0]
+    for r in branch_rows:
+        r['순위'], r['하위'] = None, False
+    for r in ranked:
+        r['순위'] = 1 + sum(1 for o in ranked if shown(o) > shown(r))
+    k = min(PROGRESS_BOTTOM_MAX, len(ranked) // 2)
+    if k:
+        threshold = sorted(shown(r) for r in ranked)[k - 1]
+        for r in ranked:
+            r['하위'] = shown(r) <= threshold and shown(r) < 100 and r['순위'] != 1
 
 
 def build_progress_type_charts(matrix):
@@ -386,17 +408,21 @@ def build_branch_insights(matrix):
 
     best = max(rows, key=lambda r: r['전체']['진척율'])
     worst = min(rows, key=lambda r: r['전체']['진척율'])
+    # '최저 지사(집중관리 필요)'는 실제로 뒤처진 지사가 있을 때만: 100% 달성했거나 전 지사가 같은 값이면 없다
+    lagging = lambda low, high: low < 100 and f"{low:.1f}" != f"{high:.1f}"
 
     type_worst = {}
     for t in PROGRESS_TYPES:
         eligible = [r for r in rows if r[t]['계'] > 0]
         if eligible:
-            type_worst[t] = _summarize(min(eligible, key=lambda r: r[t]['진척율']), t)
+            low = min(eligible, key=lambda r: r[t]['진척율'])
+            if lagging(low[t]['진척율'], max(r[t]['진척율'] for r in eligible)):
+                type_worst[t] = _summarize(low, t)
 
     return {
         "avg_pct": matrix['total_row']['전체']['진척율'],
         "best": _summarize(best, '전체'),
-        "worst": _summarize(worst, '전체'),
+        "worst": _summarize(worst, '전체') if lagging(worst['전체']['진척율'], best['전체']['진척율']) else None,
         "type_worst": type_worst,
     }
 
