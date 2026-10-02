@@ -1504,9 +1504,11 @@ body {
 .core-state.s-미접수::before { background: var(--critical); }
 .core-state.s-미처리::before { background: var(--text-muted); }
 /* 방문 조치결과 등록 / 관리자 실시간 현황 */
-#visitPanel:empty { display: none; }
-#visitPanel { margin-bottom: 16px; }
-#visitPanel > .chart-card { margin-top: 12px; }
+#visitPanel:empty, .visit-host:empty { display: none; }
+#visitPanel, .visit-host { margin-bottom: 16px; }
+#visitPanel > .chart-card, .visit-host > .chart-card { margin-top: 12px; }
+.visit-host .stat-grid { margin-bottom: 0; }
+.cust-pop .visit-pop { margin: 4px 0 2px; }
 .visit-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 18px 0 10px; }
 .visit-head .core-block-title { margin: 0; }
 .visit-status { font-size: 12px; color: var(--text-muted); margin-right: auto; font-variant-numeric: tabular-nums; }
@@ -3248,6 +3250,8 @@ const DataIntelMapLib = (function () {
         visit.busy = false;
         visitIndex();
         visitPanel();
+        renderVisitHosts();
+        visit.fresh = new Set();
         if (!document.querySelector('.visit-modal')) fillTable();
     }
     async function visitStart(pwd) {
@@ -3257,6 +3261,7 @@ const DataIntelMapLib = (function () {
             try { visit.token = await visitDecryptAdmin(pwd); visit.admin = true; } catch (e) { /* 관리자 토큰을 못 풀면 일반 등록자로 */ }
         }
         visitPanel();
+        renderVisitHosts();
         visitLoad();
         setInterval(() => { if (document.visibilityState === 'visible') visitLoad(); }, visit.admin ? 20000 : 60000);
         window.addEventListener('online', visitLoad);
@@ -3273,13 +3278,15 @@ const DataIntelMapLib = (function () {
     }
 
     // 등록 창
-    function visitForm(r) {
+    // target: { key(계약번호 등), name(고객명), branch(지사) } -- 코어고객 표·지도와 관리고객 지도가 같이 쓴다
+    const coreTarget = r => ({ key: visitKey(r), name: r.관리고객명 || '', branch: r.지사 || '' });
+    function visitForm(target) {
         const old = document.querySelector('.visit-modal');
         if (old) old.remove();
         const back = el('div', 'visit-modal');
         const box = el('form', 'visit-form');
         box.appendChild(el('h3', 'visit-form-title', '방문 조치결과 등록'));
-        box.appendChild(el('div', 'visit-form-who', (r.관리고객명 || '-') + ' · ' + r.지사 + (r.계약번호 ? ' · 계약 ' + r.계약번호 : '')));
+        box.appendChild(el('div', 'visit-form-who', [target.name || '-', target.branch, target.key && target.key !== target.name ? '계약 ' + target.key : ''].filter(Boolean).join(' · ')));
         const field = (label, node) => { const l = el('label', 'visit-field'); l.appendChild(el('span', null, label)); l.appendChild(node); box.appendChild(l); return node; };
         const picks = el('div', 'visit-picks');
         let chosen = '방문완료';
@@ -3302,7 +3309,7 @@ const DataIntelMapLib = (function () {
             const author = who.value.trim();
             if (!author) { msg.textContent = '등록자 이름을 입력하세요.'; who.focus(); return; }
             store.set('dim-visit-author', author);
-            const body = { p_contract_no: visitKey(r), p_customer_name: r.관리고객명 || null, p_branch: r.지사 || null, p_result: chosen,
+            const body = { p_contract_no: String(target.key), p_customer_name: target.name || null, p_branch: target.branch || null, p_result: chosen,
                 p_note: note.value.trim() || null, p_visited_on: date.value || todayIso(), p_author: author };
             save.disabled = true; msg.textContent = '등록 중...';
             try {
@@ -3338,38 +3345,39 @@ const DataIntelMapLib = (function () {
     }
     function visitAddButton(r, label) {
         const b = el('button', 'pending-map-link visit-add', label || '📝 조치결과 등록'); b.type = 'button';
-        b.addEventListener('click', e => { e.stopPropagation(); visitForm(r); });
+        b.addEventListener('click', e => { e.stopPropagation(); visitForm(coreTarget(r)); });
         return b;
     }
-    function visitCsv() {
+    function visitCsv(rows, label) {
         const head = ['등록일시', '방문일', '지사', '관리고객명', '계약번호', '결과', '내용', '등록자'];
         const q = v => '"' + String(v === null || v === undefined ? '' : v).split('"').join('""') + '"';
-        const lines = [head.map(q).join(',')].concat(visit.rows.map(v => [visitWhen(v.created_at), v.visited_on, v.branch, v.customer_name, v.contract_no, VISIT_LABEL[v.result] || v.result, v.note, v.author].map(q).join(',')));
+        const lines = [head.map(q).join(',')].concat(rows.map(v => [visitWhen(v.created_at), v.visited_on, v.branch, v.customer_name, v.contract_no, VISIT_LABEL[v.result] || v.result, v.note, v.author].map(q).join(',')));
         const blob = new Blob([String.fromCharCode(0xFEFF) + lines.join(String.fromCharCode(13, 10))], { type: 'text/csv;charset=utf-8' });
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '방문조치결과_' + todayIso() + '.csv'; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = '방문조치결과_' + label + '_' + todayIso() + '.csv'; a.click();
         setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     }
-    // 요약 아래 칸: 관리자 = 실시간 현황, 일반 = 등록 안내 + 내 등록 내역
-    function visitPanel() {
-        const box = document.getElementById('visitPanel');
-        if (!box || !visitCfg || !payload) return;
+    // 현황 칸: 관리자 = 실시간 현황, 일반 = 등록 안내 + 내 등록 내역.
+    // ctx: { keys(이 화면의 고객 계약번호 Set), label('코어고객' 등), guide(등록 방법 안내), focus(v) -> 눌렀을 때 열 대상의 번호 또는 null }
+    // 코어고객 섹션과 관리고객 '지도로 보기'가 각각 자기 고객의 등록만 보여 준다 (저장소는 같다).
+    function renderVisitPanel(box, ctx) {
+        if (!box || !visitCfg) return;
         box.textContent = '';
         if (!visit.started) return;
-        const rows = visit.rows, queued = visitQueue().length;
+        const rows = visit.rows.filter(v => ctx.keys.has(v.contract_no)), queued = visitQueue().length;
         const head = el('div', 'visit-head');
-        head.appendChild(el('h3', 'core-block-title', visit.admin ? '방문 조치결과 실시간 현황' : '방문 조치결과 등록'));
+        head.appendChild(el('h3', 'core-block-title', (visit.admin ? '방문 조치결과 실시간 현황' : '방문 조치결과 등록') + ' · ' + ctx.label));
         if (visit.admin) head.appendChild(el('span', 'badge', '관리자'));
         const status = el('span', 'visit-status', visit.error ? '⚠ ' + visit.error
             : visit.at ? '갱신 ' + visit.at.toLocaleTimeString('en-GB') + (visit.admin ? ' · 20초마다 자동' : '') : '불러오는 중...');
         head.appendChild(status);
         if (queued) head.appendChild(el('span', 'visit-status visit-queued', '전송 대기 ' + queued + '건 (연결되면 자동 전송)'));
         const refresh = el('button', 'filter-pill', '🔄 새로고침'); refresh.type = 'button'; refresh.addEventListener('click', visitLoad); head.appendChild(refresh);
-        if (visit.admin && rows.length) { const c = el('button', 'filter-pill', '📥 CSV 저장'); c.type = 'button'; c.addEventListener('click', visitCsv); head.appendChild(c); }
+        if (visit.admin && rows.length) { const c = el('button', 'filter-pill', '📥 CSV 저장'); c.type = 'button'; c.addEventListener('click', () => visitCsv(rows, ctx.label)); head.appendChild(c); }
         box.appendChild(head);
 
         if (!visit.admin) {
             const guide = el('div', 'visit-guide');
-            guide.appendChild(el('span', null, '지도의 마커나 아래 표의 고객을 열고 "조치결과 등록"을 누르세요. 등록한 내용은 관리자가 바로 봅니다.'));
+            guide.appendChild(el('span', null, ctx.guide + ' 등록한 내용은 관리자가 바로 봅니다.'));
             const name = el('input', 'filter-input visit-name'); name.type = 'text'; name.maxLength = 40; name.placeholder = '등록자 이름'; name.value = visitAuthor();
             name.setAttribute('aria-label', '등록자 이름');
             name.addEventListener('change', () => { store.set('dim-visit-author', name.value.trim()); visitLoad(); });
@@ -3382,8 +3390,8 @@ const DataIntelMapLib = (function () {
         const customers = new Set(rows.map(v => v.contract_no));
         const grid = el('div', 'stat-grid');
         grid.appendChild(tile(visit.admin ? '오늘 등록' : '오늘 내가 등록', rows.filter(isToday).length + '건', '전체 ' + rows.length + '건'));
-        grid.appendChild(tile('등록된 고객', customers.size + '곳', visit.admin ? '코어고객 ' + payload.rows.length + '곳 중 ' + pct(payload.rows.filter(r => customers.has(visitKey(r))).length, payload.rows.length) + '%' : '내가 등록한 고객',
-            visit.admin ? pct(payload.rows.filter(r => customers.has(visitKey(r))).length, payload.rows.length) : null));
+        grid.appendChild(tile('등록된 고객', customers.size + '곳', visit.admin ? ctx.label + ' ' + int(ctx.keys.size) + '곳 중 ' + pct(customers.size, ctx.keys.size) + '%' : '내가 등록한 고객',
+            visit.admin ? pct(customers.size, ctx.keys.size) : null));
         grid.appendChild(tile('해지징후 · 재방문 필요', rows.filter(v => v.result === '해지징후').length + ' · ' + rows.filter(v => v.result === '재방문필요').length + '건', '부재 ' + rows.filter(v => v.result === '부재').length + '건'));
         if (visit.admin) grid.appendChild(tile('등록자', new Set(rows.map(v => v.author)).size + '명', '최근: ' + (rows[0] ? rows[0].author + ' ' + visitWhen(rows[0].created_at) : '-')));
         box.appendChild(grid);
@@ -3405,14 +3413,14 @@ const DataIntelMapLib = (function () {
             cols.appendChild(groupCard('지사별 등록', '결과별 건수', v => v.branch || '미지정', keys => keys.sort((a, b) => branchRank(a) - branchRank(b))));
             cols.appendChild(groupCard('등록자별', '등록이 많은 순 10명', v => v.author, null));
         }
-        const feed = card(visit.admin ? '최근 등록' : '내 등록 내역', '고객명을 누르면 아래 표에서 그 고객을 엽니다' + (visit.admin ? ' · 새로 들어온 등록은 파랗게 표시' : ''));
+        const feed = card(visit.admin ? '최근 등록' : '내 등록 내역', [ctx.focus ? '고객명을 누르면 아래 표에서 그 고객을 엽니다' : '', visit.admin ? '새로 들어온 등록은 파랗게 표시' : ''].filter(Boolean).join(' · '));
         const list = el('div', 'visit-feed');
         rows.slice(0, 40).forEach(v => {
             const row = el('div', 'visit-feed-row' + (visit.fresh.has(v.id) ? ' is-new' : ''));
             row.appendChild(el('span', 'visit-feed-time', visitWhen(v.created_at)));
-            const target = payload.rows.find(r => visitKey(r) === v.contract_no);
-            const name = el(target ? 'button' : 'span', 'visit-feed-name', (v.branch ? v.branch + ' · ' : '') + (v.customer_name || v.contract_no));
-            if (target) { name.type = 'button'; name.dataset.coreFocus = target._i; }
+            const target = ctx.focus ? ctx.focus(v) : null;
+            const name = el(target !== null ? 'button' : 'span', 'visit-feed-name', (v.branch ? v.branch + ' · ' : '') + (v.customer_name || v.contract_no));
+            if (target !== null) { name.type = 'button'; name.dataset.coreFocus = target; }
             row.appendChild(name);
             row.appendChild(visitChip(v.result));
             row.appendChild(el('span', 'visit-feed-note', v.note || ''));
@@ -3430,8 +3438,25 @@ const DataIntelMapLib = (function () {
         feed.appendChild(list);
         if (cols.firstChild) box.appendChild(cols);
         box.appendChild(feed);  // 최근 등록은 내용이 길어 한 줄 전체를 쓴다
-        visit.fresh = new Set();
     }
+    // 코어고객 섹션의 현황 칸
+    function visitPanel() {
+        if (!payload) return;
+        renderVisitPanel(document.getElementById('visitPanel'), {
+            keys: new Set(payload.rows.map(visitKey)), label: '코어고객',
+            guide: '지도의 마커나 아래 표의 고객을 열고 "조치결과 등록"을 누르세요.',
+            focus: v => { const r = payload.rows.find(x => visitKey(x) === v.contract_no); return r ? r._i : null; } });
+    }
+    // 다른 화면(관리고객 '지도로 보기')이 같은 등록 기능을 쓰는 입구
+    const visitHosts = [];
+    const renderVisitHosts = () => visitHosts.forEach(([getBox, getCtx]) => { const b = getBox(); if (b) renderVisitPanel(b, getCtx()); });
+    window.DataIntelVisit = {
+        enabled: !!visitCfg,
+        latest: key => visit.by.get(String(key)) || [],
+        chip: visitChip,
+        form: target => visitForm(target),
+        attach: (getBox, getCtx) => { visitHosts.push([getBox, getCtx]); renderVisitHosts(); },
+    };
 
     function render() {
         const wrap = document.getElementById('coreSectionWrap');
@@ -6278,6 +6303,19 @@ const DataIntelMapLib = (function () {
             const zone = mapZone(r), own = mapOwner(r), fee = mapWon(r['월정료']);
             item.appendChild(mkEl('div', 'core-pop-line', [mapBranch(r), zone ? '구역 ' + zone : '', own ? '담당 ' + own : '', fee ? '월정료 ' + fee : ''].filter(Boolean).join(' · ')));
             if (mapText(r['세부활동내역'])) item.appendChild(mkEl('div', 'core-pop-note', mapText(r['세부활동내역'])));
+            // 방문 조치결과 등록 (코어고객과 같은 저장소) -- 연결 코드가 실린 리포트에서만
+            if (window.DataIntelVisit && DataIntelVisit.enabled) {
+                const key = mapText(r['계약번호']) || mapName(r), seen = DataIntelVisit.latest(key);
+                const line = mkEl('div', 'visit-pop');
+                if (seen.length) {
+                    line.appendChild(DataIntelVisit.chip(seen[0].result));
+                    line.appendChild(document.createTextNode(' ' + seen[0].visited_on + ' · ' + seen[0].author + (seen.length > 1 ? ' 외 ' + (seen.length - 1) + '건' : '')));
+                }
+                const add = mkEl('button', 'pending-map-link visit-add', '📝 결과 등록'); add.type = 'button';
+                add.addEventListener('click', e => { e.stopPropagation(); DataIntelVisit.form({ key, name: mapName(r), branch: mapBranch(r) }); });
+                line.appendChild(add);
+                item.appendChild(line);
+            }
             // 전체 컬럼 -- 값이 있는 열만
             const det = document.createElement('details');
             det.className = 'cust-pop-all';
@@ -6359,6 +6397,12 @@ const DataIntelMapLib = (function () {
         if (navLink) navLink.hidden = !show;
         if (!show) return;
         if (!wrap.firstChild) {
+            if (window.DataIntelVisit && DataIntelVisit.enabled) {
+                const v = mkEl('div', 'visit-host'); v.id = 'custVisitPanel'; wrap.appendChild(v);
+                DataIntelVisit.attach(() => document.getElementById('custVisitPanel'), () => ({
+                    keys: new Set(latestMergedRows.map(r => mapText(r['계약번호']) || mapName(r))), label: '관리고객',
+                    guide: '"지도로 보기"에서 마커를 누르고 "결과 등록"을 누르세요.', focus: null }));
+            }
             const c = mkEl('div'); c.id = 'custMapControls'; wrap.appendChild(c);
             const b = mkEl('div', 'core-map cust-map'); b.id = 'custMapBox'; b.hidden = true; wrap.appendChild(b);
         }
@@ -6928,7 +6972,8 @@ def render_dashboard_sections(p):
 def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
                           cancelled_facility_df=None, raw_files=None, matching_config=None,
                           password=None, admin_password=None, expiry_date=None, encrypt=True,
-                          eda_link=False, core_df=None, core_voc_df=None, kakao_key=None, kakao_js_key=None, log=print):
+                          eda_link=False, core_df=None, core_voc_df=None, kakao_key=None, kakao_js_key=None,
+                          visit_sync=None, log=print):
     """Generates the password-protected HTML dashboard report.
 
     df: already-merged 총괄DB dataframe (server-rendered initial dashboard).
@@ -6959,6 +7004,9 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
     core_df / core_voc_df: 9. 코어고객 활동관리 (+ 9-1 VOC매칭) -- independent
         section with a 설치주소 map (see core_customers.py). kakao_key: Kakao
         REST key for geocoding; None -> this PC's saved key.
+    visit_sync: 방문 조치결과 등록 연결 (visit_sync.py). None -> this PC's saved
+        connection; with one, markers in 지도로 보기 and the core section get
+        조치결과 등록 and the admin sees the live view.
     kakao_js_key: Kakao JavaScript key -- map background becomes 카카오맵 (see
         render_map_config). None -> this PC's saved key.
     eda_link: show the '딥 다이브 EDA' button, which opens a sibling
@@ -7035,6 +7083,17 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
         geo, geo_note = geocode_addresses(df['설치주소'], kakao_key or load_kakao_key(), log=log)
         geo_json = (f'<script type="application/json" id="geoData" data-note="{_e(geo_note or "")}">'
                     + json.dumps(geo, ensure_ascii=False, separators=(',', ':')).replace('<', '\\u003c') + '</script>')
+    # 방문 조치결과 등록: 지도(관리고객·코어고객)가 있고 이 PC에 연결 코드가 있을 때만
+    visit_json = ""
+    if geo_json or core_json:
+        if visit_sync is None:
+            from .visit_sync import load_visit_sync
+            visit_sync = load_visit_sync()
+        if visit_sync:
+            from .visit_sync import report_config
+            visit_json = ('<script type="application/json" id="visitConfig">'
+                          + json.dumps(report_config(visit_sync, admin_password if admin_password != password else None))
+                          .replace('<', '\\u003c') + '</script>')
     dash_nav_html = render_dashboard_nav(
         extra_items=[('secCancel', '⚠️ 해지')] if (cancel_section_html or nudge_section_html) else [])
     dash_sections_html = render_dashboard_sections({
@@ -7095,6 +7154,7 @@ def generate_html_report(df, voc_df=None, patrol_df=None, cancel_df=None,
 
 {embedded_script}
 {render_map_config(kakao_js_key) if (geo_json or core_json) else ""}
+{visit_json}
 <script>{script}</script>
 </body>
 </html>"""
